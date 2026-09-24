@@ -609,6 +609,29 @@ sealed interface TodayUiState {
 
 **验收**:主题三选一切换即时生效;`CostChip` 被 `CostMeter` 替换后,条目详情和推荐卡都能看到成本图形;**全项目 0 处硬编码中文字面量**(用自定义 lint 规则卡住)。
 
+### P1 执行记录(2026-09-24 已完成)
+
+| 项 | 结果 |
+|---|---|
+| 1 `ui/theme/` 拆分 | 新增 `Color/Type/Shape/Spacing/Lens/Motion.kt`,`Theme.kt` 只做装配 |
+| 2 色槽补齐 | 品牌绿完整 tonal palette,补 `surfaceContainer*` / `surfaceDim` / `surfaceBright` / `inverse*` / `outlineVariant` / `scrim` |
+| 3 `LensColors` | `LensColors` + `LocalLensColors` + `lensIcon`(盾/¥/时钟/警示三角);口径色刻意不跟随壁纸 |
+| 4 中文排版 | 6 个档位,行高给到 1.6~1.75;日期改 `DateTimeFormatter.ofLocalizedDate`(跟随系统 locale) |
+| 5 形状 | 回到 M3 尺度 4/8/12/16/28,让形状承担层级 |
+| 6 间距 | `Spacing` 单一阶梯,各屏的字面量已替换 |
+| 7 主题容器 | `MaterialExpressiveTheme` + `MotionScheme.expressive()`(alpha28 已毕业,**无需 `@OptIn`**) |
+| 8 主题三选一 | 品牌绿/跟随壁纸/深色优先,DataStore 持久化,`MainActivity` 订阅后切换即时生效 |
+| 9 `strings.xml` | 全部 UI 文案已抽取;新增 `data/EntryKeys` 把 entries.json 的机器可读 key 抽成常量 |
+| 10 `CostMeter` | 组件 + `CostMeterModel` 纯逻辑 + 5 例单测;条目详情与今日推荐卡已使用,`CostChips` 已删除 |
+
+**实际做法与本文的偏差 / 留待后续**
+
+1. **「自定义 lint 规则」改用 JVM 单测 `UiNoChineseLiteralTest` 等价实现** —— 不新增 lint-api 模块、不与 AGP 版本耦合,直接跑在现有 `testDebugUnitTest` 里,违规即失败。只扫 `com/betterlife/app/ui/`;`ai`(提示词)/`recommend`/`data` 里的中文不是 UI 文案。
+2. **间距字面量** —— 界面级已全部走 `Spacing`;**组件内部几何**(徽标内边距、`CostMeter` 的格子尺寸与 2dp 间隙)保留字面量,因为它们是组件尺寸而非「间距」,未纳入 token。
+3. **截图测试** —— 按本文 §8 属 P3(需 androidTest 依赖),P1 只落单测。
+4. **P0 遗留的 9 处 `ListItem(headlineContent=)` 弃用未迁移** —— 迁移会改视觉,属 P2「表达性 ListItem」。
+5. `material-icons-extended` 已启用(P1-1 引入),用于口径图标;R8 会在 release 里裁掉未用到的图标。
+
 ### P2 · 组件替换(按屏拆 PR)
 
 顺序按"用户价值 / 改动风险"排序:
