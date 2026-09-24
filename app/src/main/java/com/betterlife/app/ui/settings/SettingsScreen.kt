@@ -1,4 +1,7 @@
-// 设置页:AI 服务商/API Key、每日提醒(含通知权限)、主题、档案入口、关于与免责
+// 设置页:AI 服务商/API Key(含连接自检)、每日提醒、主题、档案入口、关于与免责
+//
+// 分组用表达性分段 ListItem 连成一组,不再靠 HorizontalDivider 划线;
+// 输入框走 rememberSaveable,旋转设备不丢已经敲进去的内容。
 package com.betterlife.app.ui.settings
 
 import android.Manifest
@@ -6,8 +9,10 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,30 +20,38 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -47,16 +60,21 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -81,36 +99,38 @@ fun SettingsScreen(
     onEditProfile: () -> Unit,
     vm: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
 ) {
-    val settings by vm.settings.collectAsStateWithLifecycle()
+    val state by vm.uiState.collectAsStateWithLifecycle()
+    val settings = state.settings
     val currentThemeMode = ThemeMode.fromKey(settings.themeMode)
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
+    val uriHandler = LocalUriHandler.current
 
     val customLabel = stringResource(R.string.settings_custom)
     val savedMessage = stringResource(R.string.settings_saved)
-    // 预设:核心层两个 + 自定义
     val presets = remember(vm.presets) {
         vm.presets.map { PresetOption(it.label, it.baseUrl, it.model) } +
             PresetOption("", "", "", isCustom = true)
     }
     val presetLabels = presets.map { if (it.isCustom) customLabel else it.label }
 
-    var baseUrl by remember { mutableStateOf("") }
-    var apiKey by remember { mutableStateOf("") }
-    var model by remember { mutableStateOf("") }
-    var userTouched by remember { mutableStateOf(false) }
-    var emissions by remember { mutableIntStateOf(0) }
-    // 跳过 ViewModel 的默认首发值,第二次发射才是 DataStore 里的真实配置
-    LaunchedEffect(settings) {
-        emissions++
-        if (!userTouched && emissions >= 2) {
+    var baseUrl by rememberSaveable { mutableStateOf("") }
+    var apiKey by rememberSaveable { mutableStateOf("") }
+    var model by rememberSaveable { mutableStateOf("") }
+    var initialized by rememberSaveable { mutableStateOf(false) }
+    // 只在真实配置读出来之后填一次表单,之后完全交给用户
+    LaunchedEffect(state.loaded) {
+        if (state.loaded && !initialized) {
             baseUrl = settings.apiBaseUrl
             apiKey = settings.apiKey
             model = settings.apiModel
+            initialized = true
         }
     }
 
     var showTimePicker by remember { mutableStateOf(false) }
+    var keyVisible by rememberSaveable { mutableStateOf(false) }
 
     val enableReminder: (Boolean) -> Unit = { enabled ->
         vm.setReminder(enabled, settings.reminderHour, settings.reminderMinute)
@@ -133,6 +153,14 @@ fun SettingsScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+        if (!state.loaded) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.Center,
+            ) { CircularProgressIndicator() }
+            return@Scaffold
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -163,7 +191,6 @@ fun SettingsScreen(
                             text = { Text(presetLabels[index]) },
                             onClick = {
                                 expanded = false
-                                userTouched = true
                                 if (!preset.isCustom) {
                                     baseUrl = preset.baseUrl
                                     model = preset.model
@@ -176,109 +203,156 @@ fun SettingsScreen(
 
             OutlinedTextField(
                 value = apiKey,
-                onValueChange = { userTouched = true; apiKey = it },
+                onValueChange = { apiKey = it },
                 label = { Text(stringResource(R.string.settings_api_key)) },
                 singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (keyVisible) VisualTransformation.None
+                else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { keyVisible = !keyVisible }) {
+                        Icon(
+                            imageVector = if (keyVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            contentDescription = stringResource(
+                                if (keyVisible) R.string.settings_api_key_hide else R.string.settings_api_key_show,
+                            ),
+                        )
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = baseUrl,
-                onValueChange = { userTouched = true; baseUrl = it },
+                onValueChange = { baseUrl = it },
                 label = { Text(stringResource(R.string.settings_base_url)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = model,
-                onValueChange = { userTouched = true; model = it },
+                onValueChange = { model = it },
                 label = { Text(stringResource(R.string.settings_model)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Button(
-                onClick = {
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Button(onClick = {
                     vm.saveApiConfig(baseUrl, apiKey, model)
                     scope.launch { snackbar.showSnackbar(savedMessage) }
-                },
-                modifier = Modifier.align(Alignment.End),
-            ) { Text(stringResource(R.string.settings_save_ai)) }
+                }) { Text(stringResource(R.string.settings_save_ai)) }
 
-            HorizontalDivider()
+                Spacer(Modifier.width(Spacing.space2))
+
+                OutlinedButton(
+                    onClick = { vm.testConnection() },
+                    enabled = state.connectionTest !is SettingsViewModel.ConnectionTest.Running,
+                ) {
+                    if (state.connectionTest is SettingsViewModel.ConnectionTest.Running) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(Spacing.space4),
+                            strokeWidth = 2.dp,
+                        )
+                        Spacer(Modifier.width(Spacing.space2))
+                    }
+                    Text(stringResource(R.string.settings_test_connection))
+                }
+            }
+
+            when (val test = state.connectionTest) {
+                is SettingsViewModel.ConnectionTest.Success -> TestResultText(
+                    text = stringResource(R.string.settings_test_ok),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+
+                is SettingsViewModel.ConnectionTest.Failed -> TestResultText(
+                    text = test.detail,
+                    color = MaterialTheme.colorScheme.error,
+                )
+
+                else -> {}
+            }
+
             SectionTitle(stringResource(R.string.settings_section_reminder))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.settings_reminder_enable), modifier = Modifier.weight(1f))
-                Switch(
-                    checked = settings.reminderEnabled,
-                    onCheckedChange = { want ->
-                        if (want && Build.VERSION.SDK_INT >= 33) {
-                            val granted = ContextCompat.checkSelfPermission(
-                                context, Manifest.permission.POST_NOTIFICATIONS,
-                            ) == PackageManager.PERMISSION_GRANTED
-                            if (!granted) {
-                                notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                return@Switch
-                            }
+            SegmentedListItem(
+                checked = settings.reminderEnabled,
+                onCheckedChange = { want ->
+                    if (want && Build.VERSION.SDK_INT >= 33) {
+                        val granted = ContextCompat.checkSelfPermission(
+                            context, Manifest.permission.POST_NOTIFICATIONS,
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (!granted) {
+                            notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            return@SegmentedListItem
                         }
-                        enableReminder(want)
-                    },
-                )
+                    }
+                    enableReminder(want)
+                },
+                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 2),
+            ) {
+                Text(stringResource(R.string.settings_reminder_enable))
             }
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_reminder_time)) },
+            SegmentedListItem(
+                onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    showTimePicker = true
+                },
+                shapes = ListItemDefaults.segmentedShapes(index = 1, count = 2),
                 trailingContent = {
                     Text("%02d:%02d".format(settings.reminderHour, settings.reminderMinute))
                 },
-                modifier = Modifier.clickable { showTimePicker = true },
-            )
+            ) {
+                Text(stringResource(R.string.settings_reminder_time))
+            }
 
-            HorizontalDivider()
             SectionTitle(stringResource(R.string.settings_section_theme))
-            ThemeMode.entries
-                .filter { it != ThemeMode.MATERIAL_YOU || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S }
-                .forEach { mode ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { vm.setThemeMode(mode) }
-                            .padding(vertical = Spacing.space1),
-                    ) {
-                        RadioButton(
-                            selected = currentThemeMode == mode,
-                            onClick = { vm.setThemeMode(mode) },
-                        )
-                        Text(
-                            text = themeModeLabel(mode),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(start = Spacing.space2),
-                        )
-                    }
-                }
 
-            HorizontalDivider()
+            val themeModes = remember {
+                ThemeMode.entries.filter {
+                    it != ThemeMode.MATERIAL_YOU || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                }
+            }
+            themeModes.forEachIndexed { index, mode ->
+                SegmentedListItem(
+                    selected = currentThemeMode == mode,
+                    onClick = { vm.setThemeMode(mode) },
+                    shapes = ListItemDefaults.segmentedShapes(index = index, count = themeModes.size),
+                ) {
+                    Text(themeModeLabel(mode))
+                }
+            }
+
             SectionTitle(stringResource(R.string.settings_section_profile))
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_edit_profile)) },
+
+            SegmentedListItem(
+                onClick = onEditProfile,
+                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
                 supportingContent = { Text(stringResource(R.string.settings_edit_profile_sub)) },
                 trailingContent = {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                 },
-                modifier = Modifier.clickable(onClick = onEditProfile),
-            )
+            ) {
+                Text(stringResource(R.string.settings_edit_profile))
+            }
 
-            HorizontalDivider()
             SectionTitle(stringResource(R.string.settings_section_about))
             Text(
                 stringResource(R.string.settings_about_source),
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                stringResource(R.string.settings_disclaimer),
+                text = stringResource(R.string.settings_about_source_url),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.primary,
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier.clickable {
+                    runCatching { uriHandler.openUri(SOURCES_URL) }
+                },
             )
+            DisclaimerSection()
             Spacer(Modifier.height(Spacing.space6))
         }
     }
@@ -305,9 +379,56 @@ fun SettingsScreen(
     }
 }
 
+private const val SOURCES_URL = "https://github.com/eternity4719/HowToLiveBetter"
+
 @Composable
 private fun SectionTitle(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+}
+
+@Composable
+private fun TestResultText(text: String, color: androidx.compose.ui.graphics.Color) {
+    Text(text = text, style = MaterialTheme.typography.bodySmall, color = color)
+}
+
+/** 免责声明默认收起:长文默认展开是「关于」页读不下去的根源 */
+@Composable
+private fun DisclaimerSection() {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(Spacing.space3)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_disclaimer_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    contentDescription = stringResource(
+                        if (expanded) R.string.action_collapse else R.string.action_expand,
+                    ),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            AnimatedVisibility(visible = expanded) {
+                Text(
+                    text = stringResource(R.string.settings_disclaimer),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = Spacing.space2),
+                )
+            }
+        }
+    }
 }
 
 @Composable

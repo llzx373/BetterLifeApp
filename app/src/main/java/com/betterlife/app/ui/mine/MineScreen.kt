@@ -1,7 +1,6 @@
-// 我的页:档案摘要 + 编辑档案/AI 问答/设置入口
+// 我的页:档案摘要(可在此直接增删目标) + 编辑档案/AI 问答/设置入口
 package com.betterlife.app.ui.mine
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -15,52 +14,26 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
-import com.betterlife.app.data.Exercise
 import com.betterlife.app.data.Goal
-import com.betterlife.app.data.Occupation
 import com.betterlife.app.data.Profile
-import com.betterlife.app.data.Smoking
+import com.betterlife.app.data.ProfileLabels
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.ProfileViewModel
-
-@Composable
-private fun goalLabel(goal: Goal): String = stringResource(
-    when (goal) {
-        Goal.HEALTH -> R.string.goal_health
-        Goal.MONEY -> R.string.goal_money
-        Goal.TIME -> R.string.goal_time
-        Goal.CAREER -> R.string.goal_career
-        Goal.FAMILY -> R.string.goal_family
-        Goal.RELAX -> R.string.goal_relax
-    },
-)
-
-@Composable
-private fun profileSummary(p: Profile): String = buildString {
-    append(stringResource(R.string.mine_age_segment, p.ageRange.key))
-    when (p.occupation) {
-        Occupation.PROGRAMMER -> append(stringResource(R.string.mine_suffix_programmer))
-        Occupation.STUDENT -> append(stringResource(R.string.mine_suffix_student))
-        else -> {}
-    }
-    if (p.smoking == Smoking.YES) append(stringResource(R.string.mine_suffix_smoking))
-    if (p.exercise == Exercise.NONE) append(stringResource(R.string.mine_suffix_no_exercise))
-}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -71,6 +44,7 @@ fun MineScreen(
     vm: ProfileViewModel = viewModel(factory = ProfileViewModel.Factory),
 ) {
     val profile by vm.profile.collectAsStateWithLifecycle()
+    val summary = profileSummary(profile)
 
     Scaffold { padding ->
         Column(
@@ -83,55 +57,85 @@ fun MineScreen(
         ) {
             Text(stringResource(R.string.mine_title), style = MaterialTheme.typography.headlineSmall)
 
+            // 档案是用户的个人化信息,值得一点强调色,也和今日任务卡区分开
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 ),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(modifier = Modifier.padding(Spacing.space4), verticalArrangement = Arrangement.spacedBy(Spacing.space2)) {
+                Column(
+                    modifier = Modifier.padding(Spacing.space4),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.space2),
+                ) {
                     Text(stringResource(R.string.mine_profile_title), style = MaterialTheme.typography.titleSmall)
+                    Text(summary, style = MaterialTheme.typography.bodyMedium)
+
                     Text(
-                        profileSummary(profile),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = stringResource(R.string.mine_goals_hint),
+                        style = MaterialTheme.typography.labelSmall,
                     )
-                    if (profile.goals.isNotEmpty()) {
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
-                            profile.goals.forEach { goal ->
-                                SuggestionChip(onClick = {}, label = { Text(goalLabel(goal)) })
-                            }
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
+                        Goal.entries.forEach { goal ->
+                            val selected = goal in profile.goals
+                            ToggleButton(
+                                checked = selected,
+                                onCheckedChange = { checked ->
+                                    vm.update {
+                                        it.copy(
+                                            goals = if (checked) it.goals + goal else it.goals - goal,
+                                        )
+                                    }
+                                },
+                            ) { Text(stringResource(ProfileLabels.goal(goal))) }
                         }
                     }
                 }
             }
 
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.mine_edit_profile)) },
-                trailingContent = {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                },
-                modifier = Modifier.clickable(onClick = onEditProfile),
+            val entries = listOf(
+                EntryItem(
+                    titleRes = R.string.mine_edit_profile,
+                    subtitleRes = null,
+                    onClick = onEditProfile,
+                ),
+                EntryItem(
+                    titleRes = R.string.mine_chat,
+                    subtitleRes = R.string.mine_chat_sub,
+                    onClick = onOpenChat,
+                ),
+                EntryItem(
+                    titleRes = R.string.mine_settings,
+                    subtitleRes = R.string.mine_settings_sub,
+                    onClick = onOpenSettings,
+                ),
             )
-            HorizontalDivider()
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.mine_chat)) },
-                supportingContent = { Text(stringResource(R.string.mine_chat_sub)) },
-                trailingContent = {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                },
-                modifier = Modifier.clickable(onClick = onOpenChat),
-            )
-            HorizontalDivider()
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.mine_settings)) },
-                supportingContent = { Text(stringResource(R.string.mine_settings_sub)) },
-                trailingContent = {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                },
-                modifier = Modifier.clickable(onClick = onOpenSettings),
-            )
-            HorizontalDivider()
+            entries.forEachIndexed { index, entry ->
+                SegmentedListItem(
+                    onClick = entry.onClick,
+                    shapes = ListItemDefaults.segmentedShapes(index = index, count = entries.size),
+                    supportingContent = entry.subtitleRes?.let { res -> { Text(stringResource(res)) } },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    },
+                ) {
+                    Text(stringResource(entry.titleRes))
+                }
+            }
         }
     }
+}
+
+private data class EntryItem(
+    val titleRes: Int,
+    val subtitleRes: Int?,
+    val onClick: () -> Unit,
+)
+
+@Composable
+private fun profileSummary(p: Profile): String = buildString {
+    append(stringResource(R.string.mine_age_segment, p.ageRange.key))
+    ProfileLabels.occupationSuffix(p.occupation)?.let { append(stringResource(it)) }
+    ProfileLabels.summaryFlags(p).forEach { append(stringResource(it)) }
 }

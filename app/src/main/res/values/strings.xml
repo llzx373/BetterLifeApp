@@ -133,6 +133,7 @@
     <!-- 我的 -->
     <string name="mine_title">我的</string>
     <string name="mine_profile_title">我的档案</string>
+    <string name="mine_goals_hint">想改善什么?点一下即可增删</string>
     <string name="mine_age_segment">%1$s 岁段</string>
     <string name="mine_suffix_programmer"> · 程序员</string>
     <string name="mine_suffix_student"> · 学生</string>
@@ -220,6 +221,10 @@
     <string name="settings_provider">服务商</string>
     <string name="settings_custom">自定义</string>
     <string name="settings_api_key">API Key</string>
+    <string name="settings_api_key_show">显示密钥</string>
+    <string name="settings_api_key_hide">隐藏密钥</string>
+    <string name="settings_test_connection">测试连接</string>
+    <string name="settings_test_ok">连接正常</string>
     <string name="settings_base_url">Base URL</string>
     <string name="settings_model">模型</string>
     <string name="settings_saved">已保存</string>
@@ -235,6 +240,8 @@
     <string name="settings_edit_profile">修改我的档案</string>
     <string name="settings_edit_profile_sub">重新走一遍引导,已填内容会保留</string>
     <string name="settings_section_about">关于</string>
-    <string name="settings_about_source">内容出处:《高性价比人生指南》\ngithub.com/eternity4719/HowToLiveBetter</string>
+    <string name="settings_about_source">内容整理自《高性价比人生指南》</string>
+    <string name="settings_about_source_url">github.com/eternity4719/HowToLiveBetter</string>
+    <string name="settings_disclaimer_title">免责声明</string>
     <string name="settings_disclaimer">内容版权归原项目所有,请遵循其许可证使用。本应用仅做整理与呈现,不构成医疗、法律或投资意见;涉及健康与安全的决定,请咨询专业人士。</string>
 </resources>

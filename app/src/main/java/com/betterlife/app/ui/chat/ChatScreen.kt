@@ -54,7 +54,7 @@ fun ChatScreen(
     settingsVm: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
-    val settings by settingsVm.settings.collectAsStateWithLifecycle()
+    val settingsState by settingsVm.uiState.collectAsStateWithLifecycle()
     var input by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
 
@@ -81,7 +81,7 @@ fun ChatScreen(
                 .padding(padding)
                 .imePadding(),
         ) {
-            if (settings.apiKey.isBlank()) {
+            if (settingsState.settings.apiKey.isBlank()) {
                 Surface(
                     color = MaterialTheme.colorScheme.tertiaryContainer,
                     modifier = Modifier.fillMaxWidth(),
