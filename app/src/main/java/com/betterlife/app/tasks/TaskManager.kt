@@ -56,6 +56,30 @@ class TaskManager(
 
     suspend fun deleteTask(taskId: Long) = taskDao.delete(taskId)
 
+    /**
+     * 换一条：把当前条目标记为「不再推荐」（DISMISSED，会被推荐引擎排除），
+     * 删除今天的这条任务，再按档案补一条当天还没有的顶上。
+     *
+     * 与「今天不做」区分：后者只是 [deleteTask] 移除今天的安排，
+     * 不写 DISMISSED，所以这条内容以后还可能被推荐回来。
+     */
+    suspend fun replaceTodayTask(profile: Profile, task: TaskEntity, date: LocalDate = LocalDate.now()) {
+        val dateStr = date.toString()
+        setEntryState(task.entryId, EntryStateEntity.STATE_DISMISSED)
+        taskDao.delete(task.taskId)
+        val data = entryRepository.entriesData()
+        val taken = entryStateDao.excludedIds().toSet() + taskDao.dailyEntryIds(dateStr)
+        val next = planner.plan(date, profile, data.entries, data.rules, taken).firstOrNull() ?: return
+        taskDao.insert(
+            TaskEntity(
+                entryId = next.id,
+                type = TaskEntity.TYPE_DAILY,
+                date = dateStr,
+                createdAt = System.currentTimeMillis(),
+            )
+        )
+    }
+
     /** 条目状态操作：DONE / DISMISSED / TODO；传 null 清除状态（恢复可推荐） */
     suspend fun setEntryState(entryId: String, state: String?) {
         if (state == null) entryStateDao.delete(entryId)

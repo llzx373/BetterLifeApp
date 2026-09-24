@@ -29,6 +29,10 @@ interface TaskDao {
     @Query("SELECT COUNT(*) FROM tasks WHERE type = 'DAILY' AND date = :date")
     suspend fun countDailyByDate(date: String): Int
 
+    /** 当天已有的 DAILY 条目 id,「换一条」补位时用来避免重复 */
+    @Query("SELECT entryId FROM tasks WHERE type = 'DAILY' AND date = :date")
+    suspend fun dailyEntryIds(date: String): List<String>
+
     @Query("SELECT COUNT(*) FROM tasks WHERE type = 'DAILY' AND date = :date AND done = 0")
     suspend fun countUndoneDaily(date: String): Int
 

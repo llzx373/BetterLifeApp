@@ -1,13 +1,23 @@
-// 今日页:问候 + 今日任务打卡(含连续天数)+ 按口径分组的为你推荐 + AI 问答入口 FAB
+// 今日页:问候 + 连续天数胶囊 + 今日任务(SplitButton 打卡)+ 按口径分组的推荐分段列表 + AI 入口 FAB
+//
+// 三级视觉层级(见 docs/DESIGN_SYSTEM.md §5.1):问候区是纯文字,今日任务占唯一的 Card,
+// 推荐是分段列表 —— 601 条里的 5 条不该长得和「今天必须做的事」一样。
 package com.betterlife.app.ui.today
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,44 +27,78 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SplitButtonDefaults
+import androidx.compose.material3.SplitButtonLayout
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
 import com.betterlife.app.data.EntryDto
+import com.betterlife.app.data.db.TaskEntity
 import com.betterlife.app.recommend.ScoredEntry
 import com.betterlife.app.ui.common.CostMeter
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
 import com.betterlife.app.ui.common.lensGroupTitle
+import com.betterlife.app.ui.theme.LocalLensColors
 import com.betterlife.app.ui.theme.Spacing
+import com.betterlife.app.ui.theme.lensIcon
 import com.betterlife.app.viewmodel.LibraryViewModel
 import com.betterlife.app.viewmodel.TodayViewModel
+import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+
+/** 打卡后卡片停在原位的时间:等勾选的形变做完再下沉 */
+private const val REORDER_DELAY_MS = 300L
+
+/** 连续天数到这个值,胶囊换成强调色填充 */
+private const val STREAK_STRONG_DAYS = 7
 
 @Composable
 fun TodayScreen(
@@ -75,96 +119,182 @@ fun TodayScreen(
             }
         },
     ) { padding ->
-        val state = todayState
-        if (state is TodayViewModel.UiState.Loading) {
-            Box(
+        when (val state = todayState) {
+            TodayViewModel.UiState.Loading -> CenteredBox(Modifier.fillMaxSize().padding(padding)) {
+                CircularProgressIndicator()
+            }
+
+            TodayViewModel.UiState.Empty -> NoProfileState(
+                onEditProfile = onEditProfile,
                 modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center,
-            ) { CircularProgressIndicator() }
-            return@Scaffold
-        }
-        if (state is TodayViewModel.UiState.Error) {
-            ErrorState(
+            )
+
+            TodayViewModel.UiState.Error -> ErrorState(
                 onRetry = todayVm::retry,
                 modifier = Modifier.fillMaxSize().padding(padding),
             )
-            return@Scaffold
-        }
-        val items = (state as TodayViewModel.UiState.Ready).items
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.space4),
-            verticalArrangement = Arrangement.spacedBy(Spacing.space3),
-        ) {
-            item { GreetingHeader() }
-
-            item {
-                Text(stringResource(R.string.today_tasks_title), style = MaterialTheme.typography.titleMedium)
-            }
-            if (items.isEmpty()) {
-                item {
-                    EmptyCard(
-                        text = stringResource(R.string.today_tasks_empty),
-                        actionText = stringResource(R.string.today_action_fill_profile),
-                        onAction = onEditProfile,
-                    )
-                }
-            } else {
-                items(items.size) { i ->
-                    val item = items[i]
-                    DailyTaskCard(
-                        item = item,
-                        onToggle = { todayVm.toggleTask(item.task) },
-                        onClick = { item.entry?.let { onOpenEntry(it.id) } },
-                    )
-                }
-            }
-
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        stringResource(R.string.today_recommend_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(onClick = onOpenLibrary) { Text(stringResource(R.string.today_all_entries)) }
-                }
-            }
-            if (libraryState.recommended.isEmpty()) {
-                item {
-                    EmptyCard(
-                        text = stringResource(R.string.today_recommend_empty),
-                        actionText = stringResource(R.string.today_action_go_profile),
-                        onAction = onEditProfile,
-                    )
-                }
-            } else {
-                libraryState.recommended.forEach { (lens, entries) ->
-                    item(key = "lens-$lens") {
-                        Text(
-                            text = lensGroupTitle(lens),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    items(entries.size, key = { "rec-$lens-$it" }) { i ->
-                        RecommendCard(
-                            scored = entries[i],
-                            onClick = { onOpenEntry(entries[i].entry.id) },
-                            onAddTodo = { libraryVm.addToTodo(entries[i].entry.id) },
-                        )
-                    }
-                }
-            }
-
-            item { Spacer(Modifier.height(Spacing.space12)) } // 给 FAB 留位
+            is TodayViewModel.UiState.Ready -> TodayContent(
+                state = state,
+                libraryState = libraryState,
+                onToggle = todayVm::toggleTask,
+                onSwap = todayVm::swapTask,
+                onDrop = todayVm::dropTask,
+                onOpenEntry = onOpenEntry,
+                onAddTodo = libraryVm::addToTodo,
+                onOpenLibrary = onOpenLibrary,
+                onEditProfile = onEditProfile,
+                contentPadding = padding,
+            )
         }
     }
 }
 
 @Composable
-private fun GreetingHeader() {
+private fun TodayContent(
+    state: TodayViewModel.UiState.Ready,
+    libraryState: LibraryViewModel.UiState,
+    onToggle: (TaskEntity) -> Unit,
+    onSwap: (TaskEntity) -> Unit,
+    onDrop: (TaskEntity) -> Unit,
+    onOpenEntry: (String) -> Unit,
+    onAddTodo: (String) -> Unit,
+    onOpenLibrary: () -> Unit,
+    onEditProfile: () -> Unit,
+    contentPadding: PaddingValues,
+) {
+    // 打卡后让卡片先停在原位 300ms:形变和位移动画同时发生会互相打架
+    var settlingId by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(settlingId) {
+        val id = settlingId ?: return@LaunchedEffect
+        delay(REORDER_DELAY_MS)
+        if (settlingId == id) settlingId = null
+    }
+    val tasks = remember(state.items, settlingId) {
+        state.items.sortedWith(
+            compareBy({ it.task.done && it.task.taskId != settlingId }, { it.task.taskId }),
+        )
+    }
+    val streak = remember(state.items) { state.items.maxOfOrNull { it.streak } ?: 0 }
+
+    // 全部完成时卡片收起,只留一句话;用户想回顾(或撤销)可以再展开
+    var reviewing by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(state.allDone) { if (!state.allDone) reviewing = false }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(contentPadding),
+        contentPadding = PaddingValues(vertical = Spacing.space4),
+        verticalArrangement = Arrangement.spacedBy(Spacing.space3),
+    ) {
+        item(key = "greeting") {
+            GreetingHeader(streak = streak, modifier = Modifier.padding(horizontal = Spacing.space4))
+        }
+
+        item(key = "tasks-title") {
+            val doneCount = tasks.size - state.undoneCount
+            val progress = stringResource(R.string.today_tasks_progress, doneCount, tasks.size)
+            Text(
+                text = stringResource(R.string.today_tasks_title),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier
+                    .padding(horizontal = Spacing.space4)
+                    .then(
+                        if (tasks.isEmpty()) Modifier
+                        else Modifier.semantics { contentDescription = progress },
+                    ),
+            )
+        }
+
+        when {
+            tasks.isEmpty() -> item(key = "tasks-empty") {
+                EmptyCard(
+                    text = stringResource(R.string.today_tasks_empty),
+                    actionText = stringResource(R.string.today_action_fill_profile),
+                    onAction = onEditProfile,
+                    modifier = Modifier.padding(horizontal = Spacing.space4),
+                )
+            }
+
+            state.allDone && !reviewing -> item(key = "all-done") {
+                AllDoneCard(
+                    count = tasks.size,
+                    onReview = { reviewing = true },
+                    modifier = Modifier.padding(horizontal = Spacing.space4),
+                )
+            }
+
+            else -> items(tasks, key = { it.task.taskId }) { item ->
+                DailyTaskCard(
+                    item = item,
+                    onToggle = {
+                        if (!item.task.done) settlingId = item.task.taskId
+                        onToggle(item.task)
+                    },
+                    onSwap = { onSwap(item.task) },
+                    onDrop = { onDrop(item.task) },
+                    onOpenEntry = { item.entry?.let { onOpenEntry(it.id) } },
+                    modifier = Modifier
+                        .padding(horizontal = Spacing.space4)
+                        .animateItem(),
+                )
+            }
+        }
+
+        item(key = "recommend-title") {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = Spacing.space4, end = Spacing.space1),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.today_recommend_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onOpenLibrary) { Text(stringResource(R.string.today_all_entries)) }
+            }
+        }
+
+        if (libraryState.recommended.isEmpty()) {
+            item(key = "recommend-empty") {
+                EmptyCard(
+                    text = stringResource(R.string.today_recommend_empty),
+                    actionText = stringResource(R.string.today_action_go_profile),
+                    onAction = onEditProfile,
+                    modifier = Modifier.padding(horizontal = Spacing.space4),
+                )
+            }
+        } else {
+            libraryState.recommended.forEach { (lens, entries) ->
+                item(key = "lens-$lens") {
+                    LensGroupHeader(
+                        lens = lens,
+                        modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space1),
+                    )
+                }
+                itemsIndexed(entries, key = { _, scored -> "rec-${scored.entry.id}" }) { index, scored ->
+                    Column {
+                        if (index > 0) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                                modifier = Modifier.padding(start = Spacing.space4),
+                            )
+                        }
+                        RecommendedRow(
+                            scored = scored,
+                            onClick = { onOpenEntry(scored.entry.id) },
+                            onAddTodo = { onAddTodo(scored.entry.id) },
+                        )
+                    }
+                }
+            }
+        }
+
+        item(key = "bottom-spacer") { Spacer(Modifier.height(Spacing.space12)) }
+    }
+}
+
+@Composable
+private fun GreetingHeader(streak: Int, modifier: Modifier = Modifier) {
     val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
     val greeting = when (hour) {
         in 5..10 -> stringResource(R.string.today_greeting_morning)
@@ -172,14 +302,34 @@ private fun GreetingHeader() {
         in 14..17 -> stringResource(R.string.today_greeting_afternoon)
         else -> stringResource(R.string.today_greeting_evening)
     }
-    // 日期格式交给系统 locale，不再硬编码中文
+    // 日期格式交给系统 locale,不再硬编码中文
     val date = remember { LocalDate.now().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)) }
-    Column {
-        Text(greeting, style = MaterialTheme.typography.headlineSmall)
+    Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(greeting, style = MaterialTheme.typography.headlineSmall)
+            Text(
+                date,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (streak > 0) StreakPill(streak)
+    }
+}
+
+/** 连续天数胶囊:数字用等宽数字,否则天数跳动时整行会横移 */
+@Composable
+private fun StreakPill(days: Int) {
+    val strong = days >= STREAK_STRONG_DAYS
+    Surface(
+        color = if (strong) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = if (strong) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+        shape = MaterialTheme.shapes.extraLarge,
+    ) {
         Text(
-            date,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = stringResource(R.string.today_streak_pill, days),
+            style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+            modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space2),
         )
     }
 }
@@ -188,90 +338,194 @@ private fun GreetingHeader() {
 private fun DailyTaskCard(
     item: TodayViewModel.TaskItem,
     onToggle: () -> Unit,
-    onClick: () -> Unit,
+    onSwap: () -> Unit,
+    onDrop: () -> Unit,
+    onOpenEntry: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val done = item.task.done
     Card(
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(
-            containerColor = if (done) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surfaceVariant,
+            // 完成态退到背景:更低的容器层级 + 更弱的文字
+            containerColor = if (done) MaterialTheme.colorScheme.surfaceContainerLowest
+            else MaterialTheme.colorScheme.surfaceContainerLow,
         ),
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        modifier = modifier.fillMaxWidth(),
     ) {
-        Row(
-            modifier = Modifier.padding(Spacing.space3),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
+        Column(Modifier.padding(Spacing.space4)) {
+            Text(
+                text = item.entry?.title ?: item.task.entryId,
+                style = MaterialTheme.typography.titleSmall,
+                color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                textDecoration = if (done) TextDecoration.LineThrough else TextDecoration.Underline,
+                modifier = Modifier.clickable(onClick = onOpenEntry),
+            )
+            item.entry?.human?.takeIf { it.isNotBlank() }?.let {
+                Spacer(Modifier.height(Spacing.space1))
                 Text(
-                    text = item.entry?.title ?: item.task.entryId,
-                    style = MaterialTheme.typography.titleSmall,
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                item.entry?.human?.takeIf { it.isNotBlank() }?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (item.streak > 0) {
-                    Text(
-                        text = stringResource(R.string.today_streak_days, item.streak),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
             }
-            Spacer(Modifier.width(Spacing.space2))
-            IconButton(onClick = onToggle) {
-                // 打勾动画:完成时绿色对勾弹入,未完成显示空圈
-                AnimatedVisibility(
-                    visible = done,
-                    enter = scaleIn() + fadeIn(),
-                ) {
-                    Icon(
-                        Icons.Filled.CheckCircle,
-                        contentDescription = stringResource(R.string.today_task_done_desc),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(32.dp),
-                    )
-                }
-                if (!done) {
-                    Icon(
-                        Icons.Filled.CheckCircle,
-                        contentDescription = stringResource(R.string.today_task_todo_desc),
-                        tint = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(32.dp),
-                    )
-                }
+            Spacer(Modifier.height(Spacing.space3))
+            TaskAction(done = done, onToggle = onToggle, onSwap = onSwap, onDrop = onDrop)
+        }
+    }
+}
+
+/** 打卡动作:未完成是「打卡 + 更多」分裂按钮,已完成收成一个可撤销的按钮 */
+@Composable
+private fun TaskAction(
+    done: Boolean,
+    onToggle: () -> Unit,
+    onSwap: () -> Unit,
+    onDrop: () -> Unit,
+) {
+    val haptics = LocalHapticFeedback.current
+    AnimatedContent(
+        targetState = done,
+        transitionSpec = {
+            (scaleIn(initialScale = 0.9f) + fadeIn()) togetherWith (scaleOut(targetScale = 0.9f) + fadeOut())
+        },
+        label = "taskAction",
+    ) { isDone ->
+        if (isDone) {
+            FilledTonalButton(onClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.ToggleOff)
+                onToggle()
+            }) {
+                Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(Spacing.space4))
+                Spacer(Modifier.width(Spacing.space1))
+                Text(stringResource(R.string.today_task_undo))
+            }
+        } else {
+            SplitButtonLayout(
+                leadingButton = {
+                    SplitButtonDefaults.LeadingButton(onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
+                        onToggle()
+                    }) {
+                        Text(stringResource(R.string.today_task_check))
+                    }
+                },
+                trailingButton = {
+                    var menuOpen by remember { mutableStateOf(false) }
+                    Box {
+                        SplitButtonDefaults.TrailingButton(
+                            checked = menuOpen,
+                            onCheckedChange = { menuOpen = it },
+                        ) {
+                            Icon(
+                                Icons.Filled.MoreVert,
+                                contentDescription = stringResource(R.string.today_task_menu),
+                            )
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.today_action_swap)) },
+                                onClick = {
+                                    menuOpen = false
+                                    onSwap()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.today_action_drop)) },
+                                onClick = {
+                                    menuOpen = false
+                                    onDrop()
+                                },
+                            )
+                        }
+                    }
+                },
+            )
+        }
+    }
+}
+
+/** 全部完成:一句话 + 一次形变,不弹窗、不放彩带 */
+@Composable
+private fun AllDoneCard(count: Int, onReview: () -> Unit, modifier: Modifier = Modifier) {
+    val visible = remember { MutableTransitionState(false).apply { targetState = true } }
+    AnimatedVisibility(
+        visibleState = visible,
+        enter = fadeIn() + scaleIn(initialScale = 0.96f),
+        modifier = modifier,
+    ) {
+        Card(
+            shape = MaterialTheme.shapes.large,
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier.padding(Spacing.space4),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Filled.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.width(Spacing.space3))
+                Text(
+                    text = stringResource(R.string.today_all_done, count),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onReview) { Text(stringResource(R.string.today_all_done_review)) }
             }
         }
     }
 }
 
+/** 口径分组标题:标题之外再带图标 + 口径色,不依赖颜色也能区分 */
 @Composable
-private fun RecommendCard(
+private fun LensGroupHeader(lens: String, modifier: Modifier = Modifier) {
+    val tint = LocalLensColors.current.forLens(lens) ?: MaterialTheme.colorScheme.onSurfaceVariant
+    val icon = lensIcon(lens)
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.space2),
+    ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(Spacing.space4))
+        } else {
+            Box(Modifier.size(Spacing.space2).clip(CircleShape).background(tint))
+        }
+        Text(lensGroupTitle(lens), style = MaterialTheme.typography.titleSmall, color = tint)
+    }
+}
+
+/** 推荐条目:分段列表行,不是卡片 */
+@Composable
+private fun RecommendedRow(
     scored: ScoredEntry,
     onClick: () -> Unit,
     onAddTodo: () -> Unit,
 ) {
     val entry: EntryDto = scored.entry
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(Spacing.space3),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
+    val overline: (@Composable () -> Unit)? =
+        if (entry.grade.isNotBlank() || entry.dispute) {
+            {
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
                     GradeBadge(entry.grade)
                     if (entry.dispute) DisputeBadge()
                 }
-                Spacer(Modifier.height(Spacing.space2))
-                Text(entry.title, style = MaterialTheme.typography.titleSmall)
+            }
+        } else {
+            null
+        }
+
+    ListItem(
+        modifier = Modifier.clickable(onClick = onClick),
+        overlineContent = overline,
+        supportingContent = {
+            Column {
                 if (entry.human.isNotBlank()) {
                     Text(
                         text = entry.human,
@@ -280,34 +534,58 @@ private fun RecommendCard(
                         overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Spacer(Modifier.height(Spacing.space2))
                 }
-                Spacer(Modifier.height(Spacing.space2))
                 CostMeter(entry)
             }
+        },
+        trailingContent = {
             IconButton(onClick = onAddTodo) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.today_add_todo_desc))
             }
-        }
+        },
+    ) {
+        Text(entry.title, style = MaterialTheme.typography.titleSmall)
     }
 }
 
 @Composable
-private fun EmptyCard(text: String, actionText: String, onAction: () -> Unit) {
+private fun EmptyCard(
+    text: String,
+    actionText: String,
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             modifier = Modifier.padding(Spacing.space4),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
-            )
+            Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             TextButton(onClick = onAction) { Text(actionText) }
         }
+    }
+}
+
+/** 没档案:整页只做一件事 —— 说清填档案的收益,给一个入口 */
+@Composable
+private fun NoProfileState(onEditProfile: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(Spacing.space6),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = stringResource(R.string.today_empty_profile),
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(Spacing.space4))
+        Button(onClick = onEditProfile) { Text(stringResource(R.string.today_action_go_profile)) }
     }
 }
 
@@ -326,4 +604,9 @@ private fun ErrorState(onRetry: () -> Unit, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(Spacing.space3))
         Button(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
     }
+}
+
+@Composable
+private fun CenteredBox(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Box(modifier, contentAlignment = Alignment.Center) { content() }
 }

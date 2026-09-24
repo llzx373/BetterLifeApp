@@ -51,6 +51,7 @@
 
     <!-- 今日页 -->
     <string name="today_tasks_title">今日任务</string>
+    <string name="today_tasks_progress">已完成 %1$d 项,共 %2$d 项</string>
     <string name="today_tasks_empty">还没有今日任务。先完善档案,或去条目库逛逛。</string>
     <string name="today_action_fill_profile">完善档案</string>
     <string name="today_recommend_title">为你推荐</string>
@@ -61,9 +62,15 @@
     <string name="today_greeting_noon">中午好</string>
     <string name="today_greeting_afternoon">下午好</string>
     <string name="today_greeting_evening">晚上好</string>
-    <string name="today_streak_days">已连续 %1$d 天</string>
-    <string name="today_task_done_desc">已完成,点击取消</string>
-    <string name="today_task_todo_desc">打卡</string>
+    <string name="today_streak_pill">连续 %1$d 天</string>
+    <string name="today_empty_profile">填 3 个问题,推荐立刻变准</string>
+    <string name="today_all_done">今天的 %1$d 件小事都做完了</string>
+    <string name="today_all_done_review">看看今天做了什么</string>
+    <string name="today_task_check">打卡</string>
+    <string name="today_task_undo">撤销</string>
+    <string name="today_task_menu">更多操作</string>
+    <string name="today_action_swap">换一条</string>
+    <string name="today_action_drop">今天不做</string>
     <string name="today_add_todo_desc">加入待办</string>
 
     <!-- 待办页 -->

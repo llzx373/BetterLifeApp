@@ -91,4 +91,15 @@ class DailyTaskPlannerTest {
         val result = planner.plan(date, profile, entries, rules(exclude = listOf("01-01", "01-02", "02-01")), emptySet())
         assertTrue(result.isEmpty())
     }
+
+    @Test
+    fun `换一条时已占用的条目不会被重复补位`() {
+        val planner = DailyTaskPlanner(maxDaily = 3)
+        // 今日已有 01-01,用户把 01-02 换掉 → 两者都不能再被选中
+        val taken = setOf("01-01", "01-02")
+        val ids = planner.plan(date, profile, entries, rules(), taken).map { it.id }
+        assertFalse("01-01" in ids)
+        assertFalse("01-02" in ids)
+        assertEquals(listOf("02-01"), ids)
+    }
 }
