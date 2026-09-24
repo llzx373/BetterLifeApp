@@ -90,7 +90,8 @@
     <string name="section_title_short">第 %1$d 章</string>
 
     <!-- 条目详情 -->
-    <string name="detail_loading_or_missing">条目不存在或还在加载</string>
+    <string name="detail_loading">正在打开条目</string>
+    <string name="detail_missing">没找到这条内容,可能已被移除</string>
     <string name="detail_section_cost">成本</string>
     <string name="detail_impact">对人生的影响程度:%1$s</string>
     <string name="detail_section_human">说人话</string>
@@ -104,6 +105,12 @@
     <string name="detail_section_note">备注</string>
     <string name="detail_add_todo">加入待办</string>
     <string name="detail_added_todo">已加入待办</string>
+    <string name="detail_copy">复制文本</string>
+    <string name="detail_share">分享</string>
+    <string name="detail_copied">已复制到剪贴板</string>
+    <string name="detail_cost_money">钱 %1$s</string>
+    <string name="detail_cost_time">时间 %1$s</string>
+    <string name="detail_cost_will">毅力 %1$s</string>
     <string name="detail_dispute_notice">这条建议存在争议,请结合自己的情况判断。</string>
     <string name="detail_todo_notice">这条内容还未核实,谨慎参考。</string>
 
