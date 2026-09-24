@@ -12,19 +12,20 @@ import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun BetterLifeTheme(
+    themeMode: ThemeMode = ThemeMode.BRAND_GREEN,
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
+    val dark = themeMode == ThemeMode.DARK || darkTheme
+    val dynamic = themeMode == ThemeMode.MATERIAL_YOU && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val colorScheme = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-
-        darkTheme -> DarkColors
+        dynamic -> if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        dark -> DarkColors
         else -> LightColors
     }
     // 口径色不跟随壁纸：Material You 会把四个语义色洗掉，失去区分度（见 DESIGN_SYSTEM §3.1）
-    val lensColors = if (darkTheme) darkLensColors else lightLensColors
+    val lensColors = if (dark) darkLensColors else lightLensColors
 
     CompositionLocalProvider(LocalLensColors provides lensColors) {
         MaterialExpressiveTheme(

@@ -34,6 +34,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -60,6 +61,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.viewmodel.SettingsViewModel
+import com.betterlife.app.ui.theme.ThemeMode
 import kotlinx.coroutines.launch
 
 private data class PresetOption(val label: String, val baseUrl: String, val model: String)
@@ -72,6 +74,7 @@ fun SettingsScreen(
     vm: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
 ) {
     val settings by vm.settings.collectAsStateWithLifecycle()
+    val currentThemeMode = ThemeMode.fromKey(settings.themeMode)
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -221,6 +224,30 @@ fun SettingsScreen(
             )
 
             HorizontalDivider()
+            SectionTitle("主题")
+            ThemeMode.entries
+                .filter { it != ThemeMode.MATERIAL_YOU || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S }
+                .forEach { mode ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { vm.setThemeMode(mode) }
+                            .padding(vertical = 4.dp),
+                    ) {
+                        RadioButton(
+                            selected = currentThemeMode == mode,
+                            onClick = { vm.setThemeMode(mode) },
+                        )
+                        Text(
+                            text = themeModeLabel(mode),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                }
+
+            HorizontalDivider()
             SectionTitle("档案")
             ListItem(
                 headlineContent = { Text("修改我的档案") },
@@ -271,4 +298,10 @@ fun SettingsScreen(
 @Composable
 private fun SectionTitle(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+}
+
+private fun themeModeLabel(mode: ThemeMode): String = when (mode) {
+    ThemeMode.BRAND_GREEN -> "品牌绿(默认)"
+    ThemeMode.MATERIAL_YOU -> "跟随系统壁纸"
+    ThemeMode.DARK -> "深色优先"
 }

@@ -10,6 +10,7 @@ import com.betterlife.app.ai.LlmClient
 import com.betterlife.app.data.AppSettings
 import com.betterlife.app.data.SettingsStore
 import com.betterlife.app.tasks.ReminderScheduler
+import com.betterlife.app.ui.theme.ThemeMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -52,6 +53,12 @@ class SettingsViewModel(
             settingsStore.setReminder(enabled, hour, minute)
             if (enabled) reminderScheduler.enqueue(hour, minute)
             else reminderScheduler.cancel()
+        }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch(Dispatchers.IO) {
+            settingsStore.setThemeMode(mode.key)
         }
     }
 

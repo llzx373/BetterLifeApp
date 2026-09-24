@@ -20,6 +20,7 @@ data class AppSettings(
     val reminderMinute: Int = 0,
     val reminderEnabled: Boolean = false,
     val onboardingDone: Boolean = false,
+    val themeMode: String = SettingsStore.DEFAULT_THEME_MODE,
 )
 
 class SettingsStore(private val context: Context) {
@@ -32,6 +33,7 @@ class SettingsStore(private val context: Context) {
         val REMINDER_MINUTE = intPreferencesKey("reminder_minute")
         val REMINDER_ENABLED = booleanPreferencesKey("reminder_enabled")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
+        val THEME_MODE = stringPreferencesKey("theme_mode")
     }
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -43,6 +45,7 @@ class SettingsStore(private val context: Context) {
             reminderMinute = p[Keys.REMINDER_MINUTE] ?: 0,
             reminderEnabled = p[Keys.REMINDER_ENABLED] ?: false,
             onboardingDone = p[Keys.ONBOARDING_DONE] ?: false,
+            themeMode = p[Keys.THEME_MODE] ?: DEFAULT_THEME_MODE,
         )
     }
 
@@ -66,5 +69,13 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setOnboardingDone(done: Boolean) {
         context.dataStore.edit { it[Keys.ONBOARDING_DONE] = done }
+    }
+
+    suspend fun setThemeMode(modeKey: String) {
+        context.dataStore.edit { it[Keys.THEME_MODE] = modeKey }
+    }
+
+    companion object {
+        const val DEFAULT_THEME_MODE = "brand_green"
     }
 }
