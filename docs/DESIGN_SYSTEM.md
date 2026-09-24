@@ -291,7 +291,7 @@ space12= 48dp   // 空状态、页面底部避让 FAB
    - **次屏**:证据等级(带 A/B/C 的解释,现在是内联 `when` 映射)、成本明细。
    - **折叠**:来源、备注。默认收起。
    - 用**间距和字号**分层,而不是六张一模一样的卡。
-3. **底部动作换成 `FloatingToolbar`**,把"加入待办"从底部按钮升级为悬浮工具栏:加入待办 / 收藏 / 复制文本 / 分享。工具栏自带 `WindowInsets` 处理。
+3. **底部动作换成 `FloatingToolbar`**(已实现):加入待办 / 收藏 / 复制文本 / 分享。工具栏自带 `WindowInsets` 处理。
 4. **争议/待核实横幅保留**,但文案按 §9 改(现在把两条独立信息用 `append` 拼成一段)。
 5. **修性能**(已在 P1 顺手完成):详情页已改用 `AppContainer` 的单例 `EntryRepository`,不再是 `remember { EntryRepository(...) }` 每次进详情重解析 601 条 JSON(见 §8 P2 执行记录)。
 
@@ -676,11 +676,34 @@ sealed interface TodayUiState {
 
 1. **没用 `SearchBar`。** alpha28 已把它重构为基于 `SearchBarState` 的新 API,并且**去掉了 `content` 槽**(`inputField` 之外不再接管结果列表),与「输入时就地出结果」的形态对不上。条目库改用同视觉语言的 `TextField`(大圆角 + `surfaceContainerHigh` + 无下划线)。等 API 稳定后再换。
 2. **排序切换没用 `ButtonGroup`。** `ButtonGroup` 的形态是「按钮组 + 溢出菜单」,而排序是单选语义,用已稳定的 `SingleChoiceSegmentedButtonRow` + `SegmentedButton` 更贴切。
-3. **「收藏」没有做(明确留给独立 PR)。** `entry_states` 是单状态主键,一个条目只能处于 TODO/DONE/DISMISSED 之一;加收藏要么改主键为复合、要么新建表,两者都要动数据库(`version = 1`,目前没有 migration)。这属于数据模型变更,不该混在「按屏替换组件」里。详情页工具栏当前是 **加入待办 / 复制文本 / 分享**。
+3. **「收藏」在 P2 之后补做,见下面的「P2 补充」。** 当时 `entry_states` 是单状态主键(一个条目只能是 TODO/DONE/DISMISSED 之一),加收藏要么改复合主键、要么新建表,属于数据模型变更,所以没混进「按屏替换组件」里。
 4. **P0 遗留的 9 处 `ListItem(headlineContent = …)` 弃用形式已全部迁移**到表达性重载(headline 走尾随 `content`)。设置页与我的页的分组改用 `SegmentedListItem` + `ListItemDefaults.segmentedShapes`。
 5. **条目库大屏 list-detail 与 `PullToRefreshBox`** 按上文仍属 P3,未在 P2 做。
 6. **动效只用了默认的 `scaleIn/fadeIn`**,还没有按 §6.1 全面取用 `MaterialTheme.motionScheme` 的 spec(§6.2 属 P3)。
 7. **截图测试仍然缺席。** §8 P2 的验收写着「每屏 PR 附 4 张截图」,但截图测试的基础设施(androidTest 依赖)被归在 P3;本阶段的验收是**手工截图 + 肉眼检查**,没有自动回归。这是 P2 阶段最大的验收缺口,建议下一轮先把 P3 的截图测试提到最前面,再动 P3 的动效。
+
+### P2 补充(2026-09-24):收藏与条目状态模型
+
+「条目详情」那屏的悬浮工具栏按 §5.2 应该放四个动作,当时只落了三个 —— 收藏要动数据模型,被单独留了出来。现在补上,并把状态模型一并修对。
+
+**问题**:`entry_states` 用 `entryId` 做**单主键**,一个条目只能处于 `TODO` / `DONE` / `DISMISSED` 之一。于是「加入待办」和「收藏」会互相覆盖 —— 而它们本来是**正交**的两件事。
+
+**改法**:主键改成 `(entryId, state)`,状态从「互斥的单值」变成「可共存的一组」。
+
+| 变更 | 位置 |
+|---|---|
+| 主键 `entryId` → `(entryId, state)`;新增 `STATE_FAVORITE` | `data/db/Entities.kt` |
+| `delete(entryId)` → `delete(entryId, state)`;新增按状态查 id 的 Flow | `data/db/Daos.kt` |
+| `setEntryState`(覆盖式) → `addEntryState` / `removeEntryState` / `setFavorite` | `tasks/TaskManager.kt` |
+| 数据库 `version 1 → 2` | `data/db/AppDatabase.kt` |
+
+**没有写 migration**:应用尚未发布,`AppDatabase` 直接上 `fallbackToDestructiveMigration(dropAllTables = true)`,旧库会被重建。发布前再改 schema 也照此处理;**一旦对外发布,这里必须补真实的 `Migration`**,否则等于删用户数据。
+
+**收藏的入口**:
+- 详情页悬浮工具栏:`收藏 / 取消收藏`,收藏态来自 `favoriteIdsFlow`。
+- 新增「我的收藏」页(`ui/favorites/FavoritesScreen.kt`),从「我的」页进入,可以在列表里直接取消收藏,空状态给出引导。
+
+**顺手清掉的死代码**:`LibraryViewModel` 的 `entryStates` / `markEntryDone` / `dismissEntry` / `restoreEntry` 在 P2-3 重写条目库之后已经没有调用方,一并删除。
 
 ### P3 · 动效与打磨
 

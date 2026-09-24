@@ -103,6 +103,7 @@ python tools/build_content.py      # 内容变更后重跑,看自检统计
 - `collectAsStateWithLifecycle` 已改用官方 `androidx.lifecycle.compose` 实现(此前是本仓库 `ui/util/StateFlowExt.kt` 的本地替代品,引入 `lifecycle-runtime-compose` 后已删除)
 - 今日页 `TodayViewModel.UiState` 是 sealed:`Loading` / `Empty` / `Ready(items)` / `Error`。数据流由档案驱动(档案为 null 直接进 `Empty`,整页引导去填档案),资产与数据库读取包了 try/catch,失败不再崩溃而是出「内容加载失败」+ 重试
 - `EntryDetailScreen` 改用 `AppContainer` 的单例 `EntryRepository`,不再 `remember { EntryRepository(context) }` 每次进详情重解析 601 条 JSON
+- 条目状态 `entry_states` 用 `(entryId, state)` 复合主键:加入待办、已完成、不再推荐、已收藏彼此正交,不会互相覆盖。数据库 v2,应用未发布,用 destructive fallback 直接重建(见 DESIGN_SYSTEM §8「P2 补充」)
 - 单任务无独立提醒时间(只有全局提醒),TodoScreen 未展示提醒时间
 - 第二阶段计划:Health Connect 接入(步数/睡眠/运动自动核销每日任务)、数据图表、成就系统;接入点在 `TaskManager.completeTask` 与 `DailyTaskPlanner`
 - 条目内容的 LICENSE 归原书仓库,分发 APK 即分发其内容,关于页须保留出处
