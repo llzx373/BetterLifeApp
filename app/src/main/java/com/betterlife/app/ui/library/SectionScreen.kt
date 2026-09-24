@@ -33,6 +33,7 @@ import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
 import com.betterlife.app.ui.common.RatioBadge
 import com.betterlife.app.ui.common.TodoBadge
+import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.LibraryViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,7 +69,7 @@ fun SectionScreen(
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(vertical = 8.dp),
+            contentPadding = PaddingValues(vertical = Spacing.space2),
         ) {
             section?.intro?.takeIf { it.isNotBlank() }?.let { intro ->
                 item {
@@ -76,7 +77,7 @@ fun SectionScreen(
                         intro,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space2),
                     )
                 }
             }
@@ -87,7 +88,7 @@ fun SectionScreen(
                         Text(entry.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     },
                     supportingContent = {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
                             RatioBadge(entry.ratio)
                             GradeBadge(entry.grade)
                             if (entry.dispute) DisputeBadge()

@@ -41,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
 import com.betterlife.app.ai.ChatMessage
+import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.ChatViewModel
 import com.betterlife.app.viewmodel.SettingsViewModel
 
@@ -87,7 +88,7 @@ fun ChatScreen(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space1),
                     ) {
                         Text(
                             stringResource(R.string.chat_no_key_banner),
@@ -103,8 +104,8 @@ fun ChatScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(Spacing.space4),
+                verticalArrangement = Arrangement.spacedBy(Spacing.space3),
             ) {
                 // 首条固定安全提示
                 item(key = "safety") {
@@ -126,9 +127,9 @@ fun ChatScreen(
                     item(key = "asking") {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.space2),
                         ) {
-                            CircularProgressIndicator(modifier = Modifier.padding(4.dp), strokeWidth = 2.dp)
+                            CircularProgressIndicator(modifier = Modifier.padding(Spacing.space1), strokeWidth = 2.dp)
                             Text(
                                 stringResource(R.string.chat_thinking),
                                 style = MaterialTheme.typography.bodySmall,
@@ -140,7 +141,7 @@ fun ChatScreen(
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                modifier = Modifier.fillMaxWidth().padding(Spacing.space3),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 OutlinedTextField(
@@ -191,7 +192,7 @@ private fun Bubble(text: String, isUser: Boolean, isError: Boolean) {
             Text(
                 text = text,
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = Spacing.space3, vertical = Spacing.space2),
             )
         }
     }

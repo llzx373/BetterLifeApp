@@ -54,6 +54,7 @@ import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
 import com.betterlife.app.ui.common.RatioBadge
 import com.betterlife.app.ui.common.TodoBadge
+import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.LibraryViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -93,7 +94,7 @@ fun EntryDetailScreen(
         if (e == null) {
             Text(
                 stringResource(R.string.detail_loading_or_missing),
-                modifier = Modifier.padding(padding).padding(16.dp),
+                modifier = Modifier.padding(padding).padding(Spacing.space4),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             return@Scaffold
@@ -101,17 +102,17 @@ fun EntryDetailScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(Spacing.space4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.space3),
         ) {
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
                     RatioBadge(e.ratio)
                     GradeBadge(e.grade)
                     if (e.dispute) DisputeBadge()
                     if (e.todo) TodoBadge()
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(Spacing.space2))
                 Text(e.title, style = MaterialTheme.typography.headlineSmall)
             }
 
@@ -128,7 +129,7 @@ fun EntryDetailScreen(
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.padding(12.dp),
+                            modifier = Modifier.padding(Spacing.space3),
                         )
                     }
                 }
@@ -196,7 +197,7 @@ fun EntryDetailScreen(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.detail_add_todo)) }
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(Spacing.space6))
             }
         }
     }
@@ -214,7 +215,7 @@ private fun DetailSection(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(Spacing.space3)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -236,8 +237,8 @@ private fun DetailSection(
             }
             AnimatedVisibility(visible = expanded) {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.space2),
+                    modifier = Modifier.padding(top = Spacing.space2),
                 ) { content() }
             }
         }
@@ -249,7 +250,7 @@ private fun DetailSection(
 private fun SourceText(src: String) {
     val uriHandler = LocalUriHandler.current
     val urls = remember(src) { URL_REGEX.findAll(src).map { it.value }.toList() }
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.space2)) {
         Text(src, style = MaterialTheme.typography.bodySmall)
         urls.forEach { url ->
             Text(

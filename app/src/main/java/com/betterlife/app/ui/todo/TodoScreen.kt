@@ -32,6 +32,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
 import com.betterlife.app.data.db.TaskEntity
+import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.TodoViewModel
 
 @Composable
@@ -46,8 +47,8 @@ fun TodoScreen(
     Scaffold { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(Spacing.space4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.space3),
         ) {
             item { Text(stringResource(R.string.todo_title), style = MaterialTheme.typography.headlineSmall) }
 
@@ -113,7 +114,7 @@ private fun TodoRow(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = Spacing.space2, vertical = Spacing.space1),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Checkbox(checked = task.done, onCheckedChange = { onToggle() })

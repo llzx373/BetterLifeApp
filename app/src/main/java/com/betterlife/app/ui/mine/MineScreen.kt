@@ -35,6 +35,7 @@ import com.betterlife.app.data.Goal
 import com.betterlife.app.data.Occupation
 import com.betterlife.app.data.Profile
 import com.betterlife.app.data.Smoking
+import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.ProfileViewModel
 
 @Composable
@@ -77,8 +78,8 @@ fun MineScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(Spacing.space4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.space3),
         ) {
             Text(stringResource(R.string.mine_title), style = MaterialTheme.typography.headlineSmall)
 
@@ -88,7 +89,7 @@ fun MineScreen(
                 ),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(modifier = Modifier.padding(Spacing.space4), verticalArrangement = Arrangement.spacedBy(Spacing.space2)) {
                     Text(stringResource(R.string.mine_profile_title), style = MaterialTheme.typography.titleSmall)
                     Text(
                         profileSummary(profile),
@@ -96,7 +97,7 @@ fun MineScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     if (profile.goals.isNotEmpty()) {
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
                             profile.goals.forEach { goal ->
                                 SuggestionChip(onClick = {}, label = { Text(goalLabel(goal)) })
                             }

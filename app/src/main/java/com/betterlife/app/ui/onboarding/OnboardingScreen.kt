@@ -47,6 +47,7 @@ import com.betterlife.app.data.Occupation
 import com.betterlife.app.data.Profile
 import com.betterlife.app.data.Smoking
 import com.betterlife.app.data.SugaryDrinks
+import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.ProfileViewModel
 import kotlinx.coroutines.launch
 
@@ -74,9 +75,9 @@ fun OnboardingScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = Spacing.space6),
         ) {
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(Spacing.space4))
             Text(
                 text = stringResource(
                     if (editMode) R.string.onboarding_title_edit else R.string.onboarding_title_new,
@@ -93,7 +94,7 @@ fun OnboardingScreen(
                 progress = { (pagerState.currentPage + 1).toFloat() / STEP_COUNT },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 12.dp),
+                    .padding(vertical = Spacing.space3),
             )
 
             HorizontalPager(
@@ -105,7 +106,7 @@ fun OnboardingScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.space4),
                 ) {
                     when (page) {
                         0 -> StepBasics(profile) { vm.update(it) }
@@ -113,14 +114,14 @@ fun OnboardingScreen(
                         2 -> StepFamily(profile) { vm.update(it) }
                         3 -> StepGoals(profile) { vm.update(it) }
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(Spacing.space2))
                 }
             }
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 16.dp),
+                    .padding(vertical = Spacing.space4),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (pagerState.currentPage > 0) {
@@ -141,7 +142,7 @@ fun OnboardingScreen(
                             ),
                         )
                     }
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(Spacing.space2))
                     Button(onClick = {
                         scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
                     }) { Text(stringResource(R.string.onboarding_next)) }
@@ -173,7 +174,7 @@ private fun <T> SingleChoiceChips(
     selected: T,
     onSelect: (T) -> Unit,
 ) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
         options.forEach { (value, label) ->
             FilterChip(
                 selected = selected == value,
@@ -191,7 +192,7 @@ private fun <T> MultiChoiceChips(
     selected: Set<T>,
     onToggle: (T) -> Unit,
 ) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
         options.forEach { (value, label) ->
             FilterChip(
                 selected = value in selected,
@@ -217,7 +218,7 @@ private fun SwitchRow(label: String, checked: Boolean, onChecked: (Boolean) -> U
 
 @Composable
 private fun StepBasics(profile: Profile, update: ((Profile) -> Profile) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.space3)) {
         FieldLabel(stringResource(R.string.field_age))
         SingleChoiceChips(
             options = AgeRange.entries.map { it to it.key },
@@ -262,7 +263,7 @@ private fun StepBasics(profile: Profile, update: ((Profile) -> Profile) -> Unit)
 
 @Composable
 private fun StepHabits(profile: Profile, update: ((Profile) -> Profile) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.space3)) {
         FieldLabel(stringResource(R.string.field_smoking))
         SingleChoiceChips(
             options = listOf(
@@ -333,7 +334,7 @@ private fun StepHabits(profile: Profile, update: ((Profile) -> Profile) -> Unit)
 
 @Composable
 private fun StepFamily(profile: Profile, update: ((Profile) -> Profile) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.space3)) {
         FieldLabel(stringResource(R.string.field_children))
         SingleChoiceChips(
             options = listOf(
@@ -358,7 +359,7 @@ private fun StepFamily(profile: Profile, update: ((Profile) -> Profile) -> Unit)
 
 @Composable
 private fun StepGoals(profile: Profile, update: ((Profile) -> Profile) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.space3)) {
         FieldLabel(stringResource(R.string.field_goals))
         Text(
             stringResource(R.string.field_goals_hint),

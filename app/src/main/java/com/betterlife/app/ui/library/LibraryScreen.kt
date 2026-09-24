@@ -34,6 +34,7 @@ import com.betterlife.app.R
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
 import com.betterlife.app.ui.common.RatioBadge
+import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.LibraryViewModel
 
 @Composable
@@ -45,10 +46,10 @@ fun LibraryScreen(
     val state by vm.uiState.collectAsStateWithLifecycle()
 
     Scaffold { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {
-            Spacer(Modifier.height(12.dp))
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = Spacing.space4)) {
+            Spacer(Modifier.height(Spacing.space3))
             Text(stringResource(R.string.library_title), style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Spacing.space3))
             OutlinedTextField(
                 value = state.query,
                 onValueChange = { vm.search(it) },
@@ -64,18 +65,18 @@ fun LibraryScreen(
                     }
                 },
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Spacing.space2))
 
             if (state.query.isNotBlank()) {
                 // 搜索模式:显示匹配条目,点击直接进详情
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.space1)) {
                     if (state.searchResults.isEmpty()) {
                         item {
                             Text(
                                 stringResource(R.string.library_no_match),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(vertical = 16.dp),
+                                modifier = Modifier.padding(vertical = Spacing.space4),
                             )
                         }
                     }
@@ -86,7 +87,7 @@ fun LibraryScreen(
                                 Text(entry.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             },
                             supportingContent = {
-                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
                                     RatioBadge(entry.ratio)
                                     GradeBadge(entry.grade)
                                     if (entry.dispute) DisputeBadge()
@@ -100,7 +101,7 @@ fun LibraryScreen(
                 }
             } else {
                 // 目录模式:章号 + 章名 + 条数
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.space1)) {
                     items(state.sections.size, key = { state.sections[it].n }) { i ->
                         val section = state.sections[i]
                         ListItem(

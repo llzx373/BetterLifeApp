@@ -49,6 +49,7 @@ import com.betterlife.app.ui.common.CostMeter
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
 import com.betterlife.app.ui.common.lensGroupTitle
+import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.LibraryViewModel
 import com.betterlife.app.viewmodel.TodayViewModel
 import java.time.LocalDate
@@ -93,8 +94,8 @@ fun TodayScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.space4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.space3),
         ) {
             item { GreetingHeader() }
 
@@ -157,7 +158,7 @@ fun TodayScreen(
                 }
             }
 
-            item { Spacer(Modifier.height(72.dp)) } // 给 FAB 留位
+            item { Spacer(Modifier.height(Spacing.space12)) } // 给 FAB 留位
         }
     }
 }
@@ -198,7 +199,7 @@ private fun DailyTaskCard(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(Spacing.space3),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -223,7 +224,7 @@ private fun DailyTaskCard(
                     )
                 }
             }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Spacing.space2))
             IconButton(onClick = onToggle) {
                 // 打勾动画:完成时绿色对勾弹入,未完成显示空圈
                 AnimatedVisibility(
@@ -261,15 +262,15 @@ private fun RecommendCard(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(Spacing.space3),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
                     GradeBadge(entry.grade)
                     if (entry.dispute) DisputeBadge()
                 }
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(Spacing.space2))
                 Text(entry.title, style = MaterialTheme.typography.titleSmall)
                 if (entry.human.isNotBlank()) {
                     Text(
@@ -280,7 +281,7 @@ private fun RecommendCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(Spacing.space2))
                 CostMeter(entry)
             }
             IconButton(onClick = onAddTodo) {
@@ -297,7 +298,7 @@ private fun EmptyCard(text: String, actionText: String, onAction: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(Spacing.space4),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -313,7 +314,7 @@ private fun EmptyCard(text: String, actionText: String, onAction: () -> Unit) {
 @Composable
 private fun ErrorState(onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.padding(24.dp),
+        modifier = modifier.padding(Spacing.space6),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -322,7 +323,7 @@ private fun ErrorState(onRetry: () -> Unit, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(Spacing.space3))
         Button(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
     }
 }

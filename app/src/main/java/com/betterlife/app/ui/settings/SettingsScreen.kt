@@ -62,6 +62,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
+import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.ui.theme.ThemeMode
 import com.betterlife.app.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
@@ -137,8 +138,8 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = Spacing.space4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.space3),
         ) {
             SectionTitle(stringResource(R.string.settings_section_ai))
 
@@ -242,7 +243,7 @@ fun SettingsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { vm.setThemeMode(mode) }
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = Spacing.space1),
                     ) {
                         RadioButton(
                             selected = currentThemeMode == mode,
@@ -251,7 +252,7 @@ fun SettingsScreen(
                         Text(
                             text = themeModeLabel(mode),
                             style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(start = 8.dp),
+                            modifier = Modifier.padding(start = Spacing.space2),
                         )
                     }
                 }
@@ -278,7 +279,7 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(Spacing.space6))
         }
     }
 
