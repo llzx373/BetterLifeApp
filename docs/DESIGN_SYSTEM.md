@@ -293,7 +293,7 @@ space12= 48dp   // 空状态、页面底部避让 FAB
    - 用**间距和字号**分层,而不是六张一模一样的卡。
 3. **底部动作换成 `FloatingToolbar`**,把"加入待办"从底部按钮升级为悬浮工具栏:加入待办 / 收藏 / 复制文本 / 分享。工具栏自带 `WindowInsets` 处理。
 4. **争议/待核实横幅保留**,但文案按 §9 改(现在把两条独立信息用 `append` 拼成一段)。
-5. **修性能**:详情页应通过 `AppContainer` 拿单例仓库,而不是 `remember { EntryRepository(...) }`。这既是架构问题也是体验问题(现在是明显的白屏等待)。
+5. **修性能**(已在 P1 顺手完成):详情页已改用 `AppContainer` 的单例 `EntryRepository`,不再是 `remember { EntryRepository(...) }` 每次进详情重解析 601 条 JSON(见 §8 P2 执行记录)。
 
 **验收**:进入详情页无白屏;首屏无需滚动即可看到成本/收益/性价比;工具栏在深色与浅色下均不遮挡内容。
 
@@ -647,6 +647,40 @@ sealed interface TodayUiState {
 每屏一个 PR,独立可回滚。**每屏完成后跑一次截图测试基线。**
 
 **验收**:每屏 PR 附 4 张截图(浅色/深色 × 100%/200% 字体);§7.1 中该屏的缺失状态全部补齐。
+
+### P2 执行记录(2026-09-24 已完成)
+
+按屏拆 7 个提交,顺序与上文一致,每屏独立可回滚。
+
+| 屏 | 结果 |
+|---|---|
+| 今日页 | 拆掉统一 Card 外壳:问候区回到纯文字 + `StreakPill`(等宽数字,连续 7 天转强调色),今日任务独占 Card(`large` + `surfaceContainerLow`),推荐改分段 `ListItem` + `outlineVariant` 分隔线、口径分组标题带图标与口径色;完成态退到 `surfaceContainerLowest` + 删除线;打卡换 `SplitButton`(打卡 + 换一条/今天不做),整卡不再可点,进详情由标题下划线承担;`UiState` 增加 `Empty`(还没档案)与 `Ready` 区分 |
+| 条目详情 | `CostMeter` 提到首屏,与徽标、标题、收益组成决策区;六栏分层(说人话/收益/证据等级靠字号与间距分层,成本明细/来源/备注折叠);底部换 `HorizontalFloatingToolbar`;争议与待核实拆成两条独立提示;区分「正在打开」与「没找到」 |
+| 条目库 + 章节页 | 目录按该章主导口径着色(图标 + 口径色)+ 条数占比条;章内顶部加排序切换(性价比/证据等级/原书顺序,排序在 VM 里算);`ListItem` 迁移到表达性重载 |
+| 待办页 | 每日习惯与一次性待办在 VM 里分区:前者圆形勾选 + 口径色 + 分区进度环,后者方框勾选;空状态文案分清「今天还没安排」与「没任务」;删除改 Snackbar + 撤销(`restoreTask` 按原 id 写回) |
+| 引导页 | 进度换 `LinearWavyProgressIndicator`;打开滑动翻页;底部动作栏改最小高度、三态共用一套 Row;单选/多选换 `ToggleButton`;每步顶部加一行「为什么问这个」 |
+| 设置页 + 我的页 | 去掉 `emissions >= 2` 取值 hack,`UiState` 带 `loaded` 标志;输入框 `rememberSaveable`;API Key 支持显示/隐藏;新增「测试连接」;分组换表达性 `SegmentedListItem`;关于页拆出折叠免责声明;我的页的领域映射下沉到 `data/ProfileLabels` |
+| 聊天页 | 思考态换 `LinearWavyProgressIndicator` + 「正在检索 N 条建议并请教模型」;安全提示改为顶部固定 Surface;无 Key 横幅改 `secondaryContainer`;气泡按方向区分形状;补三个可点示例问题 |
+
+**验证**
+
+| 项 | 结果 |
+|---|---|
+| `testDebugUnitTest` | 40/40 通过(P1 的 30 例 + 本阶段新增 10 例) |
+| `assembleDebug` | 通过 |
+| `lint` | 0 error |
+
+新增单测:`DailyTaskPlannerTest` +1(换一条不重复补位)、`LibrarySortingTest` +6(主导口径与三种排序)、`ProfileLabelsTest` +3(映射完整性)。
+
+**实际做法与本文的偏差 / 留待后续**
+
+1. **没用 `SearchBar`。** alpha28 已把它重构为基于 `SearchBarState` 的新 API,并且**去掉了 `content` 槽**(`inputField` 之外不再接管结果列表),与「输入时就地出结果」的形态对不上。条目库改用同视觉语言的 `TextField`(大圆角 + `surfaceContainerHigh` + 无下划线)。等 API 稳定后再换。
+2. **排序切换没用 `ButtonGroup`。** `ButtonGroup` 的形态是「按钮组 + 溢出菜单」,而排序是单选语义,用已稳定的 `SingleChoiceSegmentedButtonRow` + `SegmentedButton` 更贴切。
+3. **「收藏」没有做(明确留给独立 PR)。** `entry_states` 是单状态主键,一个条目只能处于 TODO/DONE/DISMISSED 之一;加收藏要么改主键为复合、要么新建表,两者都要动数据库(`version = 1`,目前没有 migration)。这属于数据模型变更,不该混在「按屏替换组件」里。详情页工具栏当前是 **加入待办 / 复制文本 / 分享**。
+4. **P0 遗留的 9 处 `ListItem(headlineContent = …)` 弃用形式已全部迁移**到表达性重载(headline 走尾随 `content`)。设置页与我的页的分组改用 `SegmentedListItem` + `ListItemDefaults.segmentedShapes`。
+5. **条目库大屏 list-detail 与 `PullToRefreshBox`** 按上文仍属 P3,未在 P2 做。
+6. **动效只用了默认的 `scaleIn/fadeIn`**,还没有按 §6.1 全面取用 `MaterialTheme.motionScheme` 的 spec(§6.2 属 P3)。
+7. **截图测试仍然缺席。** §8 P2 的验收写着「每屏 PR 附 4 张截图」,但截图测试的基础设施(androidTest 依赖)被归在 P3;本阶段的验收是**手工截图 + 肉眼检查**,没有自动回归。这是 P2 阶段最大的验收缺口,建议下一轮先把 P3 的截图测试提到最前面,再动 P3 的动效。
 
 ### P3 · 动效与打磨
 
