@@ -86,6 +86,9 @@
     <string name="library_no_match">没有匹配的条目</string>
     <string name="library_chapter_overline">第 %1$d 章</string>
     <string name="library_entry_count">%1$d 条</string>
+    <string name="library_sort_ratio">性价比</string>
+    <string name="library_sort_grade">证据等级</string>
+    <string name="library_sort_order">原书顺序</string>
     <string name="section_title">第 %1$d 章 · %2$s</string>
     <string name="section_title_short">第 %1$d 章</string>
 
