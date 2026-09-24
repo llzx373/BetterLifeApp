@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -70,13 +71,23 @@ fun TodayScreen(
             }
         },
     ) { padding ->
-        if (todayState.loading) {
+        val state = todayState
+        if (state is TodayViewModel.UiState.Loading) {
             Box(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center,
             ) { CircularProgressIndicator() }
             return@Scaffold
         }
+        if (state is TodayViewModel.UiState.Error) {
+            ErrorState(
+                message = state.message,
+                onRetry = todayVm::retry,
+                modifier = Modifier.fillMaxSize().padding(padding),
+            )
+            return@Scaffold
+        }
+        val items = (state as TodayViewModel.UiState.Ready).items
 
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
@@ -88,7 +99,7 @@ fun TodayScreen(
             item {
                 Text("今日任务", style = MaterialTheme.typography.titleMedium)
             }
-            if (todayState.items.isEmpty()) {
+            if (items.isEmpty()) {
                 item {
                     EmptyCard(
                         text = "还没有今日任务。先完善档案,或去条目库逛逛。",
@@ -97,8 +108,8 @@ fun TodayScreen(
                     )
                 }
             } else {
-                items(todayState.items.size) { i ->
-                    val item = todayState.items[i]
+                items(items.size) { i ->
+                    val item = items[i]
                     DailyTaskCard(
                         item = item,
                         onToggle = { todayVm.toggleTask(item.task) },
@@ -288,5 +299,22 @@ private fun EmptyCard(text: String, actionText: String, onAction: () -> Unit) {
             )
             TextButton(onClick = onAction) { Text(actionText) }
         }
+    }
+}
+
+@Composable
+private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = onRetry) { Text("重试") }
     }
 }

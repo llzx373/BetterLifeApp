@@ -45,8 +45,8 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.data.EntryDto
-import com.betterlife.app.data.EntryRepository
 import com.betterlife.app.ui.common.CostChips
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
@@ -66,8 +66,7 @@ fun EntryDetailScreen(
     onBack: () -> Unit,
     vm: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
 ) {
-    val context = LocalContext.current
-    val repo = remember { EntryRepository(context.applicationContext) }
+    val repo = (LocalContext.current.applicationContext as BetterLifeApp).container.entryRepository
     val entry by produceState<EntryDto?>(initialValue = null, entryId) {
         value = withContext(Dispatchers.IO) { repo.entriesData().byId[entryId] }
     }
