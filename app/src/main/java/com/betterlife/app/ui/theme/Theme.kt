@@ -1,10 +1,9 @@
-// 应用主题：色/字/形/间距 token 分别定义在 Color/Type/Shape/Spacing/Lens.kt，这里只做装配。
-// 主题容器在 P1 第 7 项切到 MaterialExpressiveTheme；当前仍是 MaterialTheme。
+// 应用主题：色/字/形/间距/动效 token 分别定义在 Color/Type/Shape/Spacing/Lens/Motion.kt，这里只做装配。
 package com.betterlife.app.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
@@ -28,8 +27,9 @@ fun BetterLifeTheme(
     val lensColors = if (darkTheme) darkLensColors else lightLensColors
 
     CompositionLocalProvider(LocalLensColors provides lensColors) {
-        MaterialTheme(
+        MaterialExpressiveTheme(
             colorScheme = colorScheme,
+            motionScheme = AppMotionScheme,
             shapes = AppShapes,
             typography = AppTypography,
             content = content,
