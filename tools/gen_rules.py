@@ -1,0 +1,207 @@
+# -*- coding: utf-8 -*-
+import json
+
+def rng(sec, a, b):
+    return [f"{sec:02d}-{i:02d}" for i in range(a, b + 1)]
+
+universal = (
+    ["01-01", "01-02", "01-03", "01-04", "01-05", "01-06", "01-07", "01-09",
+     "01-14", "01-23", "01-25", "01-30", "01-36"]
+    + ["02-01", "02-02", "02-07", "02-18", "02-19", "02-20", "02-23", "02-25",
+       "02-27", "02-30", "02-31", "02-32", "02-34", "02-35", "02-38", "02-39"]
+    + ["03-01", "03-04", "03-06", "03-09", "03-11", "03-13", "03-19", "03-21"]
+    + ["04-01", "04-02", "04-04", "04-05", "04-06", "04-07", "04-08", "04-10",
+       "04-14", "04-15", "04-16"]
+    + ["22-01", "22-03", "22-04", "22-06", "22-09"]
+)
+
+daily = ["02-07", "02-10", "02-11", "02-13", "02-14", "02-18", "02-19", "02-20",
+         "02-23", "02-25", "02-28", "02-31", "02-32", "03-02", "03-04", "03-08",
+         "03-09", "22-09"]
+
+rules = [
+    # ---- 普惠基础池 ----
+    {"when": {}, "boostEntryIds": universal, "weight": 15,
+     "reason": "普惠基础推荐池:第1、2、3、4、22节中ratio为极高/高、不依赖特殊人群条件的行动类条目,所有人适用"},
+
+    # ---- 吸烟 ----
+    {"when": {"smoking": ["yes"]},
+     "boostEntryIds": ["02-01", "02-02", "02-03", "02-04", "02-05", "02-06", "01-24"], "weight": 100,
+     "reason": "吸烟者:戒烟四条方法(药/戒烟日/门诊/电子烟兜底)+别在家抽+重度吸烟者低剂量CT筛查,全部直接对症"},
+    {"when": {"smoking": ["quit"]},
+     "excludeEntryIds": ["02-01", "02-03", "02-04", "02-05", "02-06"], "weight": 0,
+     "reason": "已戒烟者不再需要戒烟方法类条目,避免无效推荐"},
+    {"when": {"smoking": ["no"]},
+     "excludeEntryIds": ["02-03", "02-04", "02-05", "02-06", "01-24"], "weight": 0,
+     "reason": "不吸烟者:戒烟方法不适用;02-06备注明确「本来不吸烟的人别碰电子烟」;01-24备注「不吸烟的人做低剂量CT等于花钱买焦虑」"},
+    {"when": {"secondhandSmoke": ["true"]}, "boostEntryIds": ["02-02"], "weight": 80,
+     "reason": "家里或车里有人抽烟:02-02「别在家里和车里抽烟」直接对症,二手烟61%的健康损失落在孩子身上"},
+
+    # ---- 饮酒 ----
+    {"when": {"alcohol": ["often"]}, "boostEntryIds": ["02-20", "02-21", "02-22"], "weight": 80,
+     "reason": "经常喝酒:少喝/数杯数找医生,天天喝的人别自己硬戒(02-21戒断风险)都直接相关"},
+    {"when": {"alcohol": ["sometimes"]}, "boostEntryIds": ["02-20", "02-22"], "weight": 50,
+     "reason": "偶尔喝酒:提醒少喝和减量方法,贴合度中等"},
+    {"when": {"alcohol": ["no"]}, "excludeEntryIds": ["02-21", "02-22"], "weight": 0,
+     "reason": "不喝酒的人:戒断处置和减量方法均不适用"},
+
+    # ---- 槟榔 / 含糖饮料 ----
+    {"when": {"betelNut": ["true"]}, "boostEntryIds": ["02-08"], "weight": 100,
+     "reason": "嚼槟榔者:02-08「不嚼槟榔」是唯一对口条目(口腔癌风险),最高优先"},
+    {"when": {"betelNut": ["false"]}, "excludeEntryIds": ["02-08"], "weight": 0,
+     "reason": "不嚼槟榔的人推荐「不嚼槟榔」是噪音"},
+    {"when": {"sugaryDrinks": ["daily"]}, "boostEntryIds": ["02-07"], "weight": 100,
+     "reason": "天天喝含糖饮料:02-07直接对症,级别大、成本为零"},
+    {"when": {"sugaryDrinks": ["sometimes"]}, "boostEntryIds": ["02-07"], "weight": 50,
+     "reason": "偶尔喝含糖饮料:同一条目,贴合度中等"},
+
+    # ---- 运动 / 睡眠 ----
+    {"when": {"exercise": ["none"]},
+     "boostEntryIds": ["02-11", "02-14", "02-16", "02-17", "02-18", "22-07"], "weight": 70,
+     "reason": "几乎不运动:从最低门槛的几条入手;02-16(零碎用力活动)研究对象正是不锻炼的人"},
+    {"when": {"exercise": ["low"]}, "boostEntryIds": ["02-11", "02-14", "02-17"], "weight": 60,
+     "reason": "运动不足150分钟:往达标推的几条"},
+    {"when": {"exercise": ["ok"]}, "excludeEntryIds": ["02-16"], "weight": 0,
+     "reason": "02-16备注明确:研究对象是完全不锻炼的人,已经在规律运动的人不适用"},
+    {"when": {"sleepShort": ["true"]},
+     "boostEntryIds": ["02-13", "02-39", "03-02", "03-03", "03-04", "03-08", "03-09"], "weight": 70,
+     "reason": "经常睡不够7小时:睡眠时长、作息固定、咖啡因截止时间、睡前屏幕、到点就睡一整组对症"},
+
+    # ---- 慢性病 ----
+    {"when": {"chronic": ["hypertension", "diabetes", "kidney", "heart", "other"]},
+     "boostSections": [16], "boostEntryIds": ["05-12"], "weight": 80,
+     "reason": "有慢性病:第16节(慢病之后怎么活)整节对口;05-12集采仿制药直接省长期药费"},
+    {"when": {"chronic": ["hypertension"]}, "boostEntryIds": ["01-07", "02-12", "02-09"], "weight": 90,
+     "reason": "高血压:量血压降达标、按医嘱吃药、低钠盐(02-09试验对象即高危人群)三条直接对症"},
+    {"when": {"chronic": ["diabetes"]}, "boostEntryIds": ["16-07", "13-17"], "weight": 90,
+     "reason": "糖尿病:查眼底查脚(16-07)和低血糖自救(13-17)直接对症"},
+    {"when": {"chronic": ["diabetes"]}, "excludeEntryIds": ["06-26"], "weight": 0,
+     "reason": "06-26备注明确:糖尿病人、正在吃降糖药的人不适用跳餐/断食,漏一顿可能低血糖"},
+    {"when": {"chronic": ["kidney"]}, "excludeEntryIds": ["02-09"], "weight": 0,
+     "reason": "02-09备注明确:肾功能不全或正在吃保钾类药物的人,换低钠盐前先问医生——强制排除"},
+    {"when": {"chronic": ["heart"]}, "boostEntryIds": ["01-20"], "excludeEntryIds": ["02-37"], "weight": 80,
+     "reason": "心血管病:01-20流感疫苗的A级证据只对应心血管病人;02-37备注提示心脑血管病人泡澡水温过高反而危险,排除"},
+    {"when": {"chronic": ["none"]}, "excludeEntryIds": ["02-12"], "weight": 0,
+     "reason": "02-12备注明确:这条只对医生判断该吃药的人成立,健康人不用吃"},
+
+    # ---- 职业 / 经济 / 住房 ----
+    {"when": {"occupation": ["programmer"]}, "boostSections": [11],
+     "boostEntryIds": ["02-18", "03-06", "04-17"], "weight": 80,
+     "reason": "程序员:第11节(技术人法律红线)整节对口;久坐(02-18)、深度工作(03-06)、快捷键自动化(04-17)贴合"},
+    {"when": {"occupation": ["student"]}, "boostSections": [23, 31], "weight": 75,
+     "reason": "在校学生:第23节(学什么技能划算/怎么学)和第31节(十八岁之后的路)整节对口"},
+    {"when": {"financialStress": ["true"]}, "boostSections": [7],
+     "boostEntryIds": ["05-27", "23-04", "23-09", "01-35", "09-22"], "weight": 90,
+     "reason": "经济紧张:第7节(失业金/救助/低保/法律援助兜底)整节对口;另补贴渠道两条,以及缺钱到极端时的两条红线(卖器官)"},
+    {"when": {"housing": ["rent"]}, "boostSections": [15], "boostEntryIds": ["05-03"], "weight": 80,
+     "reason": "租房:第15节(租房与买房)整节对口;05-03公积金可用于租房提取直接省钱"},
+    {"when": {"housing": ["own"]}, "boostEntryIds": ["05-28"], "weight": 50,
+     "reason": "自有住房(多有房贷):05-28提前还贷先算账贴合"},
+
+    # ---- 孩子 ----
+    {"when": {"children": ["baby"]}, "boostSections": [20],
+     "boostEntryIds": ["01-10", "01-11", "18-01", "18-02", "18-03", "05-02"], "weight": 90,
+     "reason": "家有婴幼儿:第20节(新生儿怎么带)整节对口;安全座椅、窗户限位器、育儿补贴、产假津贴、婴幼儿照护专项扣除"},
+    {"when": {"children": ["baby"]},
+     "excludeEntryIds": rng(30, 1, 13) + ["05-09", "05-10"], "weight": 0,
+     "reason": "孩子还在婴幼儿阶段:第30节(上学以后的孩子)和孩子手机充值打赏类条目为时尚早"},
+    {"when": {"children": ["school"]}, "boostSections": [30],
+     "boostEntryIds": ["01-12", "05-09", "05-10", "05-02"], "weight": 90,
+     "reason": "家有学龄儿童:第30节整节对口;儿童近水防溺水、充值打赏退款、教孩子防骗、子女教育专项扣除"},
+    {"when": {"children": ["none"], "pregnant": ["false"]},
+     "excludeEntryIds": rng(20, 1, 12) + rng(30, 1, 13) + ["01-10", "01-11", "01-12", "05-09", "05-10", "33-08", "29-07"],
+     "weight": 0,
+     "reason": "无孩子且未怀孕/备孕:婴幼儿养育、学龄儿童、儿童安全、儿童康复救助、丧亲后如何告诉孩子等条目均不适用"},
+
+    # ---- 老人 ----
+    {"when": {"hasElderly": ["true"]}, "boostSections": [17],
+     "boostEntryIds": ["01-13", "01-20", "01-21", "01-22", "13-10", "05-02"], "weight": 80,
+     "reason": "家里有老人:第17节整节对口;老人防跌倒、流感/带状疱疹/肺炎疫苗、磕过头后的迟发症状、赡养老人专项扣除"},
+
+    # ---- 怀孕 ----
+    {"when": {"pregnant": ["true"]}, "boostSections": [27, 20],
+     "boostEntryIds": ["18-01", "18-02", "18-03"], "weight": 100,
+     "reason": "怀孕/备孕(含配偶):第27节(怀孕生产全流程)最高优先,第20节(新生儿)紧随其后;育儿补贴、产假、孕期辞退保护"},
+    {"when": {"pregnant": ["true"]}, "excludeEntryIds": ["06-26", "02-27"], "weight": 0,
+     "reason": "备注明确:06-26怀孕的人不适用跳餐/断食(可能低血糖);02-27咖啡条目孕妇不适用"},
+    {"when": {"pregnant": ["false"]}, "excludeEntryIds": rng(27, 1, 16), "weight": 0,
+     "reason": "未怀孕/备孕:第27节(产检、分娩、出生办证)整节不适用"},
+
+    # ---- 出国 ----
+    {"when": {"planningAbroad": ["true"]}, "boostSections": [21, 32], "boostEntryIds": ["31-14"], "weight": 80,
+     "reason": "计划出国/留学:第21节(境外安全)和第32节(留学身份打工认证)整节对口;31-14出国打工查公司资质"},
+
+    # ---- 性别 ----
+    {"when": {"gender": ["female"]}, "boostEntryIds": ["01-16", "01-17", "01-18"],
+     "excludeEntryIds": ["01-28", "01-29", "31-02"], "weight": 70,
+     "reason": "女性:HPV疫苗、乳腺癌和宫颈癌筛查对口;01-28/01-29为男性勃起功能条目不适用;31-02兵役登记备注写明女性不强制"},
+    {"when": {"gender": ["male"]}, "excludeEntryIds": ["01-16", "01-17", "01-18"], "weight": 0,
+     "reason": "男性:HPV(本条按女性写)、乳腺癌筛查、宫颈癌筛查三条为女性条目,不适用"},
+
+    # ---- 年龄 ----
+    {"when": {"ageRange": ["18-25", "26-35"]}, "boostSections": [10], "weight": 50,
+     "reason": "18-35岁:第10节(恋爱和结婚划不划算)是该年龄段的主要决策议题"},
+    {"when": {"ageRange": ["18-25"]}, "boostSections": [23, 31], "weight": 50,
+     "reason": "18-25岁:技能学习和十八岁后的路径选择(升学/当兵/体制内/灵活就业)正当其时"},
+    {"when": {"ageRange": ["36-45", "46-60", "60+"]}, "boostEntryIds": ["01-08"], "weight": 60,
+     "reason": "01-08明确:35岁以后只要超重就查空腹血糖,正常也每三年再查"},
+    {"when": {"ageRange": ["46-60", "60+"]}, "boostEntryIds": ["01-19", "01-21"], "weight": 70,
+     "reason": "45-50岁起结直肠癌筛查(01-19)、50岁后带状疱疹疫苗(01-21)到龄适用"},
+    {"when": {"ageRange": ["60+"]},
+     "boostEntryIds": ["01-13", "01-20", "01-22", "17-01", "17-02"], "excludeEntryIds": ["02-37"], "weight": 80,
+     "reason": "60岁以上:防跌倒改造(01-13适用对象即住家60+老人)、流感/肺炎疫苗、意定监护和遗嘱;02-37备注提示老年人泡澡猝死风险,排除"},
+    {"when": {"ageRange": ["18-25", "26-35", "36-45"], "hasElderly": ["false"]},
+     "excludeEntryIds": ["01-13", "01-20", "01-21", "01-22"], "weight": 0,
+     "reason": "年轻且家中无老人:01-13(住家60+老人)、01-20(心血管病人和老年人)、01-21(50岁后)、01-22(65岁以上)均不到适用年龄"},
+    {"when": {"ageRange": ["46-60"], "hasElderly": ["false"]},
+     "excludeEntryIds": ["01-13", "01-20", "01-22"], "weight": 0,
+     "reason": "46-60岁且家中无老人:防跌倒改造(60+)、老年人流感疫苗、65岁肺炎疫苗尚未到龄"},
+    {"when": {"ageRange": ["18-25", "26-35"]}, "excludeEntryIds": ["01-19"], "weight": 0,
+     "reason": "01-19结直肠癌筛查45-50岁起,年轻人(无家族史信息)不到筛查年龄"},
+    {"when": {"ageRange": ["18-25"]}, "excludeEntryIds": ["01-17", "01-18"], "weight": 0,
+     "reason": "01-17乳腺癌筛查40岁起、01-18宫颈癌筛查30岁起,18-25岁不到年龄"},
+    {"when": {"ageRange": ["26-35"]}, "excludeEntryIds": ["01-17"], "weight": 0,
+     "reason": "01-17乳腺癌筛查40岁起,26-35岁不到年龄"},
+
+    # ---- 目标 ----
+    {"when": {"goals": ["health"]}, "boostSections": [1, 2, 16, 28], "weight": 40,
+     "reason": "目标=健康:不要早死、不要慢慢死、慢病管理、别为外形搞坏身体"},
+    {"when": {"goals": ["money"]}, "boostSections": [5, 7, 12, 15], "weight": 40,
+     "reason": "目标=钱:不要浪费钱、没钱怎么活、创业别赔家底、租房买房"},
+    {"when": {"goals": ["time"]}, "boostSections": [3, 4], "weight": 40,
+     "reason": "目标=时间:不要浪费精力、不要浪费时间"},
+    {"when": {"goals": ["career"]}, "boostSections": [19, 23], "weight": 40,
+     "reason": "目标=职业:在职离职工伤权益、学什么技能划算"},
+    {"when": {"goals": ["family"]}, "boostSections": [10, 17, 18], "weight": 40,
+     "reason": "目标=家庭:恋爱结婚、家里有老人、养孩子划不划算"},
+    {"when": {"goals": ["relax"]}, "boostSections": [22], "weight": 40,
+     "reason": "目标=放松:第22节娱乐场所安全和减压方法"},
+]
+
+doc = {"version": 1, "dailyEntryIds": daily, "rules": rules}
+
+entries = json.load(open(r"app/src/main/assets/entries.json", encoding="utf-8"))
+valid_ids = {e["id"] for e in entries["entries"]}
+valid_secs = {s["n"] for s in entries["sections"]}
+bad = []
+
+def check(ids, where):
+    for i in ids:
+        if i not in valid_ids:
+            bad.append((where, i))
+
+for idx, r in enumerate(rules):
+    check(r.get("boostEntryIds", []), f"rule{idx}.boost")
+    check(r.get("excludeEntryIds", []), f"rule{idx}.exclude")
+    for s in r.get("boostSections", []):
+        if s not in valid_secs:
+            bad.append((f"rule{idx}.sections", s))
+check(daily, "daily")
+if bad:
+    print("BAD IDS:", bad)
+else:
+    print("all ids ok")
+
+with open(r"tools/relevance_rules.json", "w", encoding="utf-8") as f:
+    json.dump(doc, f, ensure_ascii=False, indent=2)
+print("rules:", len(rules), "daily:", len(daily), "universal pool:", len(universal))
