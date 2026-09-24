@@ -1,11 +1,7 @@
-// 条目通用展示组件:性价比/证据等级/争议徽标、成本标签、口径人性化组名
+// 条目通用展示组件:性价比/证据等级/争议徽标、口径人性化组名
 package com.betterlife.app.ui.common
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -15,7 +11,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.betterlife.app.R
-import com.betterlife.app.data.EntryDto
 import com.betterlife.app.data.EntryKeys
 
 /** 口径 → 人性化组名(未识别的口径原样展示) */
@@ -112,34 +107,4 @@ fun TodoBadge(modifier: Modifier = Modifier) {
         content = MaterialTheme.colorScheme.onTertiaryContainer,
         modifier = modifier,
     )
-}
-
-@Composable
-private fun costLabel(entry: EntryDto): String = when {
-    entry.cost.isNotBlank() -> entry.cost
-    else -> buildList {
-        if (entry.money == EntryKeys.COST_MORE) add(stringResource(R.string.cost_money_high))
-        else if (entry.money == EntryKeys.COST_LESS) add(stringResource(R.string.cost_money_low))
-        if (entry.time == EntryKeys.COST_MORE) add(stringResource(R.string.cost_time_high))
-        else if (entry.time == EntryKeys.COST_MID) add(stringResource(R.string.cost_time_mid))
-        if (entry.will == EntryKeys.WILL_YES) add(stringResource(R.string.cost_will_high))
-        else if (entry.will == EntryKeys.WILL_SOME) add(stringResource(R.string.cost_will_some))
-    }.joinToString(" · ")
-}
-
-/** 成本标签(钱/时间/毅力),用 AssistChip 呈现 */
-@Composable
-fun CostChips(entry: EntryDto, modifier: Modifier = Modifier) {
-    val label = costLabel(entry)
-    if (label.isBlank()) return
-    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        AssistChip(
-            onClick = {},
-            label = { Text(label) },
-            colors = AssistChipDefaults.assistChipColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-        )
-    }
 }

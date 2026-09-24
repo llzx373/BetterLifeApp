@@ -36,14 +36,10 @@
     <string name="grade_badge">证据 %1$s</string>
     <string name="badge_dispute">争议</string>
     <string name="badge_todo">待核实</string>
-
-    <!-- 成本标签 -->
-    <string name="cost_money_high">花钱多</string>
-    <string name="cost_money_low">花小钱</string>
-    <string name="cost_time_high">费时间</string>
-    <string name="cost_time_mid">费些时间</string>
-    <string name="cost_will_high">要毅力</string>
-    <string name="cost_will_some">要些毅力</string>
+    <string name="ratio_short_very_high">极高</string>
+    <string name="ratio_short_high">高</string>
+    <string name="ratio_short_normal">一般</string>
+    <string name="cost_meter_desc">成本:钱 %1$s,时间 %2$s,毅力 %3$s;收益 %4$s;性价比 %5$s</string>
 
     <!-- 底部导航与页面标题 -->
     <string name="nav_today">今日</string>

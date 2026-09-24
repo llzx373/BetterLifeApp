@@ -45,9 +45,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
 import com.betterlife.app.data.EntryDto
 import com.betterlife.app.recommend.ScoredEntry
+import com.betterlife.app.ui.common.CostMeter
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
-import com.betterlife.app.ui.common.RatioBadge
 import com.betterlife.app.ui.common.lensGroupTitle
 import com.betterlife.app.viewmodel.LibraryViewModel
 import com.betterlife.app.viewmodel.TodayViewModel
@@ -266,7 +266,6 @@ private fun RecommendCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    RatioBadge(entry.ratio)
                     GradeBadge(entry.grade)
                     if (entry.dispute) DisputeBadge()
                 }
@@ -281,6 +280,8 @@ private fun RecommendCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                Spacer(Modifier.height(6.dp))
+                CostMeter(entry)
             }
             IconButton(onClick = onAddTodo) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.today_add_todo_desc))

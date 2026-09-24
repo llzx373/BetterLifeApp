@@ -24,4 +24,9 @@ object EntryKeys {
     const val COST_MID = "中"
     const val WILL_YES = "是"
     const val WILL_SOME = "些"
+
+    // 收益档（level）
+    const val GAIN_BIG = "大"
+    const val GAIN_MID = "中"
+    const val GAIN_SMALL = "小"
 }

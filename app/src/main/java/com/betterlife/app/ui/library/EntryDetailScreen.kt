@@ -49,7 +49,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.R
 import com.betterlife.app.data.EntryDto
-import com.betterlife.app.ui.common.CostChips
+import com.betterlife.app.ui.common.CostMeter
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
 import com.betterlife.app.ui.common.RatioBadge
@@ -136,7 +136,7 @@ fun EntryDetailScreen(
 
             item {
                 DetailSection(title = stringResource(R.string.detail_section_cost), initiallyExpanded = true) {
-                    CostChips(e)
+                    CostMeter(e)
                     if (e.level.isNotBlank()) {
                         Text(
                             stringResource(R.string.detail_impact, e.level),
