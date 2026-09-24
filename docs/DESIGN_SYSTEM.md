@@ -718,7 +718,48 @@ sealed interface TodayUiState {
 
 **验收**:大屏/折叠屏上条目库双栏可用;TalkBack 能完整走完归档→打卡→搜索→详情;CI 里有截图回归门禁。
 
+### P3 执行记录(2026-09-24 起)
+
+分两步:先把质量地基补齐,再动视觉。顺序不是随便定的 —— B4 全是动效改动,没有基线就等于裸奔。
+
+#### P3-A1 · 截图测试基础设施(2026-09-24 已完成)
+
+这就是 §8 P2 偏差记录第 7 条点名的缺口:P2 的验收写着「每屏 PR 附 4 张截图」,当时既没有 androidTest 依赖也没有任何自动回归,全靠手工肉眼。
+
+**方案:官方 Compose Preview Screenshot Testing(`com.android.compose.screenshot`)**
+
+| 项 | 决定 | 理由 |
+|---|---|---|
+| 插件版本 | `0.0.1-alpha16`,走**独立插件** | 官方已从 AGP 9.5.0-alpha03 起推荐改用 AGP test suites,但那条路**硬性要求 AGP ≥ 9.5.0-alpha03**,而本项目在 9.4.1(最新稳定线)。为一项测试能力把整个构建推到 alpha 通道不划算,故先用仍受支持的独立插件;迁 test suites 留给 A4 升完 AGP |
+| 预览组合 | 自定义 multi-preview 注解 `FourFoldPreview` | 浅/深 × 100%/200% 四张是 §11 验收清单的要求。注解放一处,新增预览只贴一个注解,不会漏掉某个组合 |
+| 深色怎么来 | `@Preview(uiMode = NIGHT_YES)`,主题仍走 `BetterLifeTheme` 的默认分支 | 深色走的就是真实运行时那条分支,不是另写一套配色 —— 否则截图证明不了线上长什么样 |
+| 基线命名 | preview `name` 用 ASCII(`light-100%` / `dark-200%`) | 该 name 会进基线文件名,非 ASCII 文件名在 CI 与跨平台上是隐患 |
+
+**改动位置**
+
+1. `gradle.properties`:`android.experimental.enableScreenshotTest=true`,外加 `android.compose.screenshot.maxHeapSize=4g`(host 侧渲染吃内存)。
+2. `libs.versions.toml` 加 `screenshot` 版本、插件别名与 `screenshot-validation-api`;`app/build.gradle.kts` 开 `experimentalProperties`。
+3. 新增 `app/src/screenshotTest/kotlin/`,公共脚手架是 `ui/ScreenshotPreviews.kt`(`FourFoldPreview` + `PreviewSurface`)。
+4. 基线落在 `app/src/screenshotTestDebug/reference/`,**入库**(`.gitignore` 未排除),否则回归无从比对。
+
+**验证**
+
+| 项 | 结果 |
+|---|---|
+| `:app:updateDebugScreenshotTest` | 生成 16 张基线(4 个预览函数 × 4 种组合) |
+| `:app:validateDebugScreenshotTest` | 通过 |
+| configuration cache | 兼容(`org.gradle.configuration-cache=true` 下 entry 正常存储,没有退化成 no-cache) |
+| **门禁有效性(负向测试)** | 临时把 `lightLensColors.life` 改成 `0xFF00FF00` → 校验如预期失败,且**只挂掉 2 个浅色组合**,深色两个不受影响。说明它按预览粒度比对,不是整体重跑;测完已还原 |
+| `testDebugUnitTest` / `lint` / `assembleDebug` | 全绿 / 0 error / 通过 |
+
+**当前只覆盖了设计系统层,各屏还没有基线**
+
+已进基线的是:`CostMeter` 三种性价比档、条目徽标组(性价比/证据/争议/待核实)、口径色板、中文排版阶梯。这四张同时是无障碍验收的证据 —— 口径色与图标成对出现、明度是否拉开、200% 缩放下排版会不会挤成一团,肉眼一看便知。
+
+**各屏进不了基线的原因**:7 个屏都是「有状态 `XxxScreen(vm)` + `private` 无状态 Content」,`private` 的 Content 在截图源集里看不见,而带 vm 的入口在 host 侧渲染里根本跑不起来(Room / DI / DataStore 都不存在)。要让每屏有基线,得先把无状态 Content 提出来改成可见 —— 这一步排在 B4 之前做。
+
 ---
+
 
 ## 9. 文案规范(voice)
 

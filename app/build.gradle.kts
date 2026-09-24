@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.screenshot)
 }
 
 // 正式签名从 keystore.properties 读取（该文件与密钥库均不入库）。
@@ -69,6 +70,9 @@ android {
         compose = true
     }
 
+    // 启用 screenshotTest 源集（配合 gradle.properties 的同名开关）
+    experimentalProperties["android.experimental.enableScreenshotTest"] = true
+
     packaging {
         resources {
             // 精确排除，不要再用 "META-INF/*" 通配 —— 那会连带干掉 META-INF/services
@@ -128,4 +132,8 @@ dependencies {
     // 测试
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+
+    // 截图测试（host 侧渲染 Compose 预览，不需要设备）
+    screenshotTestImplementation(libs.compose.ui.tooling)
+    screenshotTestImplementation(libs.screenshot.validation.api)
 }

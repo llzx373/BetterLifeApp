@@ -30,7 +30,11 @@
 ./gradlew assembleDebug       # 产出 app/build/outputs/apk/debug/app-debug.apk
 ./gradlew assembleRelease     # 产出 app/build/outputs/apk/release/app-release.apk(R8 压缩)
 ./gradlew lint                # 静态检查(abortOnError:有错误即构建失败)
+./gradlew validateDebugScreenshotTest # 截图回归:把各屏与设计组件和基线图逐像素比对
+./gradlew updateDebugScreenshotTest   # 视觉有意改动后重刷基线(改完记得看一眼 diff)
 ```
+
+截图测试跑在宿主 JVM 上,不需要设备或模拟器;基线图入库,位于 `app/src/screenshotTestDebug/reference/`。
 
 依赖与工具链版本集中在 [`gradle/libs.versions.toml`](gradle/libs.versions.toml),不要在模块脚本里硬编码版本号。
 
