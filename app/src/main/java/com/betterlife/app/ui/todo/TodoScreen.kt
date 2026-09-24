@@ -36,7 +36,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,7 +58,7 @@ fun TodoScreen(
     vm: TodoViewModel = viewModel(factory = TodoViewModel.Factory),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val undoLabel = stringResource(R.string.action_undo)
@@ -121,7 +121,7 @@ fun TodoScreen(
                         onDelete = {
                             vm.delete(item.task)
                             scope.launch {
-                                val message = context.getString(
+                                val message = resources.getString(
                                     R.string.todo_deleted,
                                     item.entry?.title ?: item.task.entryId,
                                 )
