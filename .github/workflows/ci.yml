@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 单元测试 + 静态检查 + release 包。release 在没有 keystore.properties 时
+  # 回退 debug 签名（见 README「发布构建与签名」），所以这里能在任何机器上跑通。
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 配 JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: 配 Gradle（含依赖缓存）
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: 配 Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 单元测试
+        run: ./gradlew testDebugUnitTest
+
+      - name: 静态检查（abortOnError，有 error 即失败）
+        run: ./gradlew lint
+
+      - name: 构建 release
+        run: ./gradlew assembleRelease
+
+  # 截图回归单独一个作业：它是最容易因环境差异变红的一环，
+  # 独立出来后失败原因一眼可辨，不会和单测/构建的失败混在一起。
+  screenshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 配 JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: 配 Gradle（含依赖缓存）
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: 配 Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 截图回归
+        run: ./gradlew validateDebugScreenshotTest
+
+      # 失败时把报告传上来：里面是 reference / actual / diff 三图对照，
+      # 没有它就只能靠猜是哪一屏、差在哪。
+      - name: 上传截图报告
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-report
+          path: |
+            app/build/reports/screenshotTest/**
+            app/build/outputs/**
+          if-no-files-found: ignore

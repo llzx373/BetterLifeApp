@@ -793,6 +793,28 @@ AnimatedVisibility(visibleState = visible, enter = fadeIn() + scaleIn(initialSca
 1. 凡是「靠入场动画才出现」的内容,都无法进基线。B4 要做的正是到处加入场动画,所以 **B5 的动画降级机制必须排在 B4 前面** —— 有了「关闭动画」这条路径,预览里就能走降级分支拿到确定性的静态帧,否则 B4 每加一处动画就多一处没法回归的视觉。
 2. 动效本身(弹簧、位移、时序)按定义验证不了,截图只能锁住**静态终态**。B4 的动效正确性得靠真机手动走查,不要假装有自动回归。
 
+#### P3-A2 · CI(2026-09-24 已完成)
+
+`.github/workflows/ci.yml`,两个作业:
+
+| 作业 | 内容 | 为什么这么拆 |
+|---|---|---|
+| `build` | `testDebugUnitTest` → `lint` → `assembleRelease` | release 在没有 `keystore.properties` 时回退 debug 签名(README 已写明),所以任何机器上都能跑通,不需要往 CI 里塞密钥 |
+| `screenshot` | `validateDebugScreenshotTest`,失败时上传报告 | 它是最容易因环境差异变红的一环,独立成作业后失败原因一眼可辨,不会和单测/构建的失败混在一起 |
+
+环境:`ubuntu-latest` + JDK 21(temurin)+ `gradle/actions/setup-gradle`(依赖缓存)+ `android-actions/setup-android`。compileSdk 37 的平台包由 AGP 自动下载。
+
+**顺手修掉的仓库缺陷**:`gradlew` 在 git 里是 `100644`,**没有可执行位** —— 在 Linux runner 上 `./gradlew` 会直接 `Permission denied`。已改为 `100755`。这个洞在 Windows 上永远暴露不出来。
+
+**⚠️ 未验证项:基线的跨宿主一致性**
+
+仓库里现有的基线是在 **Windows** 上渲染的,CI 跑在 **Linux** 上。layoutlib 的渲染在设计上是宿主无关的,Google 的 release notes 也在持续修宿主相关差异(alpha11「XML drawable 的小数解析不再受宿主 locale 影响」、alpha14「修 Windows 与 GitHub Actions 的命令行长度上限」),但**本机无法验证 Linux 上的渲染结果**。
+
+首次 CI 跑起来如果 `screenshot` 作业报 diff,按这个顺序处理:
+
+1. **先看图**:从 `screenshot-report` 工件里比对 reference / actual / diff。差在布局、颜色、文案 → 是真回归,修代码。
+2. **只差在笔画边缘的亚像素差异** → 是宿主差异,不是回归。在 Linux 上跑一次 `updateDebugScreenshotTest` 并把产出的基线提交,**基线以 CI 宿主为准**;之后本地 Windows 开发改为以 CI 为准(或本地不再刷基线)。
+3. 如果差异面很广又难以判断,再考虑给 `testOptions.screenshotTests` 配 `imageDifferenceThreshold` 吸收亚像素噪声 —— **但这会同时削弱门禁灵敏度,不作为首选**。
 
 ---
 
@@ -842,7 +864,7 @@ AnimatedVisibility(visibleState = visible, enter = fadeIn() + scaleIn(initialSca
 - [ ] 动画降级档位在"关闭"时全局瞬时
 - [ ] 全部交互组件补齐 9 状态(§7.1)
 - [ ] 截图测试覆盖 4 种组合(浅/深 × 100%/200%)
-- [ ] CI 跑通 test + lint + 截图回归
+- [x] CI 跑通 test + lint + 截图回归
 
 ---
 

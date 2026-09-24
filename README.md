@@ -36,6 +36,8 @@
 
 截图测试跑在宿主 JVM 上,不需要设备或模拟器;基线图入库,位于 `app/src/screenshotTestDebug/reference/`。
 
+CI 见 [`.github/workflows/ci.yml`](.github/workflows/ci.yml):`build` 作业跑单测 + lint + release 构建,`screenshot` 作业跑截图回归(失败时上传 reference/actual/diff 报告)。基线目前是在 Windows 上生成的,首次在 Linux runner 上跑若出现亚像素级差异,处理办法见 [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) §8「P3-A2」。
+
 依赖与工具链版本集中在 [`gradle/libs.versions.toml`](gradle/libs.versions.toml),不要在模块脚本里硬编码版本号。
 
 ### 发布构建与签名
