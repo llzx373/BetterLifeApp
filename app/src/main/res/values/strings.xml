@@ -114,6 +114,8 @@
     <string name="detail_section_note">备注</string>
     <string name="detail_add_todo">加入待办</string>
     <string name="detail_added_todo">已加入待办</string>
+    <string name="detail_favorite">收藏</string>
+    <string name="detail_unfavorite">取消收藏</string>
     <string name="detail_copy">复制文本</string>
     <string name="detail_share">分享</string>
     <string name="detail_copied">已复制到剪贴板</string>
@@ -136,10 +138,16 @@
     <string name="chat_error_generic">出了点问题,请稍后再试</string>
     <string name="chat_input_hint">问点什么,比如:我抽烟,先看哪几条?</string>
 
+    <!-- 我的收藏 -->
+    <string name="favorites_title">我的收藏</string>
+    <string name="favorites_empty">还没有收藏。在条目详情页点一下「收藏」,这里就会出现。</string>
+
     <!-- 我的 -->
     <string name="mine_title">我的</string>
     <string name="mine_profile_title">我的档案</string>
     <string name="mine_goals_hint">想改善什么?点一下即可增删</string>
+    <string name="mine_favorites">我的收藏</string>
+    <string name="mine_favorites_sub">详情页收藏过的条目</string>
     <string name="mine_age_segment">%1$s 岁段</string>
     <string name="mine_suffix_programmer"> · 程序员</string>
     <string name="mine_suffix_student"> · 学生</string>

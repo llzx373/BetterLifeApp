@@ -33,6 +33,7 @@ import androidx.navigation.navArgument
 import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.R
 import com.betterlife.app.ui.chat.ChatScreen
+import com.betterlife.app.ui.favorites.FavoritesScreen
 import com.betterlife.app.ui.library.EntryDetailScreen
 import com.betterlife.app.ui.library.LibraryScreen
 import com.betterlife.app.ui.library.SectionScreen
@@ -53,6 +54,7 @@ object Routes {
     const val MINE = "mine"
     const val CHAT = "chat"
     const val SETTINGS = "settings"
+    const val FAVORITES = "favorites"
     const val ONBOARDING = "onboarding"
 
     fun section(n: Int) = "library/$n"
@@ -156,6 +158,13 @@ private fun AppScaffold(startRoute: String) {
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                     onEditProfile = { navController.navigate(Routes.ONBOARDING) },
                     onOpenChat = { navController.navigate(Routes.CHAT) },
+                    onOpenFavorites = { navController.navigate(Routes.FAVORITES) },
+                )
+            }
+            composable(Routes.FAVORITES) {
+                FavoritesScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenEntry = { id -> navController.navigate(Routes.entry(id)) },
                 )
             }
             composable(Routes.CHAT) {

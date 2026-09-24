@@ -61,13 +61,17 @@ interface EntryStateDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(state: EntryStateEntity)
 
-    @Query("DELETE FROM entry_states WHERE entryId = :entryId")
-    suspend fun delete(entryId: String)
+    @Query("DELETE FROM entry_states WHERE entryId = :entryId AND state = :state")
+    suspend fun delete(entryId: String, state: String)
 
     /** 推荐引擎需要排除的条目 id：DONE 或 DISMISSED */
-    @Query("SELECT entryId FROM entry_states WHERE state IN ('DONE', 'DISMISSED')")
+    @Query("SELECT DISTINCT entryId FROM entry_states WHERE state IN ('DONE', 'DISMISSED')")
     suspend fun excludedIds(): List<String>
 
     @Query("SELECT * FROM entry_states")
     fun allStatesFlow(): Flow<List<EntryStateEntity>>
+
+    /** 处于某个状态的条目 id，收藏列表与收藏态判断用 */
+    @Query("SELECT entryId FROM entry_states WHERE state = :state")
+    fun entryIdsByStateFlow(state: String): Flow<List<String>>
 }

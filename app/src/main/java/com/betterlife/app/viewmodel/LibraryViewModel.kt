@@ -42,13 +42,16 @@ class LibraryViewModel(
         val sectionEntries: List<EntryDto> = emptyList(),
         val sort: EntrySort = EntrySort.RATIO,
         val recommended: LinkedHashMap<String, List<ScoredEntry>> = LinkedHashMap(),
-        val entryStates: Map<String, String> = emptyMap(),
         val query: String = "",
         val searchResults: List<RetrievedEntry> = emptyList(),
     )
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    /** 已收藏的条目 id,详情页据此显示收藏态 */
+    private val _favorites = MutableStateFlow<Set<String>>(emptySet())
+    val favorites: StateFlow<Set<String>> = _favorites.asStateFlow()
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -66,15 +69,18 @@ class LibraryViewModel(
                 profileRepository.profileFlow,
                 entryStateDao.allStatesFlow(),
             ) { profile, states -> profile to states }.collect { (profile, states) ->
-                val stateMap = states.associate { it.entryId to it.state }
                 val excluded = states.filter {
                     it.state == EntryStateEntity.STATE_DONE || it.state == EntryStateEntity.STATE_DISMISSED
                 }.mapTo(HashSet()) { it.entryId }
                 val recommended = profile?.let {
                     recommendationEngine.recommend(it, data.entries, data.rules, excluded)
                 } ?: LinkedHashMap()
-                _uiState.value = _uiState.value.copy(recommended = recommended, entryStates = stateMap)
+                _uiState.value = _uiState.value.copy(recommended = recommended)
             }
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            taskManager.favoriteIdsFlow().collect { ids -> _favorites.value = ids.toSet() }
         }
     }
 
@@ -106,16 +112,15 @@ class LibraryViewModel(
         }
     }
 
-    fun markEntryDone(entryId: String) = setState(entryId, EntryStateEntity.STATE_DONE)
-    fun dismissEntry(entryId: String) = setState(entryId, EntryStateEntity.STATE_DISMISSED)
-    fun restoreEntry(entryId: String) = setState(entryId, null)
-
     fun addToTodo(entryId: String) {
         viewModelScope.launch(Dispatchers.IO) { taskManager.addOneOffTodo(entryId) }
     }
 
-    private fun setState(entryId: String, state: String?) {
-        viewModelScope.launch(Dispatchers.IO) { taskManager.setEntryState(entryId, state) }
+    /** 收藏开关;与「加入待办」是两回事,互不覆盖 */
+    fun toggleFavorite(entryId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            taskManager.setFavorite(entryId, entryId !in _favorites.value)
+        }
     }
 
     companion object {

@@ -50,10 +50,15 @@ data class TaskEntity(
     }
 }
 
-/** 条目级状态：TODO(加入待办) / DONE(已完成) / DISMISSED(不再推荐) */
-@Entity(tableName = "entry_states")
+/**
+ * 条目级状态。主键是 (entryId, state) 而不是单独的 entryId —— 状态之间是**正交**的:
+ * 一个条目可以既被加入待办(TODO)、又被收藏(FAVORITE);用单主键会互相覆盖。
+ *
+ * 推荐引擎只看 DONE / DISMISSED 两种状态(见 EntryStateDao.excludedIds)。
+ */
+@Entity(tableName = "entry_states", primaryKeys = ["entryId", "state"])
 data class EntryStateEntity(
-    @PrimaryKey val entryId: String,
+    val entryId: String,
     val state: String,
     val updatedAt: Long,
 ) {
@@ -61,5 +66,6 @@ data class EntryStateEntity(
         const val STATE_TODO = "TODO"
         const val STATE_DONE = "DONE"
         const val STATE_DISMISSED = "DISMISSED"
+        const val STATE_FAVORITE = "FAVORITE"
     }
 }

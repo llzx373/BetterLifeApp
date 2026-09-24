@@ -30,6 +30,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -65,6 +67,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.R
@@ -106,6 +109,7 @@ fun EntryDetailScreen(
     }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val favorites by vm.favorites.collectAsStateWithLifecycle()
     val addedTodoMessage = stringResource(R.string.detail_added_todo)
     val copiedMessage = stringResource(R.string.detail_copied)
 
@@ -217,6 +221,11 @@ fun EntryDetailScreen(
                         vm.addToTodo(e.id)
                         scope.launch { snackbar.showSnackbar(addedTodoMessage) }
                     },
+                )
+                ToolbarAction(
+                    icon = if (e.id in favorites) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    labelRes = if (e.id in favorites) R.string.detail_unfavorite else R.string.detail_favorite,
+                    onClick = { vm.toggleFavorite(e.id) },
                 )
                 ToolbarAction(
                     icon = Icons.Filled.ContentCopy,

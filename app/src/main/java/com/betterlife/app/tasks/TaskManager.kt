@@ -70,7 +70,7 @@ class TaskManager(
      */
     suspend fun replaceTodayTask(profile: Profile, task: TaskEntity, date: LocalDate = LocalDate.now()) {
         val dateStr = date.toString()
-        setEntryState(task.entryId, EntryStateEntity.STATE_DISMISSED)
+        addEntryState(task.entryId, EntryStateEntity.STATE_DISMISSED)
         taskDao.delete(task.taskId)
         val data = entryRepository.entriesData()
         val taken = entryStateDao.excludedIds().toSet() + taskDao.dailyEntryIds(dateStr)
@@ -85,11 +85,30 @@ class TaskManager(
         )
     }
 
-    /** 条目状态操作：DONE / DISMISSED / TODO；传 null 清除状态（恢复可推荐） */
-    suspend fun setEntryState(entryId: String, state: String?) {
-        if (state == null) entryStateDao.delete(entryId)
-        else entryStateDao.upsert(EntryStateEntity(entryId, state, System.currentTimeMillis()))
+    /**
+     * 打上某种条目状态。
+     *
+     * 状态之间是正交的：加收藏不会顶掉「加入待办」，标记不再推荐也不会清掉收藏
+     * （主键是 (entryId, state)，见 [EntryStateEntity]）。
+     */
+    suspend fun addEntryState(entryId: String, state: String) {
+        entryStateDao.upsert(EntryStateEntity(entryId, state, System.currentTimeMillis()))
     }
+
+    /** 清除某种条目状态，不影响该条目的其他状态 */
+    suspend fun removeEntryState(entryId: String, state: String) {
+        entryStateDao.delete(entryId, state)
+    }
+
+    /** 收藏开关 */
+    suspend fun setFavorite(entryId: String, favorite: Boolean) {
+        if (favorite) addEntryState(entryId, EntryStateEntity.STATE_FAVORITE)
+        else removeEntryState(entryId, EntryStateEntity.STATE_FAVORITE)
+    }
+
+    /** 已收藏的条目 id */
+    fun favoriteIdsFlow(): Flow<List<String>> =
+        entryStateDao.entryIdsByStateFlow(EntryStateEntity.STATE_FAVORITE)
 
     fun todayTasksFlow(date: LocalDate = LocalDate.now()): Flow<List<TaskEntity>> =
         taskDao.dailyTasksFlow(date.toString())
