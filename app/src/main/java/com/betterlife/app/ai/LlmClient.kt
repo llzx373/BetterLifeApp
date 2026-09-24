@@ -99,7 +99,8 @@ class LlmClient(private val settings: SettingsStore) {
 
             try {
                 client.newCall(request).execute().use { resp ->
-                    val text = resp.body?.string().orEmpty()
+                    // OkHttp 5 起 Response.body 是非空的，这里不再需要安全调用
+                    val text = resp.body.string()
                     if (resp.isSuccessful) {
                         val parsed = json.decodeFromString(ChatResponse.serializer(), text)
                         val content = parsed.choices.firstOrNull()?.message?.content

@@ -816,6 +816,44 @@ AnimatedVisibility(visibleState = visible, enter = fadeIn() + scaleIn(initialSca
 2. **只差在笔画边缘的亚像素差异** → 是宿主差异,不是回归。在 Linux 上跑一次 `updateDebugScreenshotTest` 并把产出的基线提交,**基线以 CI 宿主为准**;之后本地 Windows 开发改为以 CI 为准(或本地不再刷基线)。
 3. 如果差异面很广又难以判断,再考虑给 `testOptions.screenshotTests` 配 `imageDifferenceThreshold` 吸收亚像素噪声 —— **但这会同时削弱门禁灵敏度,不作为首选**。
 
+#### P3-A3 · 正式签名(⏸ 卡在你这边,未动手)
+
+release 目前回退 debug 签名,产物不能对外分发。这一步**不是代码问题**:需要你先定密钥库放哪、密码怎么保管、谁持有。
+
+在决定之前不动它 —— 签名密钥一旦丢失不可恢复,而且它不该以任何形式进仓库(`.gitignore` 已排除 `keystore.properties` 与 `*.jks`)。生成命令与 `keystore.properties` 的字段见 README「发布构建与签名」。
+
+#### P3-A4 · 依赖升级(2026-09-24 已完成)
+
+把 P0 遗留项 2 里那批可升级的版本一次性升掉,按「独立可回滚的一步」处理。
+
+| 依赖 | 旧 | 新 |
+|---|---|---|
+| material3 | 1.5.0-alpha28 | **1.5.0-alpha29** |
+| okhttp | 4.12.0 | **5.5.0**(跨大版本) |
+| kotlinx-serialization | 1.9.0 | **1.11.0** |
+| core-ktx | 1.19.0 | **1.19.1** |
+| navigation | 2.10.1 | **2.10.2** |
+| datastore | 1.2.0 | **1.2.1** |
+| work | 2.11.2 | **2.12.0** |
+
+**升级前的风险排查**:§12 记着「`Slider` 在 alpha29 有过源码级破坏性变更」,先确认全项目没有用到它(确实没有);okhttp 4→5 是跨大版本,但本项目只用到 `OkHttpClient.Builder`、`Request.Builder`、`toRequestBody`、`toMediaType` 这几个稳定 API,面很窄。
+
+**唯一需要改代码的地方**:OkHttp 5 起 `Response.body` 是**非空**类型,原来的 `resp.body?.string().orEmpty()` 会产生「不必要的安全调用」警告 → 改为 `resp.body.string()`。
+
+**验证**
+
+| 项 | 结果 |
+|---|---|
+| `testDebugUnitTest` | 40/40 通过 |
+| `assembleDebug` / `assembleRelease` | 通过;release APK **2,985,565 字节** |
+| `lint` | 0 error |
+| `validateDebugScreenshotTest` | **通过,基线一张都不需要重刷** —— 说明 alpha28→alpha29 没有改变任何一屏的渲染,这次升级是纯底层的 |
+
+**顺带观察到的两件事**
+
+1. `datastore 1.2.1` 引入了一个原生库 `libdatastore_shared_counter.so`,构建时提示「Unable to strip」并被原样打进包里(debug / release 都出现)。不影响功能,但 APK 会因此略微变大。
+2. release 产物里已经出现了 `baselineProfiles/` 目录 —— 那是 Compose 等库**自带**的 baseline profile 被 AGP 合并进来的结果,**不等于本项目有自己的启动 profile**。B8 要做的仍是自己那一份。
+
 ---
 
 

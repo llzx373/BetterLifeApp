@@ -14,7 +14,7 @@ minSdk = "26"
 # BOM 管住 compose.ui / foundation / animation 等；material3 需单独覆盖到 alpha 线才有
 # Expressive 组件（BOM 只映射稳定版 1.4.0）。
 composeBom = "2026.09.00"
-material3 = "1.5.0-alpha28"
+material3 = "1.5.0-alpha29"
 material3Adaptive = "1.3.0"
 graphicsShapes = "1.0.1"
 # material-icons-core 已冻结在 1.7.8（不再随 Compose 发布），必须显式钉住，
@@ -23,17 +23,17 @@ materialIcons = "1.7.8"
 
 # --- AndroidX ---
 activityCompose = "1.13.0"
-coreKtx = "1.19.0"
+coreKtx = "1.19.1"
 coreSplashscreen = "1.2.0"
 lifecycle = "2.11.0"
-navigation = "2.10.1"
+navigation = "2.10.2"
 room = "2.8.5"
-datastore = "1.2.0"
-work = "2.11.2"
+datastore = "1.2.1"
+work = "2.12.0"
 
 # --- 第三方 ---
-okhttp = "4.12.0"
-kotlinxSerialization = "1.9.0"
+okhttp = "5.5.0"
+kotlinxSerialization = "1.11.0"
 kotlinxCoroutines = "1.11.0"
 
 # --- 测试 ---
