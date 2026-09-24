@@ -34,12 +34,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.betterlife.app.R
 import com.betterlife.app.data.EntryDto
 import com.betterlife.app.recommend.ScoredEntry
 import com.betterlife.app.ui.common.DisputeBadge
@@ -48,9 +51,9 @@ import com.betterlife.app.ui.common.RatioBadge
 import com.betterlife.app.ui.common.lensGroupTitle
 import com.betterlife.app.viewmodel.LibraryViewModel
 import com.betterlife.app.viewmodel.TodayViewModel
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 @Composable
 fun TodayScreen(
@@ -67,7 +70,7 @@ fun TodayScreen(
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(onClick = onOpenChat) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "AI 问答")
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.title_chat))
             }
         },
     ) { padding ->
@@ -81,7 +84,6 @@ fun TodayScreen(
         }
         if (state is TodayViewModel.UiState.Error) {
             ErrorState(
-                message = state.message,
                 onRetry = todayVm::retry,
                 modifier = Modifier.fillMaxSize().padding(padding),
             )
@@ -97,13 +99,13 @@ fun TodayScreen(
             item { GreetingHeader() }
 
             item {
-                Text("今日任务", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.today_tasks_title), style = MaterialTheme.typography.titleMedium)
             }
             if (items.isEmpty()) {
                 item {
                     EmptyCard(
-                        text = "还没有今日任务。先完善档案,或去条目库逛逛。",
-                        actionText = "完善档案",
+                        text = stringResource(R.string.today_tasks_empty),
+                        actionText = stringResource(R.string.today_action_fill_profile),
                         onAction = onEditProfile,
                     )
                 }
@@ -120,15 +122,19 @@ fun TodayScreen(
 
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("为你推荐", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    TextButton(onClick = onOpenLibrary) { Text("全部条目") }
+                    Text(
+                        stringResource(R.string.today_recommend_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onOpenLibrary) { Text(stringResource(R.string.today_all_entries)) }
                 }
             }
             if (libraryState.recommended.isEmpty()) {
                 item {
                     EmptyCard(
-                        text = "填一份档案,推荐会更准;也可以先随便看看。",
-                        actionText = "去填档案",
+                        text = stringResource(R.string.today_recommend_empty),
+                        actionText = stringResource(R.string.today_action_go_profile),
                         onAction = onEditProfile,
                     )
                 }
@@ -160,12 +166,13 @@ fun TodayScreen(
 private fun GreetingHeader() {
     val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
     val greeting = when (hour) {
-        in 5..10 -> "早上好"
-        in 11..13 -> "中午好"
-        in 14..17 -> "下午好"
-        else -> "晚上好"
+        in 5..10 -> stringResource(R.string.today_greeting_morning)
+        in 11..13 -> stringResource(R.string.today_greeting_noon)
+        in 14..17 -> stringResource(R.string.today_greeting_afternoon)
+        else -> stringResource(R.string.today_greeting_evening)
     }
-    val date = SimpleDateFormat("M月d日 EEEE", Locale.CHINESE).format(Date())
+    // 日期格式交给系统 locale，不再硬编码中文
+    val date = remember { LocalDate.now().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)) }
     Column {
         Text(greeting, style = MaterialTheme.typography.headlineSmall)
         Text(
@@ -210,7 +217,7 @@ private fun DailyTaskCard(
                 }
                 if (item.streak > 0) {
                     Text(
-                        text = "已连续 ${item.streak} 天",
+                        text = stringResource(R.string.today_streak_days, item.streak),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -225,7 +232,7 @@ private fun DailyTaskCard(
                 ) {
                     Icon(
                         Icons.Filled.CheckCircle,
-                        contentDescription = "已完成,点击取消",
+                        contentDescription = stringResource(R.string.today_task_done_desc),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(32.dp),
                     )
@@ -233,7 +240,7 @@ private fun DailyTaskCard(
                 if (!done) {
                     Icon(
                         Icons.Filled.CheckCircle,
-                        contentDescription = "打卡",
+                        contentDescription = stringResource(R.string.today_task_todo_desc),
                         tint = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.size(32.dp),
                     )
@@ -276,7 +283,7 @@ private fun RecommendCard(
                 }
             }
             IconButton(onClick = onAddTodo) {
-                Icon(Icons.Filled.Add, contentDescription = "加入待办")
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.today_add_todo_desc))
             }
         }
     }
@@ -303,18 +310,18 @@ private fun EmptyCard(text: String, actionText: String, onAction: () -> Unit) {
 }
 
 @Composable
-private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+private fun ErrorState(onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = message,
+            text = stringResource(R.string.common_load_failed),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(12.dp))
-        Button(onClick = onRetry) { Text("重试") }
+        Button(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
     }
 }

@@ -25,31 +25,40 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.betterlife.app.R
+import com.betterlife.app.data.Exercise
 import com.betterlife.app.data.Goal
+import com.betterlife.app.data.Occupation
 import com.betterlife.app.data.Profile
+import com.betterlife.app.data.Smoking
 import com.betterlife.app.viewmodel.ProfileViewModel
 
-private fun goalLabel(goal: Goal): String = when (goal) {
-    Goal.HEALTH -> "健康长寿"
-    Goal.MONEY -> "守住钱"
-    Goal.TIME -> "省时间精力"
-    Goal.CAREER -> "职业发展"
-    Goal.FAMILY -> "家庭"
-    Goal.RELAX -> "放松"
-}
+@Composable
+private fun goalLabel(goal: Goal): String = stringResource(
+    when (goal) {
+        Goal.HEALTH -> R.string.goal_health
+        Goal.MONEY -> R.string.goal_money
+        Goal.TIME -> R.string.goal_time
+        Goal.CAREER -> R.string.goal_career
+        Goal.FAMILY -> R.string.goal_family
+        Goal.RELAX -> R.string.goal_relax
+    },
+)
 
+@Composable
 private fun profileSummary(p: Profile): String = buildString {
-    append(p.ageRange.key).append(" 岁段")
+    append(stringResource(R.string.mine_age_segment, p.ageRange.key))
     when (p.occupation) {
-        com.betterlife.app.data.Occupation.PROGRAMMER -> append(" · 程序员")
-        com.betterlife.app.data.Occupation.STUDENT -> append(" · 学生")
+        Occupation.PROGRAMMER -> append(stringResource(R.string.mine_suffix_programmer))
+        Occupation.STUDENT -> append(stringResource(R.string.mine_suffix_student))
         else -> {}
     }
-    if (p.smoking == com.betterlife.app.data.Smoking.YES) append(" · 吸烟")
-    if (p.exercise == com.betterlife.app.data.Exercise.NONE) append(" · 几乎不运动")
+    if (p.smoking == Smoking.YES) append(stringResource(R.string.mine_suffix_smoking))
+    if (p.exercise == Exercise.NONE) append(stringResource(R.string.mine_suffix_no_exercise))
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -71,7 +80,7 @@ fun MineScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("我的", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.mine_title), style = MaterialTheme.typography.headlineSmall)
 
             Card(
                 colors = CardDefaults.cardColors(
@@ -80,7 +89,7 @@ fun MineScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("我的档案", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.mine_profile_title), style = MaterialTheme.typography.titleSmall)
                     Text(
                         profileSummary(profile),
                         style = MaterialTheme.typography.bodyMedium,
@@ -97,7 +106,7 @@ fun MineScreen(
             }
 
             ListItem(
-                headlineContent = { Text("编辑档案") },
+                headlineContent = { Text(stringResource(R.string.mine_edit_profile)) },
                 trailingContent = {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                 },
@@ -105,8 +114,8 @@ fun MineScreen(
             )
             HorizontalDivider()
             ListItem(
-                headlineContent = { Text("AI 问答") },
-                supportingContent = { Text("基于你的档案和 601 条建议回答") },
+                headlineContent = { Text(stringResource(R.string.mine_chat)) },
+                supportingContent = { Text(stringResource(R.string.mine_chat_sub)) },
                 trailingContent = {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                 },
@@ -114,8 +123,8 @@ fun MineScreen(
             )
             HorizontalDivider()
             ListItem(
-                headlineContent = { Text("设置") },
-                supportingContent = { Text("API Key、提醒、关于") },
+                headlineContent = { Text(stringResource(R.string.mine_settings)) },
+                supportingContent = { Text(stringResource(R.string.mine_settings_sub)) },
                 trailingContent = {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                 },

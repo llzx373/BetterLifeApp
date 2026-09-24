@@ -17,6 +17,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.betterlife.app.data.EntryKeys
 
 @Immutable
 data class LensColors(
@@ -27,10 +28,10 @@ data class LensColors(
 ) {
     /** 按 entries.json 的 lens 字段取色；未识别的口径返回 null，由调用方决定降级色 */
     fun forLens(lens: String): Color? = when (lens) {
-        "死亡率" -> life
-        "金钱" -> money
-        "时间" -> time
-        "自由" -> line
+        EntryKeys.LENS_MORTALITY -> life
+        EntryKeys.LENS_MONEY -> money
+        EntryKeys.LENS_TIME -> time
+        EntryKeys.LENS_FREEDOM -> line
         else -> null
     }
 }
@@ -53,9 +54,9 @@ val LocalLensColors = staticCompositionLocalOf { lightLensColors }
 
 /** 口径图标：与口径色配对，保证不依赖颜色也能区分 */
 fun lensIcon(lens: String): ImageVector? = when (lens) {
-    "死亡率" -> Icons.Filled.Shield
-    "金钱" -> Icons.Filled.CurrencyYuan
-    "时间" -> Icons.Filled.Schedule
-    "自由" -> Icons.Filled.Warning
+    EntryKeys.LENS_MORTALITY -> Icons.Filled.Shield
+    EntryKeys.LENS_MONEY -> Icons.Filled.CurrencyYuan
+    EntryKeys.LENS_TIME -> Icons.Filled.Schedule
+    EntryKeys.LENS_FREEDOM -> Icons.Filled.Warning
     else -> null
 }

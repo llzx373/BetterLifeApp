@@ -42,7 +42,7 @@ class TodayViewModel(
         data class Ready(val items: List<TaskItem>) : UiState {
             val undoneCount: Int get() = items.count { !it.task.done }
         }
-        data class Error(val message: String = LOAD_ERROR) : UiState
+        data object Error : UiState
     }
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
@@ -65,8 +65,8 @@ class TodayViewModel(
             } catch (c: CancellationException) {
                 throw c
             } catch (t: Throwable) {
-                Log.e(TAG, "观察档案失败", t)
-                _uiState.value = UiState.Error()
+                Log.e(TAG, "observeProfile failed", t)
+                _uiState.value = UiState.Error
             }
         }
     }
@@ -86,8 +86,8 @@ class TodayViewModel(
             } catch (c: CancellationException) {
                 throw c
             } catch (t: Throwable) {
-                Log.e(TAG, "加载今日任务失败", t)
-                _uiState.value = UiState.Error()
+                Log.e(TAG, "loadTasks failed", t)
+                _uiState.value = UiState.Error
             }
         }
     }
@@ -106,7 +106,6 @@ class TodayViewModel(
 
     companion object {
         private const val TAG = "TodayViewModel"
-        const val LOAD_ERROR = "内容加载失败"
 
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {

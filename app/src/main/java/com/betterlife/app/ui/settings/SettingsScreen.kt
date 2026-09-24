@@ -1,4 +1,4 @@
-// 设置页:AI 服务商/API Key、每日提醒(含通知权限)、档案入口、关于与免责
+// 设置页:AI 服务商/API Key、每日提醒(含通知权限)、主题、档案入口、关于与免责
 package com.betterlife.app.ui.settings
 
 import android.Manifest
@@ -55,16 +55,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.betterlife.app.viewmodel.SettingsViewModel
+import com.betterlife.app.R
 import com.betterlife.app.ui.theme.ThemeMode
+import com.betterlife.app.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
 
-private data class PresetOption(val label: String, val baseUrl: String, val model: String)
+private data class PresetOption(
+    val label: String,
+    val baseUrl: String,
+    val model: String,
+    val isCustom: Boolean = false,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,11 +85,14 @@ fun SettingsScreen(
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    val customLabel = stringResource(R.string.settings_custom)
+    val savedMessage = stringResource(R.string.settings_saved)
     // 预设:核心层两个 + 自定义
     val presets = remember(vm.presets) {
         vm.presets.map { PresetOption(it.label, it.baseUrl, it.model) } +
-            PresetOption("自定义", "", "")
+            PresetOption("", "", "", isCustom = true)
     }
+    val presetLabels = presets.map { if (it.isCustom) customLabel else it.label }
 
     var baseUrl by remember { mutableStateOf("") }
     var apiKey by remember { mutableStateOf("") }
@@ -112,10 +122,10 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("设置") },
+                title = { Text(stringResource(R.string.title_settings)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
             )
@@ -130,31 +140,30 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SectionTitle("AI 问答")
+            SectionTitle(stringResource(R.string.settings_section_ai))
 
             var expanded by remember { mutableStateOf(false) }
-            val selectedLabel = presets.firstOrNull {
-                it.baseUrl == baseUrl && it.model == model
-            }?.label ?: "自定义"
+            val selectedIndex = presets.indexOfFirst { it.baseUrl == baseUrl && it.model == model }
+            val selectedLabel = presetLabels.getOrElse(selectedIndex) { customLabel }
             ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
                 OutlinedTextField(
                     value = selectedLabel,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("服务商") },
+                    label = { Text(stringResource(R.string.settings_provider)) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                 )
                 ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    presets.forEach { preset ->
+                    presets.forEachIndexed { index, preset ->
                         DropdownMenuItem(
-                            text = { Text(preset.label) },
+                            text = { Text(presetLabels[index]) },
                             onClick = {
                                 expanded = false
                                 userTouched = true
-                                if (preset.label != "自定义") {
+                                if (!preset.isCustom) {
                                     baseUrl = preset.baseUrl
                                     model = preset.model
                                 }
@@ -167,7 +176,7 @@ fun SettingsScreen(
             OutlinedTextField(
                 value = apiKey,
                 onValueChange = { userTouched = true; apiKey = it },
-                label = { Text("API Key") },
+                label = { Text(stringResource(R.string.settings_api_key)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
@@ -175,30 +184,30 @@ fun SettingsScreen(
             OutlinedTextField(
                 value = baseUrl,
                 onValueChange = { userTouched = true; baseUrl = it },
-                label = { Text("Base URL") },
+                label = { Text(stringResource(R.string.settings_base_url)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = model,
                 onValueChange = { userTouched = true; model = it },
-                label = { Text("模型") },
+                label = { Text(stringResource(R.string.settings_model)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             Button(
                 onClick = {
                     vm.saveApiConfig(baseUrl, apiKey, model)
-                    scope.launch { snackbar.showSnackbar("已保存") }
+                    scope.launch { snackbar.showSnackbar(savedMessage) }
                 },
                 modifier = Modifier.align(Alignment.End),
-            ) { Text("保存 AI 设置") }
+            ) { Text(stringResource(R.string.settings_save_ai)) }
 
             HorizontalDivider()
-            SectionTitle("每日提醒")
+            SectionTitle(stringResource(R.string.settings_section_reminder))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("开启提醒", modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.settings_reminder_enable), modifier = Modifier.weight(1f))
                 Switch(
                     checked = settings.reminderEnabled,
                     onCheckedChange = { want ->
@@ -216,7 +225,7 @@ fun SettingsScreen(
                 )
             }
             ListItem(
-                headlineContent = { Text("提醒时间") },
+                headlineContent = { Text(stringResource(R.string.settings_reminder_time)) },
                 trailingContent = {
                     Text("%02d:%02d".format(settings.reminderHour, settings.reminderMinute))
                 },
@@ -224,7 +233,7 @@ fun SettingsScreen(
             )
 
             HorizontalDivider()
-            SectionTitle("主题")
+            SectionTitle(stringResource(R.string.settings_section_theme))
             ThemeMode.entries
                 .filter { it != ThemeMode.MATERIAL_YOU || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S }
                 .forEach { mode ->
@@ -248,10 +257,10 @@ fun SettingsScreen(
                 }
 
             HorizontalDivider()
-            SectionTitle("档案")
+            SectionTitle(stringResource(R.string.settings_section_profile))
             ListItem(
-                headlineContent = { Text("修改我的档案") },
-                supportingContent = { Text("重新走一遍引导,已填内容会保留") },
+                headlineContent = { Text(stringResource(R.string.settings_edit_profile)) },
+                supportingContent = { Text(stringResource(R.string.settings_edit_profile_sub)) },
                 trailingContent = {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                 },
@@ -259,13 +268,13 @@ fun SettingsScreen(
             )
 
             HorizontalDivider()
-            SectionTitle("关于")
+            SectionTitle(stringResource(R.string.settings_section_about))
             Text(
-                "内容出处:《高性价比人生指南》\ngithub.com/eternity4719/HowToLiveBetter",
+                stringResource(R.string.settings_about_source),
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                "内容版权归原项目所有,请遵循其许可证使用。本应用仅做整理与呈现,不构成医疗、法律或投资意见;涉及健康与安全的决定,请咨询专业人士。",
+                stringResource(R.string.settings_disclaimer),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -285,10 +294,10 @@ fun SettingsScreen(
                 TextButton(onClick = {
                     showTimePicker = false
                     vm.setReminder(settings.reminderEnabled, timeState.hour, timeState.minute)
-                }) { Text("确定") }
+                }) { Text(stringResource(R.string.action_confirm)) }
             },
             dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) { Text("取消") }
+                TextButton(onClick = { showTimePicker = false }) { Text(stringResource(R.string.action_cancel)) }
             },
             text = { TimePicker(state = timeState) },
         )
@@ -300,8 +309,11 @@ private fun SectionTitle(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
 }
 
-private fun themeModeLabel(mode: ThemeMode): String = when (mode) {
-    ThemeMode.BRAND_GREEN -> "品牌绿(默认)"
-    ThemeMode.MATERIAL_YOU -> "跟随系统壁纸"
-    ThemeMode.DARK -> "深色优先"
-}
+@Composable
+private fun themeModeLabel(mode: ThemeMode): String = stringResource(
+    when (mode) {
+        ThemeMode.BRAND_GREEN -> R.string.theme_brand
+        ThemeMode.MATERIAL_YOU -> R.string.theme_material_you
+        ThemeMode.DARK -> R.string.theme_dark
+    },
+)

@@ -35,15 +35,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.betterlife.app.R
 import com.betterlife.app.ai.ChatMessage
 import com.betterlife.app.viewmodel.ChatViewModel
 import com.betterlife.app.viewmodel.SettingsViewModel
-
-private const val SAFETY_NOTICE =
-    "急症先打 120;心理援助热线 12356;本应用给的是通用口径,不替代医生/律师。"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,10 +65,10 @@ fun ChatScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("AI 问答") },
+                title = { Text(stringResource(R.string.title_chat)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
             )
@@ -91,12 +90,12 @@ fun ChatScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     ) {
                         Text(
-                            "在设置里填入 API Key 可解锁 AI 问答,当前为本地降级回答。",
+                            stringResource(R.string.chat_no_key_banner),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onTertiaryContainer,
                             modifier = Modifier.weight(1f),
                         )
-                        TextButton(onClick = onOpenSettings) { Text("去设置") }
+                        TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.chat_go_settings)) }
                     }
                 }
             }
@@ -110,7 +109,7 @@ fun ChatScreen(
                 // 首条固定安全提示
                 item(key = "safety") {
                     Bubble(
-                        text = SAFETY_NOTICE,
+                        text = stringResource(R.string.chat_safety_notice),
                         isUser = false,
                         isError = false,
                     )
@@ -131,7 +130,7 @@ fun ChatScreen(
                         ) {
                             CircularProgressIndicator(modifier = Modifier.padding(4.dp), strokeWidth = 2.dp)
                             Text(
-                                "思考中…",
+                                stringResource(R.string.chat_thinking),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -148,7 +147,7 @@ fun ChatScreen(
                     value = input,
                     onValueChange = { input = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("问点什么,比如:我抽烟,先看哪几条?") },
+                    placeholder = { Text(stringResource(R.string.chat_input_hint)) },
                     maxLines = 4,
                 )
                 IconButton(
@@ -161,7 +160,7 @@ fun ChatScreen(
                     },
                     enabled = input.isNotBlank() && !state.asking,
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "发送")
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.action_send))
                 }
             }
         }

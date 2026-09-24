@@ -24,11 +24,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.betterlife.app.R
 import com.betterlife.app.data.db.TaskEntity
 import com.betterlife.app.viewmodel.TodoViewModel
 
@@ -47,13 +49,13 @@ fun TodoScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            item { Text("待办", style = MaterialTheme.typography.headlineSmall) }
+            item { Text(stringResource(R.string.todo_title), style = MaterialTheme.typography.headlineSmall) }
 
-            item { Text("每日习惯", style = MaterialTheme.typography.titleMedium) }
+            item { Text(stringResource(R.string.todo_daily_title), style = MaterialTheme.typography.titleMedium) }
             if (daily.isEmpty()) {
                 item {
                     Text(
-                        "今天的都做完了",
+                        stringResource(R.string.todo_daily_empty),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -70,11 +72,11 @@ fun TodoScreen(
                 }
             }
 
-            item { Text("一次性待办", style = MaterialTheme.typography.titleMedium) }
+            item { Text(stringResource(R.string.todo_once_title), style = MaterialTheme.typography.titleMedium) }
             if (once.isEmpty()) {
                 item {
                     Text(
-                        "没有一次性待办。看到想做的事,点条目上的「加入待办」。",
+                        stringResource(R.string.todo_once_empty),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -135,7 +137,7 @@ private fun TodoRow(
                 IconButton(onClick = onDelete) {
                     Icon(
                         Icons.Filled.Delete,
-                        contentDescription = "删除",
+                        contentDescription = stringResource(R.string.action_delete),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

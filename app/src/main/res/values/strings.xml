@@ -9,4 +9,210 @@
     <string name="notification_daily_title">BetterLife 每日任务</string>
     <string name="notification_daily_undone">今天还有 %1$d 条任务未完成</string>
     <string name="notification_daily_all_done">今日任务已全部完成，继续保持</string>
+
+    <!-- 通用动作 -->
+    <string name="action_back">返回</string>
+    <string name="action_retry">重试</string>
+    <string name="action_clear">清空</string>
+    <string name="action_send">发送</string>
+    <string name="action_delete">删除</string>
+    <string name="action_expand">展开</string>
+    <string name="action_collapse">收起</string>
+    <string name="action_confirm">确定</string>
+    <string name="action_cancel">取消</string>
+    <string name="common_load_failed">内容加载失败</string>
+
+    <!-- 口径（先保命 / 守住钱 / 省精力 / 别踩线） -->
+    <string name="lens_life">先保命</string>
+    <string name="lens_money">守住钱</string>
+    <string name="lens_time">省精力</string>
+    <string name="lens_line">别踩线</string>
+    <string name="lens_other">其他</string>
+
+    <!-- 徽标 -->
+    <string name="ratio_very_high">性价比 极高</string>
+    <string name="ratio_high">性价比 高</string>
+    <string name="ratio_normal">性价比 一般</string>
+    <string name="grade_badge">证据 %1$s</string>
+    <string name="badge_dispute">争议</string>
+    <string name="badge_todo">待核实</string>
+
+    <!-- 成本标签 -->
+    <string name="cost_money_high">花钱多</string>
+    <string name="cost_money_low">花小钱</string>
+    <string name="cost_time_high">费时间</string>
+    <string name="cost_time_mid">费些时间</string>
+    <string name="cost_will_high">要毅力</string>
+    <string name="cost_will_some">要些毅力</string>
+
+    <!-- 底部导航与页面标题 -->
+    <string name="nav_today">今日</string>
+    <string name="nav_todo">待办</string>
+    <string name="nav_library">条目库</string>
+    <string name="nav_mine">我的</string>
+    <string name="title_chat">AI 问答</string>
+    <string name="title_settings">设置</string>
+
+    <!-- 今日页 -->
+    <string name="today_tasks_title">今日任务</string>
+    <string name="today_tasks_empty">还没有今日任务。先完善档案,或去条目库逛逛。</string>
+    <string name="today_action_fill_profile">完善档案</string>
+    <string name="today_recommend_title">为你推荐</string>
+    <string name="today_all_entries">全部条目</string>
+    <string name="today_recommend_empty">填一份档案,推荐会更准;也可以先随便看看。</string>
+    <string name="today_action_go_profile">去填档案</string>
+    <string name="today_greeting_morning">早上好</string>
+    <string name="today_greeting_noon">中午好</string>
+    <string name="today_greeting_afternoon">下午好</string>
+    <string name="today_greeting_evening">晚上好</string>
+    <string name="today_streak_days">已连续 %1$d 天</string>
+    <string name="today_task_done_desc">已完成,点击取消</string>
+    <string name="today_task_todo_desc">打卡</string>
+    <string name="today_add_todo_desc">加入待办</string>
+
+    <!-- 待办页 -->
+    <string name="todo_title">待办</string>
+    <string name="todo_daily_title">每日习惯</string>
+    <string name="todo_daily_empty">今天的都做完了</string>
+    <string name="todo_once_title">一次性待办</string>
+    <string name="todo_once_empty">没有一次性待办。看到想做的事,点条目上的「加入待办」。</string>
+
+    <!-- 条目库 -->
+    <string name="library_title">条目库</string>
+    <string name="library_search_hint">搜条目,如:戒烟、体检、午睡</string>
+    <string name="library_no_match">没有匹配的条目</string>
+    <string name="library_chapter_overline">第 %1$d 章</string>
+    <string name="library_entry_count">%1$d 条</string>
+    <string name="section_title">第 %1$d 章 · %2$s</string>
+    <string name="section_title_short">第 %1$d 章</string>
+
+    <!-- 条目详情 -->
+    <string name="detail_loading_or_missing">条目不存在或还在加载</string>
+    <string name="detail_section_cost">成本</string>
+    <string name="detail_impact">对人生的影响程度:%1$s</string>
+    <string name="detail_section_human">说人话</string>
+    <string name="detail_section_gain">收益</string>
+    <string name="detail_section_grade">证据等级</string>
+    <string name="detail_grade_a">A 级:证据比较扎实(高质量研究支持)</string>
+    <string name="detail_grade_b">B 级:有一定证据,但不够充分</string>
+    <string name="detail_grade_c">C 级:证据较弱,多为经验性建议</string>
+    <string name="detail_grade_none">未标注证据等级</string>
+    <string name="detail_section_source">来源</string>
+    <string name="detail_section_note">备注</string>
+    <string name="detail_add_todo">加入待办</string>
+    <string name="detail_added_todo">已加入待办</string>
+    <string name="detail_dispute_notice">这条建议存在争议,请结合自己的情况判断。</string>
+    <string name="detail_todo_notice">这条内容还未核实,谨慎参考。</string>
+
+    <!-- AI 问答 -->
+    <string name="chat_safety_notice">急症先打 120;心理援助热线 12356;本应用给的是通用口径,不替代医生/律师。</string>
+    <string name="chat_no_key_banner">在设置里填入 API Key 可解锁 AI 问答,当前为本地降级回答。</string>
+    <string name="chat_go_settings">去设置</string>
+    <string name="chat_thinking">思考中…</string>
+    <string name="chat_input_hint">问点什么,比如:我抽烟,先看哪几条?</string>
+
+    <!-- 我的 -->
+    <string name="mine_title">我的</string>
+    <string name="mine_profile_title">我的档案</string>
+    <string name="mine_age_segment">%1$s 岁段</string>
+    <string name="mine_suffix_programmer"> · 程序员</string>
+    <string name="mine_suffix_student"> · 学生</string>
+    <string name="mine_suffix_smoking"> · 吸烟</string>
+    <string name="mine_suffix_no_exercise"> · 几乎不运动</string>
+    <string name="mine_edit_profile">编辑档案</string>
+    <string name="mine_chat">AI 问答</string>
+    <string name="mine_chat_sub">基于你的档案和 601 条建议回答</string>
+    <string name="mine_settings">设置</string>
+    <string name="mine_settings_sub">API Key、提醒、关于</string>
+
+    <!-- 目标（我的页与引导页共用） -->
+    <string name="goal_health">健康长寿</string>
+    <string name="goal_money">守住钱</string>
+    <string name="goal_time">省时间精力</string>
+    <string name="goal_career">职业发展</string>
+    <string name="goal_family">家庭</string>
+    <string name="goal_relax">放松</string>
+
+    <!-- 引导页 -->
+    <string name="onboarding_title_new">先了解一下你</string>
+    <string name="onboarding_title_edit">编辑档案</string>
+    <string name="onboarding_progress">第 %1$d 步,共 %2$d 步</string>
+    <string name="onboarding_skippable_hint">,除年龄段外都可跳过</string>
+    <string name="onboarding_prev">上一步</string>
+    <string name="onboarding_jump">跳到目标</string>
+    <string name="onboarding_skip">跳过本步</string>
+    <string name="onboarding_next">下一步</string>
+    <string name="onboarding_save">保存</string>
+    <string name="onboarding_generate">生成我的建议</string>
+
+    <!-- 引导页字段 -->
+    <string name="field_age">年龄段（必选）</string>
+    <string name="field_gender">性别</string>
+    <string name="field_occupation">职业</string>
+    <string name="field_housing">居住</string>
+    <string name="field_financial_stress">目前经济压力大</string>
+    <string name="field_smoking">吸烟</string>
+    <string name="field_secondhand">家里或车里有人抽烟</string>
+    <string name="field_alcohol">饮酒</string>
+    <string name="field_betel_nut">嚼槟榔</string>
+    <string name="field_sugary">含糖饮料</string>
+    <string name="field_exercise">运动</string>
+    <string name="field_sleep_short">经常睡不够 7 小时</string>
+    <string name="field_chronic">慢性病（可多选，没有就不选）</string>
+    <string name="field_children">孩子</string>
+    <string name="field_elderly">家里有老人</string>
+    <string name="field_pregnant">自己或配偶怀孕或备孕</string>
+    <string name="field_abroad">有出国计划</string>
+    <string name="field_goals">你最想改善什么？（可多选）</string>
+    <string name="field_goals_hint">选了目标,建议会更贴你的情况;不选也有通用推荐。</string>
+
+    <!-- 引导页选项 -->
+    <string name="option_other">其他</string>
+    <string name="option_sometimes">偶尔</string>
+    <string name="option_no_drink">不喝</string>
+    <string name="option_male">男</string>
+    <string name="option_female">女</string>
+    <string name="option_programmer">程序员</string>
+    <string name="option_student">学生</string>
+    <string name="option_rent">租房</string>
+    <string name="option_own">自有住房</string>
+    <string name="option_live_family">住家里</string>
+    <string name="option_smoking_yes">吸</string>
+    <string name="option_smoking_quit">已戒</string>
+    <string name="option_smoking_no">不吸</string>
+    <string name="option_alcohol_often">经常</string>
+    <string name="option_drinks_daily">每天</string>
+    <string name="option_exercise_none">几乎不运动</string>
+    <string name="option_exercise_low">每周不到 150 分钟</string>
+    <string name="option_exercise_ok">每周 150 分钟以上</string>
+    <string name="option_chronic_hypertension">高血压</string>
+    <string name="option_chronic_diabetes">糖尿病</string>
+    <string name="option_chronic_kidney">肾病</string>
+    <string name="option_chronic_heart">心脏病</string>
+    <string name="option_children_none">没有</string>
+    <string name="option_children_baby">婴幼儿</string>
+    <string name="option_children_school">学龄</string>
+
+    <!-- 设置页 -->
+    <string name="settings_section_ai">AI 问答</string>
+    <string name="settings_provider">服务商</string>
+    <string name="settings_custom">自定义</string>
+    <string name="settings_api_key">API Key</string>
+    <string name="settings_base_url">Base URL</string>
+    <string name="settings_model">模型</string>
+    <string name="settings_saved">已保存</string>
+    <string name="settings_save_ai">保存 AI 设置</string>
+    <string name="settings_section_reminder">每日提醒</string>
+    <string name="settings_reminder_enable">开启提醒</string>
+    <string name="settings_reminder_time">提醒时间</string>
+    <string name="settings_section_theme">主题</string>
+    <string name="theme_brand">品牌绿（默认）</string>
+    <string name="theme_material_you">跟随系统壁纸</string>
+    <string name="theme_dark">深色优先</string>
+    <string name="settings_section_profile">档案</string>
+    <string name="settings_edit_profile">修改我的档案</string>
+    <string name="settings_edit_profile_sub">重新走一遍引导,已填内容会保留</string>
+    <string name="settings_section_about">关于</string>
+    <string name="settings_about_source">内容出处:《高性价比人生指南》\ngithub.com/eternity4719/HowToLiveBetter</string>
+    <string name="settings_disclaimer">内容版权归原项目所有,请遵循其许可证使用。本应用仅做整理与呈现,不构成医疗、法律或投资意见;涉及健康与安全的决定,请咨询专业人士。</string>
 </resources>

@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -30,6 +31,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.betterlife.app.BetterLifeApp
+import com.betterlife.app.R
 import com.betterlife.app.ui.chat.ChatScreen
 import com.betterlife.app.ui.library.EntryDetailScreen
 import com.betterlife.app.ui.library.LibraryScreen
@@ -57,13 +59,13 @@ object Routes {
     fun entry(id: String) = "entry/$id"
 }
 
-private data class TabSpec(val route: String, val label: String, val icon: ImageVector)
+private data class TabSpec(val route: String, val labelRes: Int, val icon: ImageVector)
 
 private val tabs = listOf(
-    TabSpec(Routes.TODAY, "今日", Icons.Filled.Home),
-    TabSpec(Routes.TODO, "待办", Icons.Filled.Done),
-    TabSpec(Routes.LIBRARY, "条目库", Icons.AutoMirrored.Filled.List),
-    TabSpec(Routes.MINE, "我的", Icons.Filled.Person),
+    TabSpec(Routes.TODAY, R.string.nav_today, Icons.Filled.Home),
+    TabSpec(Routes.TODO, R.string.nav_todo, Icons.Filled.Done),
+    TabSpec(Routes.LIBRARY, R.string.nav_library, Icons.AutoMirrored.Filled.List),
+    TabSpec(Routes.MINE, R.string.nav_mine, Icons.Filled.Person),
 )
 
 @Composable
@@ -96,11 +98,12 @@ private fun AppScaffold(startRoute: String) {
             if (showBottomBar) {
                 NavigationBar {
                     tabs.forEach { tab ->
+                        val label = stringResource(tab.labelRes)
                         NavigationBarItem(
                             selected = currentRoute == tab.route,
                             onClick = { navigateTab(navController, tab.route) },
-                            icon = { Icon(tab.icon, contentDescription = tab.label) },
-                            label = { Text(tab.label) },
+                            icon = { Icon(tab.icon, contentDescription = label) },
+                            label = { Text(label) },
                         )
                     }
                 }

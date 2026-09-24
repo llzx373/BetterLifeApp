@@ -12,16 +12,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.betterlife.app.R
 import com.betterlife.app.data.EntryDto
+import com.betterlife.app.data.EntryKeys
 
 /** 口径 → 人性化组名(未识别的口径原样展示) */
+@Composable
 fun lensGroupTitle(lens: String): String = when (lens) {
-    "死亡率" -> "先保命"
-    "金钱" -> "守住钱"
-    "时间" -> "省精力"
-    "自由" -> "别踩线"
-    else -> lens.ifBlank { "其他" }
+    EntryKeys.LENS_MORTALITY -> stringResource(R.string.lens_life)
+    EntryKeys.LENS_MONEY -> stringResource(R.string.lens_money)
+    EntryKeys.LENS_TIME -> stringResource(R.string.lens_time)
+    EntryKeys.LENS_FREEDOM -> stringResource(R.string.lens_line)
+    else -> lens.ifBlank { stringResource(R.string.lens_other) }
 }
 
 @Composable
@@ -49,20 +53,20 @@ private fun SmallBadge(
 @Composable
 fun RatioBadge(ratio: String, modifier: Modifier = Modifier) {
     when (ratio) {
-        "极高" -> SmallBadge(
-            "性价比 极高",
+        EntryKeys.RATIO_VERY_HIGH -> SmallBadge(
+            stringResource(R.string.ratio_very_high),
             MaterialTheme.colorScheme.primary,
             MaterialTheme.colorScheme.onPrimary,
             modifier,
         )
-        "高" -> SmallBadge(
-            "性价比 高",
+        EntryKeys.RATIO_HIGH -> SmallBadge(
+            stringResource(R.string.ratio_high),
             MaterialTheme.colorScheme.primaryContainer,
             MaterialTheme.colorScheme.onPrimaryContainer,
             modifier,
         )
-        "一般" -> SmallBadge(
-            "性价比 一般",
+        EntryKeys.RATIO_NORMAL -> SmallBadge(
+            stringResource(R.string.ratio_normal),
             MaterialTheme.colorScheme.surfaceVariant,
             MaterialTheme.colorScheme.onSurfaceVariant,
             modifier,
@@ -81,7 +85,7 @@ fun RatioBadge(ratio: String, modifier: Modifier = Modifier) {
 fun GradeBadge(grade: String, modifier: Modifier = Modifier) {
     if (grade.isBlank()) return
     SmallBadge(
-        text = "证据 $grade",
+        text = stringResource(R.string.grade_badge, grade),
         container = MaterialTheme.colorScheme.secondaryContainer,
         content = MaterialTheme.colorScheme.onSecondaryContainer,
         modifier = modifier,
@@ -92,7 +96,7 @@ fun GradeBadge(grade: String, modifier: Modifier = Modifier) {
 @Composable
 fun DisputeBadge(modifier: Modifier = Modifier) {
     SmallBadge(
-        text = "争议",
+        text = stringResource(R.string.badge_dispute),
         container = MaterialTheme.colorScheme.errorContainer,
         content = MaterialTheme.colorScheme.onErrorContainer,
         modifier = modifier,
@@ -103,19 +107,23 @@ fun DisputeBadge(modifier: Modifier = Modifier) {
 @Composable
 fun TodoBadge(modifier: Modifier = Modifier) {
     SmallBadge(
-        text = "待核实",
+        text = stringResource(R.string.badge_todo),
         container = MaterialTheme.colorScheme.tertiaryContainer,
         content = MaterialTheme.colorScheme.onTertiaryContainer,
         modifier = modifier,
     )
 }
 
+@Composable
 private fun costLabel(entry: EntryDto): String = when {
     entry.cost.isNotBlank() -> entry.cost
     else -> buildList {
-        if (entry.money == "多") add("花钱多") else if (entry.money == "少") add("花小钱")
-        if (entry.time == "多") add("费时间") else if (entry.time == "中") add("费些时间")
-        if (entry.will == "是") add("要毅力") else if (entry.will == "些") add("要些毅力")
+        if (entry.money == EntryKeys.COST_MORE) add(stringResource(R.string.cost_money_high))
+        else if (entry.money == EntryKeys.COST_LESS) add(stringResource(R.string.cost_money_low))
+        if (entry.time == EntryKeys.COST_MORE) add(stringResource(R.string.cost_time_high))
+        else if (entry.time == EntryKeys.COST_MID) add(stringResource(R.string.cost_time_mid))
+        if (entry.will == EntryKeys.WILL_YES) add(stringResource(R.string.cost_will_high))
+        else if (entry.will == EntryKeys.WILL_SOME) add(stringResource(R.string.cost_will_some))
     }.joinToString(" · ")
 }
 

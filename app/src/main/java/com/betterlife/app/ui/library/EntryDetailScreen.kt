@@ -42,10 +42,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.BetterLifeApp
+import com.betterlife.app.R
 import com.betterlife.app.data.EntryDto
 import com.betterlife.app.ui.common.CostChips
 import com.betterlife.app.ui.common.DisputeBadge
@@ -72,6 +74,7 @@ fun EntryDetailScreen(
     }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val addedTodoMessage = stringResource(R.string.detail_added_todo)
 
     Scaffold(
         topBar = {
@@ -79,7 +82,7 @@ fun EntryDetailScreen(
                 title = { Text(entry?.id ?: "") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
             )
@@ -89,7 +92,7 @@ fun EntryDetailScreen(
         val e = entry
         if (e == null) {
             Text(
-                "条目不存在或还在加载",
+                stringResource(R.string.detail_loading_or_missing),
                 modifier = Modifier.padding(padding).padding(16.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -120,8 +123,8 @@ fun EntryDetailScreen(
                     ) {
                         Text(
                             text = buildString {
-                                if (e.dispute) append("这条建议存在争议,请结合自己的情况判断。")
-                                if (e.todo) append("这条内容还未核实,谨慎参考。")
+                                if (e.dispute) append(stringResource(R.string.detail_dispute_notice))
+                                if (e.todo) append(stringResource(R.string.detail_todo_notice))
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
@@ -132,11 +135,11 @@ fun EntryDetailScreen(
             }
 
             item {
-                DetailSection(title = "成本", initiallyExpanded = true) {
+                DetailSection(title = stringResource(R.string.detail_section_cost), initiallyExpanded = true) {
                     CostChips(e)
                     if (e.level.isNotBlank()) {
                         Text(
-                            "对人生的影响程度:${e.level}",
+                            stringResource(R.string.detail_impact, e.level),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -145,26 +148,26 @@ fun EntryDetailScreen(
             }
             if (e.human.isNotBlank()) {
                 item {
-                    DetailSection(title = "说人话", initiallyExpanded = true) {
+                    DetailSection(title = stringResource(R.string.detail_section_human), initiallyExpanded = true) {
                         Text(e.human, style = MaterialTheme.typography.bodyLarge)
                     }
                 }
             }
             if (e.gain.isNotBlank()) {
                 item {
-                    DetailSection(title = "收益", initiallyExpanded = true) {
+                    DetailSection(title = stringResource(R.string.detail_section_gain), initiallyExpanded = true) {
                         Text(e.gain, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
             item {
-                DetailSection(title = "证据等级", initiallyExpanded = true) {
+                DetailSection(title = stringResource(R.string.detail_section_grade), initiallyExpanded = true) {
                     Text(
                         when (e.grade) {
-                            "A" -> "A 级:证据比较扎实(高质量研究支持)"
-                            "B" -> "B 级:有一定证据,但不够充分"
-                            "C" -> "C 级:证据较弱,多为经验性建议"
-                            else -> "未标注证据等级"
+                            "A" -> stringResource(R.string.detail_grade_a)
+                            "B" -> stringResource(R.string.detail_grade_b)
+                            "C" -> stringResource(R.string.detail_grade_c)
+                            else -> stringResource(R.string.detail_grade_none)
                         },
                         style = MaterialTheme.typography.bodyMedium,
                     )
@@ -172,14 +175,14 @@ fun EntryDetailScreen(
             }
             if (e.src.isNotBlank()) {
                 item {
-                    DetailSection(title = "来源", initiallyExpanded = false) {
+                    DetailSection(title = stringResource(R.string.detail_section_source), initiallyExpanded = false) {
                         SourceText(e.src)
                     }
                 }
             }
             if (e.note.isNotBlank()) {
                 item {
-                    DetailSection(title = "备注", initiallyExpanded = false) {
+                    DetailSection(title = stringResource(R.string.detail_section_note), initiallyExpanded = false) {
                         Text(e.note, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
@@ -189,10 +192,10 @@ fun EntryDetailScreen(
                 Button(
                     onClick = {
                         vm.addToTodo(e.id)
-                        scope.launch { snackbar.showSnackbar("已加入待办") }
+                        scope.launch { snackbar.showSnackbar(addedTodoMessage) }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("加入待办") }
+                ) { Text(stringResource(R.string.detail_add_todo)) }
                 Spacer(Modifier.height(24.dp))
             }
         }
@@ -225,7 +228,9 @@ private fun DetailSection(
                 )
                 Icon(
                     if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                    contentDescription = if (expanded) "收起" else "展开",
+                    contentDescription = stringResource(
+                        if (expanded) R.string.action_collapse else R.string.action_expand,
+                    ),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

@@ -4,7 +4,6 @@ package com.betterlife.app.ui.library
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,10 +25,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.betterlife.app.R
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
 import com.betterlife.app.ui.common.RatioBadge
@@ -46,19 +47,19 @@ fun LibraryScreen(
     Scaffold { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {
             Spacer(Modifier.height(12.dp))
-            Text("条目库", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.library_title), style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = state.query,
                 onValueChange = { vm.search(it) },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("搜条目,如:戒烟、体检、午睡") },
+                placeholder = { Text(stringResource(R.string.library_search_hint)) },
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 trailingIcon = {
                     if (state.query.isNotEmpty()) {
                         IconButton(onClick = { vm.search("") }) {
-                            Icon(Icons.Filled.Close, contentDescription = "清空")
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.action_clear))
                         }
                     }
                 },
@@ -71,7 +72,7 @@ fun LibraryScreen(
                     if (state.searchResults.isEmpty()) {
                         item {
                             Text(
-                                "没有匹配的条目",
+                                stringResource(R.string.library_no_match),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(vertical = 16.dp),
@@ -104,10 +105,10 @@ fun LibraryScreen(
                         val section = state.sections[i]
                         ListItem(
                             headlineContent = { Text(section.title) },
-                            overlineContent = { Text("第 ${section.n} 章") },
+                            overlineContent = { Text(stringResource(R.string.library_chapter_overline, section.n)) },
                             trailingContent = {
                                 Text(
-                                    "${section.entries} 条",
+                                    stringResource(R.string.library_entry_count, section.entries),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
