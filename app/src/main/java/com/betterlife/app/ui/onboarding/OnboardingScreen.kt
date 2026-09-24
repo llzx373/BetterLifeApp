@@ -1,4 +1,7 @@
 // 引导页:四步分步向导采集档案,完成后保存并进入今日页;已建档时作为编辑页复用
+//
+// 流动进度条 + 可滑动翻页 + 固定高度的底部动作栏(三种状态共用一套 Row,按钮位置不跳),
+// 每一步顶部有一行「为什么问这个」,敏感问题不至于让人以为被审问。
 package com.betterlife.app.ui.onboarding
 
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
@@ -17,13 +21,13 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,6 +57,9 @@ import kotlinx.coroutines.launch
 
 private const val STEP_COUNT = 4
 
+/** 动作栏最小高度:文字放大到 200% 时允许它长高,但正常字体下位置固定 */
+private val ActionBarMinHeight = 64.dp
+
 @Composable
 fun OnboardingScreen(
     onFinished: () -> Unit,
@@ -65,6 +72,7 @@ fun OnboardingScreen(
 
     val pagerState = rememberPagerState(pageCount = { STEP_COUNT })
     val scope = rememberCoroutineScope()
+    val page = pagerState.currentPage
 
     LaunchedEffect(saved) {
         if (saved) onFinished()
@@ -85,13 +93,13 @@ fun OnboardingScreen(
                 style = MaterialTheme.typography.headlineSmall,
             )
             Text(
-                text = stringResource(R.string.onboarding_progress, pagerState.currentPage + 1, STEP_COUNT) +
+                text = stringResource(R.string.onboarding_progress, page + 1, STEP_COUNT) +
                     if (editMode) "" else stringResource(R.string.onboarding_skippable_hint),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            LinearProgressIndicator(
-                progress = { (pagerState.currentPage + 1).toFloat() / STEP_COUNT },
+            LinearWavyProgressIndicator(
+                progress = { (page + 1).toFloat() / STEP_COUNT },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = Spacing.space3),
@@ -99,55 +107,58 @@ fun OnboardingScreen(
 
             HorizontalPager(
                 state = pagerState,
-                userScrollEnabled = false,
                 modifier = Modifier.weight(1f),
-            ) { page ->
+            ) { current ->
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.space4),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.space3),
                 ) {
-                    when (page) {
+                    when (current) {
                         0 -> StepBasics(profile) { vm.update(it) }
                         1 -> StepHabits(profile) { vm.update(it) }
                         2 -> StepFamily(profile) { vm.update(it) }
-                        3 -> StepGoals(profile) { vm.update(it) }
+                        else -> StepGoals(profile) { vm.update(it) }
                     }
                     Spacer(Modifier.height(Spacing.space2))
                 }
             }
 
+            // 三种状态共用一套布局:左「上一步」、右「跳过本步 + 下一步」,最后一步主按钮占满余下宽度
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = Spacing.space4),
+                    .heightIn(min = ActionBarMinHeight)
+                    .padding(vertical = Spacing.space3),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (pagerState.currentPage > 0) {
+                if (page > 0) {
                     TextButton(onClick = {
-                        scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
+                        scope.launch { pagerState.animateScrollToPage(page - 1) }
                     }) { Text(stringResource(R.string.onboarding_prev)) }
                 }
                 Spacer(Modifier.weight(1f))
-                if (pagerState.currentPage < STEP_COUNT - 1) {
-                    // 第 2 步起(索引 >= 1)允许跳过;第 1 步必须选年龄段,直接给"下一步"
+
+                if (page < STEP_COUNT - 1) {
                     TextButton(onClick = {
                         scope.launch { pagerState.animateScrollToPage(STEP_COUNT - 1) }
                     }) {
                         Text(
                             stringResource(
-                                if (pagerState.currentPage == 0) R.string.onboarding_jump
-                                else R.string.onboarding_skip,
+                                if (page == 0) R.string.onboarding_jump else R.string.onboarding_skip,
                             ),
                         )
                     }
                     Spacer(Modifier.width(Spacing.space2))
                     Button(onClick = {
-                        scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                        scope.launch { pagerState.animateScrollToPage(page + 1) }
                     }) { Text(stringResource(R.string.onboarding_next)) }
                 } else {
-                    Button(onClick = { vm.save(markOnboardingDone = true) }) {
+                    Button(
+                        onClick = { vm.save(markOnboardingDone = true) },
+                        modifier = Modifier.weight(1f),
+                    ) {
                         Text(
                             stringResource(
                                 if (editMode) R.string.onboarding_save else R.string.onboarding_generate,
@@ -167,6 +178,16 @@ private fun FieldLabel(text: String) {
     Text(text, style = MaterialTheme.typography.titleSmall)
 }
 
+/** 这一步为什么问:一行说明,敏感问题尤其需要 */
+@Composable
+private fun StepNote(textRes: Int) {
+    Text(
+        text = stringResource(textRes),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun <T> SingleChoiceChips(
@@ -176,11 +197,10 @@ private fun <T> SingleChoiceChips(
 ) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
         options.forEach { (value, label) ->
-            FilterChip(
-                selected = selected == value,
-                onClick = { onSelect(value) },
-                label = { Text(label) },
-            )
+            ToggleButton(
+                checked = selected == value,
+                onCheckedChange = { onSelect(value) },
+            ) { Text(label) }
         }
     }
 }
@@ -194,11 +214,10 @@ private fun <T> MultiChoiceChips(
 ) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
         options.forEach { (value, label) ->
-            FilterChip(
-                selected = value in selected,
-                onClick = { onToggle(value) },
-                label = { Text(label) },
-            )
+            ToggleButton(
+                checked = value in selected,
+                onCheckedChange = { onToggle(value) },
+            ) { Text(label) }
         }
     }
 }
@@ -219,6 +238,7 @@ private fun SwitchRow(label: String, checked: Boolean, onChecked: (Boolean) -> U
 @Composable
 private fun StepBasics(profile: Profile, update: ((Profile) -> Profile) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.space3)) {
+        StepNote(R.string.onboarding_why_basics)
         FieldLabel(stringResource(R.string.field_age))
         SingleChoiceChips(
             options = AgeRange.entries.map { it to it.key },
@@ -264,6 +284,7 @@ private fun StepBasics(profile: Profile, update: ((Profile) -> Profile) -> Unit)
 @Composable
 private fun StepHabits(profile: Profile, update: ((Profile) -> Profile) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.space3)) {
+        StepNote(R.string.onboarding_why_habits)
         FieldLabel(stringResource(R.string.field_smoking))
         SingleChoiceChips(
             options = listOf(
@@ -335,6 +356,7 @@ private fun StepHabits(profile: Profile, update: ((Profile) -> Profile) -> Unit)
 @Composable
 private fun StepFamily(profile: Profile, update: ((Profile) -> Profile) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.space3)) {
+        StepNote(R.string.onboarding_why_family)
         FieldLabel(stringResource(R.string.field_children))
         SingleChoiceChips(
             options = listOf(
