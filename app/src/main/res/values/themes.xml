@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+      应用主题（Compose 之前的窗口外观）。
+      只负责两件事：冷启动窗口背景色、状态栏图标明暗。
+      真正的配色/字体/形状由 Compose 的 BetterLifeTheme 负责。
+      parent 用框架主题而不是 Theme.Material3.*，避免为了一个空壳主题
+      引入整个 com.google.android.material 依赖。
+    -->
+    <style name="Theme.BetterLife" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- 随日夜切换（values-night/colors.xml） -->
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:windowLightStatusBar">@bool/window_light_status_bar</item>
+    </style>
+
+    <!--
+      启动画面主题（androidx.core:core-splashscreen）。
+      postSplashScreenTheme 指向上面那个主题，installSplashScreen() 之后自动切换。
+    -->
+    <style name="Theme.BetterLife.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/window_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.BetterLife</item>
+    </style>
+
+</resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 应用名（Manifest 的 android:label 引用此值，不再硬编码） -->
+    <string name="app_name">BetterLife</string>
+
+    <!-- 每日提醒通知 -->
+    <string name="notification_channel_daily_name">每日任务</string>
+    <string name="notification_channel_daily_desc">每天提醒你完成今日的人生任务</string>
+    <string name="notification_daily_title">BetterLife 每日任务</string>
+    <string name="notification_daily_undone">今天还有 %1$d 条任务未完成</string>
+    <string name="notification_daily_all_done">今日任务已全部完成，继续保持</string>
+</resources>

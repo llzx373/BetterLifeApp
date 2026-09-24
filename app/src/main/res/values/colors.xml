@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 自适应图标背景 -->
+    <color name="ic_launcher_background">#2E7D32</color>
+
+    <!-- 窗口背景色：必须与 Compose 主题的 background 色槽一致
+         （ui/theme/Theme.kt 的 LightColors.background = 0xFFF6FBF1），
+         否则冷启动会先闪一下另一个颜色再切到 Compose 的画面。 -->
+    <color name="window_background">#F6FBF1</color>
+</resources>

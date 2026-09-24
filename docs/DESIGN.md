@@ -100,7 +100,7 @@ python tools/build_content.py      # 内容变更后重跑,看自检统计
 
 ## 8. 已知取舍与路线
 
-- `collectAsStateWithLifecycle` 用的是 `ui/util/StateFlowExt.kt` 本地实现(gradle 未引 lifecycle-runtime-compose;补上后可删)
+- `collectAsStateWithLifecycle` 已改用官方 `androidx.lifecycle.compose` 实现(此前是本仓库 `ui/util/StateFlowExt.kt` 的本地替代品,引入 `lifecycle-runtime-compose` 后已删除)
 - 单任务无独立提醒时间(只有全局提醒),TodoScreen 未展示提醒时间
 - 第二阶段计划:Health Connect 接入(步数/睡眠/运动自动核销每日任务)、数据图表、成就系统;接入点在 `TaskManager.completeTask` 与 `DailyTaskPlanner`
 - 条目内容的 LICENSE 归原书仓库,分发 APK 即分发其内容,关于页须保留出处

@@ -31,6 +31,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.data.AgeRange
 import com.betterlife.app.data.Alcohol
@@ -44,7 +45,6 @@ import com.betterlife.app.data.Occupation
 import com.betterlife.app.data.Profile
 import com.betterlife.app.data.Smoking
 import com.betterlife.app.data.SugaryDrinks
-import com.betterlife.app.ui.util.collectAsStateWithLifecycle
 import com.betterlife.app.viewmodel.ProfileViewModel
 import kotlinx.coroutines.launch
 

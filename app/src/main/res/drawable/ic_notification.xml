@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  通知小图标。API 21+ 会把通知图标当作纯白剪影处理，所以：
+  - 必须是单色白填充 + 透明背景
+  - 不能有渐变/多色
+  图形与启动图标一致（对勾 = 打卡），保持品牌一致。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M9,16.17 L4.83,12 l-1.42,1.41 L9,19 21,7 l-1.41,-1.41 z" />
+</vector>

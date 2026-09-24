@@ -47,9 +47,9 @@ interface TaskDao {
     @Query("DELETE FROM tasks WHERE taskId = :taskId")
     suspend fun delete(taskId: Long)
 
-    /** 某条目 DAILY 任务的完成日期（降序），用于计算连续天数；date 列可空故返回可空类型 */
-    @Query("SELECT date FROM tasks WHERE entryId = :entryId AND type = 'DAILY' AND done = 1 ORDER BY date DESC")
-    suspend fun doneDates(entryId: String): List<String?>
+    /** 某条目 DAILY 任务的完成日期（降序），用于计算连续天数。date 为空的记录不参与统计。 */
+    @Query("SELECT date FROM tasks WHERE entryId = :entryId AND type = 'DAILY' AND done = 1 AND date IS NOT NULL ORDER BY date DESC")
+    suspend fun doneDates(entryId: String): List<String>
 }
 
 @Dao

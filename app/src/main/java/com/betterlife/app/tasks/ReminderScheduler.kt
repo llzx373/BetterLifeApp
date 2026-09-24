@@ -3,7 +3,9 @@ package com.betterlife.app.tasks
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -15,6 +17,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.betterlife.app.BetterLifeApp
+import com.betterlife.app.MainActivity
+import com.betterlife.app.R
 import java.time.Duration
 import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
@@ -32,8 +36,12 @@ class ReminderScheduler(private val context: Context) {
         fun ensureChannel(context: Context) {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "每日任务", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                    description = "每天提醒你完成今日的人生任务"
+                NotificationChannel(
+                    CHANNEL_ID,
+                    context.getString(R.string.notification_channel_daily_name),
+                    NotificationManager.IMPORTANCE_DEFAULT,
+                ).apply {
+                    description = context.getString(R.string.notification_channel_daily_desc)
                 }
             )
         }
@@ -82,11 +90,18 @@ class DailyReminderWorker(
         ) return
 
         ReminderScheduler.ensureChannel(applicationContext)
-        val text = if (undone > 0) "今天还有 $undone 条任务未完成" else "今日任务已全部完成，继续保持"
+        val text = if (undone > 0) {
+            applicationContext.getString(R.string.notification_daily_undone, undone)
+        } else {
+            applicationContext.getString(R.string.notification_daily_all_done)
+        }
         val notification = NotificationCompat.Builder(applicationContext, ReminderScheduler.CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_popup_reminder)
-            .setContentTitle("BetterLife 每日任务")
+            // 必须是单色白剪影资源；此前用的 android.R.drawable 是框架资源，
+            // 在部分 OEM 的通知栏里会渲染成空白方块。
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(applicationContext.getString(R.string.notification_daily_title))
             .setContentText(text)
+            .setContentIntent(contentIntent())
             .setAutoCancel(true)
             .build()
         try {
@@ -95,5 +110,21 @@ class DailyReminderWorker(
         } catch (_: SecurityException) {
             // 权限被收回等情况，忽略
         }
+    }
+
+    /**
+     * 点通知回到 App。
+     * targetSdk 31 起 PendingIntent 必须显式声明可变性；这里不需要外部修改，用 FLAG_IMMUTABLE。
+     */
+    private fun contentIntent(): PendingIntent {
+        val intent = Intent(applicationContext, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        return PendingIntent.getActivity(
+            applicationContext,
+            0,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
     }
 }

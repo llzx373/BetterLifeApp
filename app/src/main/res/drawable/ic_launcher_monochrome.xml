@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  单色图标层（Android 13+ 主题图标 / Material You）。
+  系统会用自己的调色板给这一层上色，所以这里只需要一个纯白剪影，
+  几何形状必须与 ic_launcher_foreground 一致，否则主题图标和普通图标会长得不一样。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="3"
+        android:scaleY="3"
+        android:translateX="18"
+        android:translateY="18">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M9,16.17 L4.83,12 l-1.42,1.41 L9,19 21,7 l-1.41,-1.41 z" />
+    </group>
+</vector>

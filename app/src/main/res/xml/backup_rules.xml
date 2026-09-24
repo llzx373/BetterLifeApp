@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  自动备份排除规则（Android 12 及以下，对应 Manifest 的 android:fullBackupContent）。
+
+  DataStore 里存着用户的 API Key（files/datastore/settings.preferences_pb），
+  明文且未加密。若不排除，它会随 Android 云备份被导出到用户的 Google Drive。
+-->
+<full-backup-content>
+    <exclude
+        domain="file"
+        path="datastore" />
+</full-backup-content>

@@ -7,13 +7,24 @@
     <application
         android:name=".BetterLifeApp"
         android:allowBackup="true"
-        android:label="BetterLife"
-        android:supportsRtl="true">
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.BetterLife">
 
+        <!--
+          Activity 用 Splash 主题：installSplashScreen() 会把 postSplashScreenTheme
+          （= Theme.BetterLife）应用上去。两个主题的 windowBackground 同源，
+          所以从系统启动画面到 Compose 首帧之间不会出现颜色跳变。
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@android:style/Theme.Material.Light.NoActionBar">
+            android:theme="@style/Theme.BetterLife.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

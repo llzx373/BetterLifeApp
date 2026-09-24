@@ -23,12 +23,35 @@
 
 ## 构建
 
-环境:JDK 17、Android SDK(platform-34 + build-tools 34.0.0)。`local.properties` 里配置 `sdk.dir`。
+环境:JDK 17+(本项目在 JDK 21 上验证)、Android SDK(**platform-37 + build-tools 36.0.0**)。`local.properties` 里配置 `sdk.dir`。
 
 ```bash
 ./gradlew testDebugUnitTest   # 24 个单元测试
 ./gradlew assembleDebug       # 产出 app/build/outputs/apk/debug/app-debug.apk
+./gradlew assembleRelease     # 产出 app/build/outputs/apk/release/app-release.apk(R8 压缩)
+./gradlew lint                # 静态检查(abortOnError:有错误即构建失败)
 ```
+
+依赖与工具链版本集中在 [`gradle/libs.versions.toml`](gradle/libs.versions.toml),不要在模块脚本里硬编码版本号。
+
+### 发布构建与签名
+
+正式签名从仓库根目录的 `keystore.properties` 读取。该文件与密钥库都**不入库**(见 `.gitignore`):
+
+```properties
+storeFile=/absolute/path/to/release.jks
+storePassword=...
+keyAlias=...
+keyPassword=...
+```
+
+生成密钥库:
+
+```bash
+keytool -genkeypair -v -keystore release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias betterlife
+```
+
+`keystore.properties` 不存在时,release 构建会**回退到 debug 签名并打印警告** —— 这样任何机器上都能跑通 `assembleRelease`,但产出物不能用于正式分发。
 
 ## 内容管线
 
@@ -44,9 +67,12 @@ python tools/gen_rules.py                     # 重新生成 tools/relevance_rul
 
 ## 技术栈
 
-Kotlin + Jetpack Compose(Material 3)· Room · DataStore · WorkManager · Navigation Compose · OkHttp · Kotlinx Serialization。最低 Android 8.0(API 26),目标 Android 14(API 34)。
+Kotlin + Jetpack Compose(Material 3)· Room · DataStore · WorkManager · Navigation Compose · OkHttp · Kotlinx Serialization。
 
-详细架构与二次开发指引见 [docs/DESIGN.md](docs/DESIGN.md)。
+构建:AGP 9.4.1(内置 Kotlin 支持)· Kotlin 2.4.20 · KSP 2.3.12 · Gradle 9.7.1。
+SDK:最低 Android 8.0(API 26),目标 Android 16(API 36),compileSdk 37。
+
+详细架构与二次开发指引见 [docs/DESIGN.md](docs/DESIGN.md);设计系统与 M3 Expressive 改造路线见 [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)。
 
 ## 内容出处与许可
 

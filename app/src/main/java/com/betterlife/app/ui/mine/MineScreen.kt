@@ -26,10 +26,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.data.Goal
 import com.betterlife.app.data.Profile
-import com.betterlife.app.ui.util.collectAsStateWithLifecycle
 import com.betterlife.app.viewmodel.ProfileViewModel
 
 private fun goalLabel(goal: Goal): String = when (goal) {

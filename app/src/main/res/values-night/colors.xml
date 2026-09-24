@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深色模式窗口背景：对应 ui/theme/Theme.kt 的 DarkColors.background = 0xFF10150F。
+         只覆盖需要随日夜切换的资源，其余（品牌绿、图标背景）自动回落到 values/。 -->
+    <color name="window_background">#10150F</color>
+</resources>

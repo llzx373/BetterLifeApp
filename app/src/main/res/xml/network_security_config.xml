@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  网络安全配置。
+
+  背景：baseUrl 由用户在设置页自行填写。targetSdk >= 28 时明文 HTTP 默认已被禁止，
+  但显式声明可以：
+  1. 把「禁止明文」变成一条写下来的策略，而不是依赖平台默认值的隐式行为；
+  2. 在 debug 构建里放开用户 CA，方便用 Charles / mitmproxy 抓包调试 —— 这是
+     开发期真实需要的能力，且只在 debug 生效，不会影响 release 包。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>

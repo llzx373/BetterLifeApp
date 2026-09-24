@@ -1,6 +1,5 @@
 *.iml
 .gradle/
-/local.properties
 /.idea/
 .DS_Store
 /build/
@@ -9,3 +8,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# 签名材料：绝不入库
+keystore.properties
+*.jks
+*.keystore

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  备份与设备迁移规则（Android 12+，对应 Manifest 的 android:dataExtractionRules）。
+  与 backup_rules.xml 同样的理由排除 DataStore：API Key 是凭据，不进云备份、
+  也不走设备迁移。代价是换机后需要重新填一次 Key，这个代价可以接受。
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude
+            domain="file"
+            path="datastore" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude
+            domain="file"
+            path="datastore" />
+    </device-transfer>
+</data-extraction-rules>
