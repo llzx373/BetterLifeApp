@@ -150,8 +150,9 @@ fun TodayScreen(
     }
 }
 
+/** 无状态内容：截图测试直接喂假状态渲染它，不需要 ViewModel / Room / DataStore。 */
 @Composable
-private fun TodayContent(
+internal fun TodayContent(
     state: TodayViewModel.UiState.Ready,
     libraryState: LibraryViewModel.UiState,
     onToggle: (TaskEntity) -> Unit,

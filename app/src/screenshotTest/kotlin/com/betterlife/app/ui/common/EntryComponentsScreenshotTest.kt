@@ -9,10 +9,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import com.android.tools.screenshot.PreviewTest
-import com.betterlife.app.data.EntryDto
 import com.betterlife.app.data.EntryKeys
 import com.betterlife.app.ui.FourFoldPreview
 import com.betterlife.app.ui.PreviewSurface
+import com.betterlife.app.ui.fakeEntry
 import com.betterlife.app.ui.theme.Spacing
 
 @PreviewTest
@@ -22,7 +22,7 @@ fun CostMeterRatioVariants() {
     PreviewSurface {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.space3)) {
             CostMeter(
-                entry(
+                fakeEntry(
                     id = "02-01",
                     title = "把家里的食盐换成低钠盐",
                     money = EntryKeys.COST_LESS,
@@ -33,7 +33,7 @@ fun CostMeterRatioVariants() {
                 ),
             )
             CostMeter(
-                entry(
+                fakeEntry(
                     id = "06-04",
                     title = "把信用卡的分期还清",
                     money = EntryKeys.COST_MID,
@@ -44,7 +44,7 @@ fun CostMeterRatioVariants() {
                 ),
             )
             CostMeter(
-                entry(
+                fakeEntry(
                     id = "21-07",
                     title = "重新装修一遍厨房",
                     money = EntryKeys.COST_MORE,
@@ -81,23 +81,3 @@ fun EntryBadges() {
         }
     }
 }
-
-private fun entry(
-    id: String,
-    title: String,
-    money: String,
-    time: String,
-    will: String,
-    level: String,
-    ratio: String,
-) = EntryDto(
-    id = id,
-    sec = 2,
-    n = 1,
-    title = title,
-    money = money,
-    time = time,
-    will = will,
-    level = level,
-    ratio = ratio,
-)

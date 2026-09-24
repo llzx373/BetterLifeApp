@@ -756,7 +756,43 @@ sealed interface TodayUiState {
 
 已进基线的是:`CostMeter` 三种性价比档、条目徽标组(性价比/证据/争议/待核实)、口径色板、中文排版阶梯。这四张同时是无障碍验收的证据 —— 口径色与图标成对出现、明度是否拉开、200% 缩放下排版会不会挤成一团,肉眼一看便知。
 
-**各屏进不了基线的原因**:7 个屏都是「有状态 `XxxScreen(vm)` + `private` 无状态 Content」,`private` 的 Content 在截图源集里看不见,而带 vm 的入口在 host 侧渲染里根本跑不起来(Room / DI / DataStore 都不存在)。要让每屏有基线,得先把无状态 Content 提出来改成可见 —— 这一步排在 B4 之前做。
+**各屏进不了基线的原因**
+
+7 个屏都是「有状态 `XxxScreen(vm)` + `private` 无状态 Content」,`private` 的 Content 在截图源集里看不见,而带 vm 的入口在 host 侧渲染里根本跑不起来(Room / DI / DataStore 都不存在)。
+
+**已实测确认**:截图源集的编译单元与 main 之间**有 friend-path**,`internal` 成员可以直接访问(用一个引用 `AppTypography` 的探针编译验证过)。所以无状态 Content 只要从 `private` 改成 `internal` 就够,**不需要把它变成 public**,封装不用让步。
+
+#### P3-A1b · 屏级基线起步(2026-09-24 已完成)
+
+| 屏 | 做法 | 结果 |
+|---|---|---|
+| 今日页 | `TodayContent` 改 `internal` | 3 级视觉层级、口径分组、`CostMeter`、`SplitButton` 打卡位全在图里 |
+| 待办页 | 把内联在 `TodoScreen` 里的列表抽成 `TodoContent(state, padding, onToggle, onOpenEntry, onDelete)` | 两个分区、分区进度环、圆形勾选 vs 方框勾选都能回归 |
+
+`TodoContent` 的抽取是纯搬迁,行为不变;顺带也让 B4 的打卡动效有了可单测的入口。
+
+脚手架相应扩成两套:`FourFoldPreview`(组件级,跟随内容大小)与 `FourFoldScreenPreview`(整屏级,**固定 412×915**,因为整屏都是 `fillMaxSize` + `LazyColumn`,不给约束渲染结果没意义)。假数据集中在 `ui/ScreenshotFixtures.kt`。
+
+**尚未进基线的屏**:条目库 / 章节页 / 条目详情 / 引导页 / 设置页 / 我的页 / 聊天页 / 收藏页。它们按 P2 的老规矩,**跟着各自屏在 B1–B6 被改动时一起补**,不单独开一轮。
+
+#### ⚠️ 发现:截图只抓静态帧,入场动画的内容基线化不了
+
+给今日页的「全部完成」态写预览时,渲染出来是**一片空白** —— 卡片位置什么都没有。
+
+原因在 `TodayScreen.AllDoneCard`:
+
+```kotlin
+val visible = remember { MutableTransitionState(false).apply { targetState = true } }
+AnimatedVisibility(visibleState = visible, enter = fadeIn() + scaleIn(initialScale = 0.96f))
+```
+
+这是「首次组合时播放入场动画」的标准写法,在真机上没问题;但截图引擎抓的是静态帧,抓到的是 `alpha = 0` 的那一刻。留着这张基线比没有更糟 —— 它会**掩盖**那张卡的回归。所以这张预览已删除。
+
+**推论,直接影响后续顺序**:
+
+1. 凡是「靠入场动画才出现」的内容,都无法进基线。B4 要做的正是到处加入场动画,所以 **B5 的动画降级机制必须排在 B4 前面** —— 有了「关闭动画」这条路径,预览里就能走降级分支拿到确定性的静态帧,否则 B4 每加一处动画就多一处没法回归的视觉。
+2. 动效本身(弹簧、位移、时序)按定义验证不了,截图只能锁住**静态终态**。B4 的动效正确性得靠真机手动走查,不要假装有自动回归。
+
 
 ---
 

@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
+import com.betterlife.app.data.db.TaskEntity
 import com.betterlife.app.ui.theme.LocalLensColors
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.TodoViewModel
@@ -64,77 +65,95 @@ fun TodoScreen(
     val undoLabel = stringResource(R.string.action_undo)
 
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(Spacing.space4),
-            verticalArrangement = Arrangement.spacedBy(Spacing.space2),
-        ) {
-            item {
-                Text(
-                    stringResource(R.string.todo_title),
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(bottom = Spacing.space2),
-                )
-            }
-
-            item {
-                SectionHeader(
-                    titleRes = R.string.todo_daily_title,
-                    trailing = {
-                        if (state.daily.isNotEmpty()) {
-                            HabitProgress(
-                                done = state.dailyDoneCount,
-                                total = state.daily.size,
-                                allDone = state.dailyAllDone,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    },
-                )
-            }
-            if (state.daily.isEmpty()) {
-                item { EmptyHint(R.string.todo_daily_empty_none) }
-            } else {
-                items(state.daily, key = { "d-${it.task.taskId}" }) { item ->
-                    HabitRow(
-                        item = item,
-                        onToggle = { vm.toggle(item.task) },
-                        onClick = { item.entry?.let { e -> onOpenEntry(e.id) } },
+        TodoContent(
+            state = state,
+            contentPadding = padding,
+            onToggle = vm::toggle,
+            onOpenEntry = onOpenEntry,
+            onDelete = { item ->
+                vm.delete(item.task)
+                scope.launch {
+                    val message = resources.getString(
+                        R.string.todo_deleted,
+                        item.entry?.title ?: item.task.entryId,
                     )
+                    val result = snackbar.showSnackbar(
+                        message = message,
+                        actionLabel = undoLabel,
+                        withDismissAction = true,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) vm.restore(item)
                 }
-            }
+            },
+        )
+    }
+}
 
-            item {
-                SectionHeader(
-                    titleRes = R.string.todo_once_title,
-                    modifier = Modifier.padding(top = Spacing.space4),
+/** 无状态内容：截图测试直接喂假状态渲染它，不需要 ViewModel / Room / DataStore。 */
+@Composable
+internal fun TodoContent(
+    state: TodoViewModel.UiState,
+    contentPadding: PaddingValues,
+    onToggle: (TaskEntity) -> Unit,
+    onOpenEntry: (String) -> Unit,
+    onDelete: (TodoViewModel.TodoItem) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(contentPadding),
+        contentPadding = PaddingValues(Spacing.space4),
+        verticalArrangement = Arrangement.spacedBy(Spacing.space2),
+    ) {
+        item {
+            Text(
+                stringResource(R.string.todo_title),
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(bottom = Spacing.space2),
+            )
+        }
+
+        item {
+            SectionHeader(
+                titleRes = R.string.todo_daily_title,
+                trailing = {
+                    if (state.daily.isNotEmpty()) {
+                        HabitProgress(
+                            done = state.dailyDoneCount,
+                            total = state.daily.size,
+                            allDone = state.dailyAllDone,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                },
+            )
+        }
+        if (state.daily.isEmpty()) {
+            item { EmptyHint(R.string.todo_daily_empty_none) }
+        } else {
+            items(state.daily, key = { "d-${it.task.taskId}" }) { item ->
+                HabitRow(
+                    item = item,
+                    onToggle = { onToggle(item.task) },
+                    onClick = { item.entry?.let { e -> onOpenEntry(e.id) } },
                 )
             }
-            if (state.once.isEmpty()) {
-                item { EmptyHint(R.string.todo_once_empty) }
-            } else {
-                items(state.once, key = { "o-${it.task.taskId}" }) { item ->
-                    OnceRow(
-                        item = item,
-                        onToggle = { vm.toggle(item.task) },
-                        onClick = { item.entry?.let { e -> onOpenEntry(e.id) } },
-                        onDelete = {
-                            vm.delete(item.task)
-                            scope.launch {
-                                val message = resources.getString(
-                                    R.string.todo_deleted,
-                                    item.entry?.title ?: item.task.entryId,
-                                )
-                                val result = snackbar.showSnackbar(
-                                    message = message,
-                                    actionLabel = undoLabel,
-                                    withDismissAction = true,
-                                )
-                                if (result == SnackbarResult.ActionPerformed) vm.restore(item)
-                            }
-                        },
-                    )
-                }
+        }
+
+        item {
+            SectionHeader(
+                titleRes = R.string.todo_once_title,
+                modifier = Modifier.padding(top = Spacing.space4),
+            )
+        }
+        if (state.once.isEmpty()) {
+            item { EmptyHint(R.string.todo_once_empty) }
+        } else {
+            items(state.once, key = { "o-${it.task.taskId}" }) { item ->
+                OnceRow(
+                    item = item,
+                    onToggle = { onToggle(item.task) },
+                    onClick = { item.entry?.let { e -> onOpenEntry(e.id) } },
+                    onDelete = { onDelete(item) },
+                )
             }
         }
     }
