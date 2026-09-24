@@ -20,6 +20,7 @@
     <string name="action_collapse">收起</string>
     <string name="action_confirm">确定</string>
     <string name="action_cancel">取消</string>
+    <string name="action_undo">撤销</string>
     <string name="common_load_failed">内容加载失败</string>
 
     <!-- 口径（先保命 / 守住钱 / 省精力 / 别踩线） -->
@@ -76,9 +77,14 @@
     <!-- 待办页 -->
     <string name="todo_title">待办</string>
     <string name="todo_daily_title">每日习惯</string>
-    <string name="todo_daily_empty">今天的都做完了</string>
+    <string name="todo_daily_empty_none">今天还没有安排习惯,去今日页看看</string>
+    <string name="todo_daily_all_done">今天的都完成了</string>
+    <string name="todo_daily_progress">%1$d/%2$d</string>
+    <string name="todo_habit_done_desc">已完成,点击取消</string>
+    <string name="todo_habit_todo_desc">打卡</string>
     <string name="todo_once_title">一次性待办</string>
     <string name="todo_once_empty">没有一次性待办。看到想做的事,点条目上的「加入待办」。</string>
+    <string name="todo_deleted">已删除「%1$s」</string>
 
     <!-- 条目库 -->
     <string name="library_title">条目库</string>

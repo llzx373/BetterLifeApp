@@ -56,6 +56,11 @@ class TaskManager(
 
     suspend fun deleteTask(taskId: Long) = taskDao.delete(taskId)
 
+    /** 撤销删除:按原 taskId 把任务写回,顺序与状态都保持不变 */
+    suspend fun restoreTask(task: TaskEntity) {
+        taskDao.insert(task)
+    }
+
     /**
      * 换一条：把当前条目标记为「不再推荐」（DISMISSED，会被推荐引擎排除），
      * 删除今天的这条任务，再按档案补一条当天还没有的顶上。

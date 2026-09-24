@@ -25,15 +25,31 @@ class TodoViewModel(
 
     data class TodoItem(val task: TaskEntity, val entry: EntryDto?)
 
-    private val _items = MutableStateFlow<List<TodoItem>>(emptyList())
-    val items: StateFlow<List<TodoItem>> = _items.asStateFlow()
+    /**
+     * 每日习惯与一次性待办分开给出:两类的语义和交互都不同,
+     * 分区在 VM 里算一次,界面不做过滤也不重组重算。
+     */
+    data class UiState(
+        val daily: List<TodoItem> = emptyList(),
+        val once: List<TodoItem> = emptyList(),
+    ) {
+        val dailyDoneCount: Int get() = daily.count { it.task.done }
+        val dailyAllDone: Boolean get() = daily.isNotEmpty() && dailyDoneCount == daily.size
+    }
+
+    private val _uiState = MutableStateFlow(UiState())
+    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     init {
         viewModelScope.launch {
             combine(taskManager.todayTasksFlow(), taskManager.todoListFlow()) { daily, once -> daily + once }
                 .collect { tasks ->
                     val data = withContext(Dispatchers.IO) { entryRepository.entriesData() }
-                    _items.value = tasks.map { TodoItem(it, data.byId[it.entryId]) }
+                    val items = tasks.map { TodoItem(it, data.byId[it.entryId]) }
+                    _uiState.value = UiState(
+                        daily = items.filter { it.task.type == TaskEntity.TYPE_DAILY },
+                        once = items.filter { it.task.type == TaskEntity.TYPE_ONCE },
+                    )
                 }
         }
     }
@@ -51,6 +67,11 @@ class TodoViewModel(
 
     fun delete(task: TaskEntity) {
         viewModelScope.launch(Dispatchers.IO) { taskManager.deleteTask(task.taskId) }
+    }
+
+    /** 撤销删除:把同一条任务按原 id 写回 */
+    fun restore(item: TodoItem) {
+        viewModelScope.launch(Dispatchers.IO) { taskManager.restoreTask(item.task) }
     }
 
     companion object {
