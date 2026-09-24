@@ -33,10 +33,19 @@ class ChatViewModel(
     data class UiState(
         val messages: List<ChatUiMessage> = emptyList(),
         val asking: Boolean = false,
+        /** 本地条目数,思考态文案用它说清「检索了多少条」 */
+        val entryCount: Int = 0,
     )
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            val count = entryRepository.entriesData().entries.size
+            _uiState.value = _uiState.value.copy(entryCount = count)
+        }
+    }
 
     fun ask(question: String) {
         if (question.isBlank() || _uiState.value.asking) return
@@ -51,7 +60,7 @@ class ChatViewModel(
             val result = aiAdvisor.ask(profile, question, data.entries, data.rules)
             val reply = result.fold(
                 onSuccess = { ChatUiMessage(ChatMessage.ROLE_ASSISTANT, it) },
-                onFailure = { ChatUiMessage(ChatMessage.ROLE_ASSISTANT, it.message ?: "出错了", isError = true) },
+                onFailure = { ChatUiMessage(ChatMessage.ROLE_ASSISTANT, it.message.orEmpty(), isError = true) },
             )
             withContext(Dispatchers.Main) {
                 _uiState.value = _uiState.value.copy(

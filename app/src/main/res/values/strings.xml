@@ -127,7 +127,13 @@
     <string name="chat_safety_notice">急症先打 120;心理援助热线 12356;本应用给的是通用口径,不替代医生/律师。</string>
     <string name="chat_no_key_banner">在设置里填入 API Key 可解锁 AI 问答,当前为本地降级回答。</string>
     <string name="chat_go_settings">去设置</string>
-    <string name="chat_thinking">思考中…</string>
+    <string name="chat_thinking">正在检索 %1$d 条建议并请教模型</string>
+    <string name="chat_thinking_plain">正在检索建议并请教模型</string>
+    <string name="chat_suggestions_title">试着问一个:</string>
+    <string name="chat_suggestion_1">我抽烟,先看哪几条?</string>
+    <string name="chat_suggestion_2">每天久坐 10 小时,怎么办?</string>
+    <string name="chat_suggestion_3">体检该查哪些项目?</string>
+    <string name="chat_error_generic">出了点问题,请稍后再试</string>
     <string name="chat_input_hint">问点什么,比如:我抽烟,先看哪几条?</string>
 
     <!-- 我的 -->

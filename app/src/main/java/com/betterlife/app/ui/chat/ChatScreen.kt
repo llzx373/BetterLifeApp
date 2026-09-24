@@ -1,4 +1,7 @@
-// AI 问答页:气泡对话 + 输入发送;无 API Key 时顶部横幅提示降级;首条固定安全提示
+// AI 问答页:安全提示固定在顶部 + 气泡对话 + 可点的示例问题
+//
+// 安全提示不是模型回答,所以它不做成列表里的第一个气泡,而是固定的 Surface;
+// 无 Key 横幅走 secondaryContainer,避免和口径色里的「别踩线」撞色。
 package com.betterlife.app.ui.chat
 
 import androidx.compose.foundation.layout.Arrangement
@@ -6,23 +9,29 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,6 +54,14 @@ import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.ChatViewModel
 import com.betterlife.app.viewmodel.SettingsViewModel
 
+private val BubbleMaxWidth = 300.dp
+private val ThinkingIndicatorWidth = 40.dp
+private val SuggestionRes = listOf(
+    R.string.chat_suggestion_1,
+    R.string.chat_suggestion_2,
+    R.string.chat_suggestion_3,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
@@ -57,6 +74,8 @@ fun ChatScreen(
     val settingsState by settingsVm.uiState.collectAsStateWithLifecycle()
     var input by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
+
+    val noApiKey = settingsState.loaded && settingsState.settings.apiKey.isBlank()
 
     // 新消息到达时滚到底部
     LaunchedEffect(state.messages.size) {
@@ -81,24 +100,10 @@ fun ChatScreen(
                 .padding(padding)
                 .imePadding(),
         ) {
-            if (settingsState.settings.apiKey.isBlank()) {
-                Surface(
-                    color = MaterialTheme.colorScheme.tertiaryContainer,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space1),
-                    ) {
-                        Text(
-                            stringResource(R.string.chat_no_key_banner),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer,
-                            modifier = Modifier.weight(1f),
-                        )
-                        TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.chat_go_settings)) }
-                    }
-                }
+            SafetyNotice()
+
+            if (noApiKey) {
+                NoKeyBanner(onOpenSettings = onOpenSettings)
             }
 
             LazyColumn(
@@ -107,36 +112,21 @@ fun ChatScreen(
                 contentPadding = PaddingValues(Spacing.space4),
                 verticalArrangement = Arrangement.spacedBy(Spacing.space3),
             ) {
-                // 首条固定安全提示
-                item(key = "safety") {
-                    Bubble(
-                        text = stringResource(R.string.chat_safety_notice),
-                        isUser = false,
-                        isError = false,
-                    )
+                if (state.messages.isEmpty() && noApiKey) {
+                    item(key = "suggestions") {
+                        Suggestions(onPick = { vm.ask(it) })
+                    }
                 }
-                items(state.messages.size) { i ->
+                items(state.messages.size, key = { it }) { i ->
                     val msg = state.messages[i]
                     Bubble(
-                        text = msg.content,
+                        text = msg.content.ifBlank { stringResource(R.string.chat_error_generic) },
                         isUser = msg.role == ChatMessage.ROLE_USER,
                         isError = msg.isError,
                     )
                 }
                 if (state.asking) {
-                    item(key = "asking") {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.space2),
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.padding(Spacing.space1), strokeWidth = 2.dp)
-                            Text(
-                                stringResource(R.string.chat_thinking),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+                    item(key = "asking") { ThinkingRow(entryCount = state.entryCount) }
                 }
             }
 
@@ -168,32 +158,122 @@ fun ChatScreen(
     }
 }
 
+/** 安全底线是常量,不是模型回答:固定在顶部,不随对话滚走 */
+@Composable
+private fun SafetyNotice() {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space2),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(Spacing.space4))
+            Spacer(Modifier.width(Spacing.space2))
+            Text(
+                text = stringResource(R.string.chat_safety_notice),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+@Composable
+private fun NoKeyBanner(onOpenSettings: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space1),
+        ) {
+            Text(
+                stringResource(R.string.chat_no_key_banner),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.chat_go_settings)) }
+        }
+    }
+}
+
+/** 空状态:与其留白,不如给三个能直接点的问题 */
+@Composable
+private fun Suggestions(onPick: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.space2)) {
+        Text(
+            text = stringResource(R.string.chat_suggestions_title),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SuggestionRes.forEach { res ->
+            val question = stringResource(res)
+            SuggestionChip(
+                onClick = { onPick(question) },
+                label = { Text(question) },
+            )
+        }
+    }
+}
+
+/** 思考态:说清在检索什么,而不是干等一个「思考中」 */
+@Composable
+private fun ThinkingRow(entryCount: Int) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.space2),
+    ) {
+        LinearWavyProgressIndicator(
+            modifier = Modifier.width(ThinkingIndicatorWidth),
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            text = if (entryCount > 0) stringResource(R.string.chat_thinking, entryCount)
+            else stringResource(R.string.chat_thinking_plain),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** 气泡:用户侧大圆角右对齐,助手侧小圆角左对齐,方向感不靠颜色也能看出来 */
 @Composable
 private fun Bubble(text: String, isUser: Boolean, isError: Boolean) {
     val container = when {
         isError -> MaterialTheme.colorScheme.errorContainer
         isUser -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.surfaceVariant
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
     }
     val content = when {
         isError -> MaterialTheme.colorScheme.onErrorContainer
         isUser -> MaterialTheme.colorScheme.onPrimary
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.onSurface
     }
+    val shape = if (isUser) MaterialTheme.shapes.large else MaterialTheme.shapes.extraSmall
+
     Box(modifier = Modifier.fillMaxWidth()) {
         Surface(
             color = container,
             contentColor = content,
-            shape = MaterialTheme.shapes.medium,
+            shape = shape,
             modifier = Modifier
                 .align(if (isUser) Alignment.CenterEnd else Alignment.CenterStart)
-                .widthIn(max = 300.dp),
+                .widthIn(max = BubbleMaxWidth),
         ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyMedium,
+            Row(
                 modifier = Modifier.padding(horizontal = Spacing.space3, vertical = Spacing.space2),
-            )
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (isError) {
+                    Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(Spacing.space4))
+                    Spacer(Modifier.width(Spacing.space2))
+                }
+                Text(text = text, style = MaterialTheme.typography.bodyMedium)
+            }
         }
     }
 }
