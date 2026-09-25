@@ -2,8 +2,9 @@
 .gradle/
 /.idea/
 .DS_Store
-/build/
-/app/build/
+# 任意模块的构建产物。原来只写了 /build/ 与 /app/build/，
+# 加 :baselineprofile 模块后那两条覆盖不到它，构建产物会被误提交。
+build/
 /captures
 .externalNativeBuild
 .cxx

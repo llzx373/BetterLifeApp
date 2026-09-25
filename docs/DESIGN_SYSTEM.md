@@ -1101,6 +1101,40 @@ release 目前回退 debug 签名,产物不能对外分发。这一步**不是�
 
 **基线为什么必须重刷**:口径色出现在色板、今日页的口径分组标题、条目库目录的章节图标三处,改色必然动这三张图。**这次重刷是有意的视觉变更,不是回归** —— 判断依据就是上面那张 ΔE 表。
 
+#### P3-B8 · Baseline Profile(2026-09-24 已完成)
+
+**为什么值得做**:baseline profile 把「冷启动热点」提前编译成 AOT 代码,让首次启动不必解释执行。Compose 等库自带的 profile 已由 AGP 合并进包(见 A4 那条观察),但那只覆盖**库自己的代码**;本 App 的热点是 `AppContainer` 初始化、Room 建库、以及 `entries.json`(2.8 MB / 601 条)的解析。
+
+**做法**
+
+1. `implementation("androidx.profileinstaller")` —— 它负责把打进包的 profile 真正装上(API < 33 尤其需要)。**只写生成器不装 installer 是最常见的半成品。**
+2. 新增 `:baselineprofile` 模块(`com.android.test` + `androidx.baselineprofile`),内含 `BaselineProfileGenerator`:`pressHome()` → `startActivityAndWait()` → `device.waitForIdle()`,覆盖冷启动路径。
+3. `:app` 侧 `baselineProfile(project(":baselineprofile"))` 把生成器接上,于是有了 `generateBaselineProfile` 任务。
+
+**踩到的两个坑**
+
+1. **`com.android.test` 不能带版本号**:它与 AGP 是同一个构件,`:app` 已经把 AGP 带上 classpath,再写 `version` 会报 `already on the classpath with an unknown version`。子模块里必须写成无版本的 `id("com.android.test")`。
+2. 加了模块之后,构建末尾 Gradle daemon 会耗尽 Metaspace 并被强制重启 —— `MaxMetaspaceSize` 从 1024m 提到 **1536m**。
+
+**刻意不进 CI**:生成 profile 必须连真机或模拟器,CI 的 runner 上没有。`./gradlew :app:generateBaselineProfile` 是**发布前的本机步骤**,和单测/截图那类自动化门禁不是一个性质 —— CI 配置里也写了注释,免得后来者以为是漏配。
+
+**验证**
+
+| 项 | 结果 |
+|---|---|
+| `:baselineprofile:assemble` | 通过(生成器能编译成测试 APK) |
+| `testDebugUnitTest` / `lint` / `assembleRelease` / `validateDebugScreenshotTest` | 全绿 |
+| `:app:generateBaselineProfile` | 任务已存在,**未执行**(需要设备) |
+| release APK | **3,106,861 字节**(P3 开始前是 2,985,565) |
+
+**APK 涨了约 121 KB,原因不是 profileinstaller**
+
+顺手量了一下,免得归错因:B1/B2 引入了三个 `material3-adaptive` 构件(导航套件、layout、navigation),代码都进 `classes.dex`;profileinstaller 本身很小。
+
+另外量到 APK 里有 **9 个嵌套路径的 `META-INF/**/LICENSE.txt`**(如 `META-INF/androidx/room/room-common/LICENSE.txt`)没被 `packaging` 的排除规则命中 —— 因为规则写的是 `META-INF/LICENSE.txt`,匹配不到嵌套路径。压缩后合计 **29 KB,占包体 1.0%**。
+
+**没有动它**:库的许可声明要不要留在包里是法务选择,真要排除,应该先在「关于」页补一个开源许可声明 —— 那是另一件事,不该顺手做掉。
+
 ---
 
 

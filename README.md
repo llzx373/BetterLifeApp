@@ -32,6 +32,7 @@
 ./gradlew lint                # 静态检查(abortOnError:有错误即构建失败)
 ./gradlew validateDebugScreenshotTest # 截图回归:把各屏与设计组件和基线图逐像素比对
 ./gradlew updateDebugScreenshotTest   # 视觉有意改动后重刷基线(改完记得看一眼 diff)
+./gradlew :app:generateBaselineProfile # 生成 baseline profile —— 需要连着真机/模拟器,CI 不跑
 ```
 
 截图测试跑在宿主 JVM 上,不需要设备或模拟器;基线图入库,位于 `app/src/screenshotTestDebug/reference/`。
@@ -74,6 +75,8 @@ python tools/gen_rules.py                     # 重新生成 tools/relevance_rul
 ## 技术栈
 
 Kotlin + Jetpack Compose(Material 3)· Room · DataStore · WorkManager · Navigation Compose · OkHttp · Kotlinx Serialization。
+
+模块:`:app`(应用本身)与 `:baselineprofile`(baseline profile 生成器,`com.android.test` 模块,只跑在真机/模拟器上)。
 
 构建:AGP 9.4.1(内置 Kotlin 支持)· Kotlin 2.4.20 · KSP 2.3.12 · Gradle 9.7.1。
 SDK:最低 Android 8.0(API 26),目标 Android 16(API 36),compileSdk 37。

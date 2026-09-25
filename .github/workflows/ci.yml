@@ -41,6 +41,9 @@ jobs:
 
   # 截图回归单独一个作业：它是最容易因环境差异变红的一环，
   # 独立出来后失败原因一眼可辨，不会和单测/构建的失败混在一起。
+  #
+  # 注意：这里**不跑** baseline profile 生成（./gradlew :app:generateBaselineProfile）——
+  # 它需要连真机或模拟器，属于发布前的本机步骤，不是漏配。
   screenshot:
     runs-on: ubuntu-latest
     steps:

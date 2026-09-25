@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.screenshot)
+    alias(libs.plugins.baselineprofile)
 }
 
 // 正式签名从 keystore.properties 读取（该文件与密钥库均不入库）。
@@ -127,6 +128,11 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)
+    // 把打包进来的 baseline profile 真正装上（API < 33 尤其需要）
+    implementation(libs.androidx.profileinstaller)
+
+    // baseline profile 生成器（只有跑 generateBaselineProfile 时才会用到）
+    baselineProfile(project(":baselineprofile"))
 
     // 第三方
     implementation(libs.okhttp)
