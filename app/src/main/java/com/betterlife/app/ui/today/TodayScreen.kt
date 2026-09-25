@@ -90,7 +90,7 @@ import com.betterlife.app.ui.theme.lensIcon
 import com.betterlife.app.viewmodel.LibraryViewModel
 import com.betterlife.app.viewmodel.TodayViewModel
 import kotlinx.coroutines.delay
-import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
@@ -137,6 +137,7 @@ fun TodayScreen(
             is TodayViewModel.UiState.Ready -> TodayContent(
                 state = state,
                 libraryState = libraryState,
+                now = LocalDateTime.now(),
                 onToggle = todayVm::toggleTask,
                 onSwap = todayVm::swapTask,
                 onDrop = todayVm::dropTask,
@@ -155,6 +156,7 @@ fun TodayScreen(
 internal fun TodayContent(
     state: TodayViewModel.UiState.Ready,
     libraryState: LibraryViewModel.UiState,
+    now: LocalDateTime,
     onToggle: (TaskEntity) -> Unit,
     onSwap: (TaskEntity) -> Unit,
     onDrop: (TaskEntity) -> Unit,
@@ -188,7 +190,11 @@ internal fun TodayContent(
         verticalArrangement = Arrangement.spacedBy(Spacing.space3),
     ) {
         item(key = "greeting") {
-            GreetingHeader(streak = streak, modifier = Modifier.padding(horizontal = Spacing.space4))
+            GreetingHeader(
+                streak = streak,
+                now = now,
+                modifier = Modifier.padding(horizontal = Spacing.space4),
+            )
         }
 
         item(key = "tasks-title") {
@@ -294,17 +300,22 @@ internal fun TodayContent(
     }
 }
 
+/** 问候语只由小时决定。提成纯函数 + 由外部传入时刻,是为了让截图预览能固定住时间 ——
+ * 直接在组件里读时钟的话,基线每天（甚至每小时）都会自己失效。 */
+internal fun greetingResForHour(hour: Int): Int = when (hour) {
+    in 5..10 -> R.string.today_greeting_morning
+    in 11..13 -> R.string.today_greeting_noon
+    in 14..17 -> R.string.today_greeting_afternoon
+    else -> R.string.today_greeting_evening
+}
+
 @Composable
-private fun GreetingHeader(streak: Int, modifier: Modifier = Modifier) {
-    val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-    val greeting = when (hour) {
-        in 5..10 -> stringResource(R.string.today_greeting_morning)
-        in 11..13 -> stringResource(R.string.today_greeting_noon)
-        in 14..17 -> stringResource(R.string.today_greeting_afternoon)
-        else -> stringResource(R.string.today_greeting_evening)
-    }
+private fun GreetingHeader(streak: Int, now: LocalDateTime, modifier: Modifier = Modifier) {
+    val greeting = stringResource(greetingResForHour(now.hour))
     // 日期格式交给系统 locale,不再硬编码中文
-    val date = remember { LocalDate.now().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)) }
+    val date = remember(now) {
+        now.toLocalDate().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL))
+    }
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(greeting, style = MaterialTheme.typography.headlineSmall)

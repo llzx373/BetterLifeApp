@@ -16,6 +16,13 @@ import com.betterlife.app.ui.fakeTask
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.LibraryViewModel
 import com.betterlife.app.viewmodel.TodayViewModel
+import java.time.LocalDateTime
+
+/**
+ * 固定时刻。今日页头部要显示问候语和日期，跟着真实时钟跑的话
+ * 基线每小时（问候语）和每天（日期）都会自己失效 —— 这条预览生成过一次就会失败。
+ */
+private val FIXED_NOW: LocalDateTime = LocalDateTime.of(2026, 9, 24, 20, 30)
 
 private val lowSodiumSalt = fakeEntry(
     id = "02-01",
@@ -109,6 +116,7 @@ fun TodayReady() {
         TodayContent(
             state = TodayViewModel.UiState.Ready(todayTasks(allDone = false)),
             libraryState = libraryState,
+            now = FIXED_NOW,
             onToggle = {},
             onSwap = {},
             onDrop = {},

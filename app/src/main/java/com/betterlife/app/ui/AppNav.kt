@@ -1,9 +1,13 @@
-// 主页壳:按 onboardingDone 决定起始路由,底部四个 tab + 全部页面路由
+// 主页壳:起始路由来自 SettingsViewModel(唯一读过 onboardingDone 的地方),
+// 导航用 NavigationSuiteScaffold —— compact 出 ShortNavigationBar,
+// medium/expanded 自动换成 WideNavigationRail,大屏适配不再需要手写宽度分支。
+//
+// 路由一律走类型安全形式(Kotlin Serialization):`entry/{entryId}` 这种字符串
+// 路由散在多个文件里手写,重构时必错。
 package com.betterlife.app.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Done
@@ -11,26 +15,29 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldValue
+import androidx.compose.material3.adaptive.navigationsuite.rememberNavigationSuiteScaffoldState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
-import androidx.navigation.NavType
+import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
-import com.betterlife.app.BetterLifeApp
+import androidx.navigation.toRoute
 import com.betterlife.app.R
 import com.betterlife.app.ui.chat.ChatScreen
 import com.betterlife.app.ui.favorites.FavoritesScreen
@@ -42,147 +49,183 @@ import com.betterlife.app.ui.onboarding.OnboardingScreen
 import com.betterlife.app.ui.settings.SettingsScreen
 import com.betterlife.app.ui.today.TodayScreen
 import com.betterlife.app.ui.todo.TodoScreen
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.betterlife.app.viewmodel.SettingsViewModel
+import kotlinx.serialization.Serializable
+import kotlin.reflect.KClass
 
-object Routes {
-    const val TODAY = "today"
-    const val TODO = "todo"
-    const val LIBRARY = "library"
-    const val SECTION = "library/{sectionN}"
-    const val ENTRY = "entry/{entryId}"
-    const val MINE = "mine"
-    const val CHAT = "chat"
-    const val SETTINGS = "settings"
-    const val FAVORITES = "favorites"
-    const val ONBOARDING = "onboarding"
+// ---- 路由 ----
+// 四个 tab 用 data object 就够了;带参的两个是 data class,参数即路由参数。
 
-    fun section(n: Int) = "library/$n"
-    fun entry(id: String) = "entry/$id"
-}
+@Serializable
+data object TodayRoute
 
-private data class TabSpec(val route: String, val labelRes: Int, val icon: ImageVector)
+@Serializable
+data object TodoRoute
 
-private val tabs = listOf(
-    TabSpec(Routes.TODAY, R.string.nav_today, Icons.Filled.Home),
-    TabSpec(Routes.TODO, R.string.nav_todo, Icons.Filled.Done),
-    TabSpec(Routes.LIBRARY, R.string.nav_library, Icons.AutoMirrored.Filled.List),
-    TabSpec(Routes.MINE, R.string.nav_mine, Icons.Filled.Person),
+@Serializable
+data object LibraryRoute
+
+@Serializable
+data class SectionRoute(val sectionN: Int)
+
+@Serializable
+data class EntryRoute(val entryId: String)
+
+@Serializable
+data object MineRoute
+
+@Serializable
+data object ChatRoute
+
+@Serializable
+data object SettingsRoute
+
+@Serializable
+data object FavoritesRoute
+
+@Serializable
+data object OnboardingRoute
+
+internal data class TabSpec(
+    val routeClass: KClass<*>,
+    val labelRes: Int,
+    val icon: ImageVector,
+    val go: (NavHostController) -> Unit,
+)
+
+/**
+ * 每个 tab 各自写死具体路由类型,不把它们退化成 `Any` ——
+ * 类型安全路由的序列化信息来自路由对象的**静态类型**,退化成 Any 会丢掉这层保障。
+ */
+internal val tabs = listOf(
+    TabSpec(TodayRoute::class, R.string.nav_today, Icons.Filled.Home) { it.navigate(TodayRoute) { tabOptions() } },
+    TabSpec(TodoRoute::class, R.string.nav_todo, Icons.Filled.Done) { it.navigate(TodoRoute) { tabOptions() } },
+    TabSpec(
+        LibraryRoute::class,
+        R.string.nav_library,
+        Icons.AutoMirrored.Filled.List,
+    ) { it.navigate(LibraryRoute) { tabOptions() } },
+    TabSpec(MineRoute::class, R.string.nav_mine, Icons.Filled.Person) { it.navigate(MineRoute) { tabOptions() } },
 )
 
 @Composable
-fun AppNav() {
-    val context = LocalContext.current
-    // SettingsViewModel 的初始值与默认值不可区分,这里直接读一次 DataStore 决定起始页,避免闪屏
-    val startRoute by produceState<String?>(initialValue = null) {
-        val app = context.applicationContext as BetterLifeApp
-        val done = withContext(Dispatchers.IO) { app.container.settingsStore.current().onboardingDone }
-        value = if (done) Routes.TODAY else Routes.ONBOARDING
-    }
+fun AppNav(vm: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)) {
+    val state by vm.uiState.collectAsStateWithLifecycle()
 
-    when (val start = startRoute) {
-        null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    // DataStore 还没读出来时不要先渲染 today 再跳走,那会闪一下
+    if (!state.loaded) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
-        else -> AppScaffold(start)
+        return
     }
+
+    AppScaffold(
+        startDestination = if (state.settings.onboardingDone) TodayRoute else OnboardingRoute,
+    )
 }
 
 @Composable
-private fun AppScaffold(startRoute: String) {
+private fun AppScaffold(startDestination: Any) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = backStackEntry?.destination?.route
-    val showBottomBar = currentRoute in tabs.map { it.route }
+    val currentDestination = backStackEntry?.destination
+    val selectedTab = tabs.firstOrNull { tab ->
+        currentDestination?.hierarchy?.any { it.hasRoute(tab.routeClass) } == true
+    }
 
-    Scaffold(
-        bottomBar = {
-            if (showBottomBar) {
-                NavigationBar {
-                    tabs.forEach { tab ->
-                        val label = stringResource(tab.labelRes)
-                        NavigationBarItem(
-                            selected = currentRoute == tab.route,
-                            onClick = { navigateTab(navController, tab.route) },
-                            icon = { Icon(tab.icon, contentDescription = label) },
-                            label = { Text(label) },
-                        )
-                    }
-                }
+    // 非 tab 页(详情/设置/聊天/引导)收起导航组件,让内容占满。
+    // 初始值跟着起始路由走,避免引导页先闪一下导航栏再看它收回去。
+    val navState = rememberNavigationSuiteScaffoldState(
+        initialValue = if (tabs.any { it.routeClass == startDestination::class }) {
+            NavigationSuiteScaffoldValue.Visible
+        } else {
+            NavigationSuiteScaffoldValue.Hidden
+        },
+    )
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == null) navState.hide() else navState.show()
+    }
+
+    NavigationSuiteScaffold(
+        state = navState,
+        navigationItems = {
+            tabs.forEach { tab ->
+                val label = stringResource(tab.labelRes)
+                NavigationSuiteItem(
+                    selected = selectedTab == tab,
+                    onClick = { tab.go(navController) },
+                    icon = { Icon(tab.icon, contentDescription = label) },
+                    label = { Text(label) },
+                )
             }
         },
-    ) { padding ->
+    ) {
         NavHost(
             navController = navController,
-            startDestination = startRoute,
-            modifier = Modifier.padding(padding),
+            startDestination = startDestination,
+            modifier = Modifier.fillMaxSize(),
         ) {
-            composable(Routes.TODAY) {
+            composable<TodayRoute> {
                 TodayScreen(
-                    onOpenEntry = { id -> navController.navigate(Routes.entry(id)) },
-                    onOpenChat = { navController.navigate(Routes.CHAT) },
-                    onEditProfile = { navController.navigate(Routes.ONBOARDING) },
-                    onOpenLibrary = { navigateTab(navController, Routes.LIBRARY) },
+                    onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
+                    onOpenChat = { navController.navigate(ChatRoute) },
+                    onEditProfile = { navController.navigate(OnboardingRoute) },
+                    onOpenLibrary = { navController.navigate(LibraryRoute) { tabOptions() } },
                 )
             }
-            composable(Routes.TODO) {
-                TodoScreen(onOpenEntry = { id -> navController.navigate(Routes.entry(id)) })
+            composable<TodoRoute> {
+                TodoScreen(onOpenEntry = { id -> navController.navigate(EntryRoute(id)) })
             }
-            composable(Routes.LIBRARY) {
+            composable<LibraryRoute> {
                 LibraryScreen(
-                    onOpenSection = { n -> navController.navigate(Routes.section(n)) },
-                    onOpenEntry = { id -> navController.navigate(Routes.entry(id)) },
+                    onOpenSection = { n -> navController.navigate(SectionRoute(n)) },
+                    onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
                 )
             }
-            composable(
-                route = Routes.SECTION,
-                arguments = listOf(navArgument("sectionN") { type = NavType.IntType }),
-            ) { entry ->
+            composable<SectionRoute> { entry ->
                 SectionScreen(
-                    sectionN = entry.arguments?.getInt("sectionN") ?: 0,
+                    sectionN = entry.toRoute<SectionRoute>().sectionN,
                     onBack = { navController.popBackStack() },
-                    onOpenEntry = { id -> navController.navigate(Routes.entry(id)) },
+                    onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
                 )
             }
-            composable(
-                route = Routes.ENTRY,
-                arguments = listOf(navArgument("entryId") { type = NavType.StringType }),
-            ) { entry ->
+            composable<EntryRoute> { entry ->
                 EntryDetailScreen(
-                    entryId = entry.arguments?.getString("entryId").orEmpty(),
+                    entryId = entry.toRoute<EntryRoute>().entryId,
                     onBack = { navController.popBackStack() },
                 )
             }
-            composable(Routes.MINE) {
+            composable<MineRoute> {
                 MineScreen(
-                    onOpenSettings = { navController.navigate(Routes.SETTINGS) },
-                    onEditProfile = { navController.navigate(Routes.ONBOARDING) },
-                    onOpenChat = { navController.navigate(Routes.CHAT) },
-                    onOpenFavorites = { navController.navigate(Routes.FAVORITES) },
+                    onOpenSettings = { navController.navigate(SettingsRoute) },
+                    onEditProfile = { navController.navigate(OnboardingRoute) },
+                    onOpenChat = { navController.navigate(ChatRoute) },
+                    onOpenFavorites = { navController.navigate(FavoritesRoute) },
                 )
             }
-            composable(Routes.FAVORITES) {
+            composable<FavoritesRoute> {
                 FavoritesScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenEntry = { id -> navController.navigate(Routes.entry(id)) },
+                    onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
                 )
             }
-            composable(Routes.CHAT) {
+            composable<ChatRoute> {
                 ChatScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                    onOpenSettings = { navController.navigate(SettingsRoute) },
                 )
             }
-            composable(Routes.SETTINGS) {
+            composable<SettingsRoute> {
                 SettingsScreen(
                     onBack = { navController.popBackStack() },
-                    onEditProfile = { navController.navigate(Routes.ONBOARDING) },
+                    onEditProfile = { navController.navigate(OnboardingRoute) },
                 )
             }
-            composable(Routes.ONBOARDING) {
+            composable<OnboardingRoute> {
                 OnboardingScreen(onFinished = {
-                    navController.navigate(Routes.TODAY) {
-                        popUpTo(Routes.ONBOARDING) { inclusive = true }
+                    navController.navigate(TodayRoute) {
+                        popUpTo(OnboardingRoute) { inclusive = true }
                     }
                 })
             }
@@ -190,11 +233,10 @@ private fun AppScaffold(startRoute: String) {
     }
 }
 
-private fun navigateTab(navController: NavHostController, route: String) {
+/** tab 之间切换的导航选项:保留各自栈内状态,不重复入栈 */
+private fun NavOptionsBuilder.tabOptions() {
     // 固定锚定 today:onboarding 作为起始页时在完成后会被弹出回退栈,不能作为 popUpTo 锚点
-    navController.navigate(route) {
-        popUpTo(Routes.TODAY) { saveState = true }
-        launchSingleTop = true
-        restoreState = true
-    }
+    popUpTo(TodayRoute) { saveState = true }
+    launchSingleTop = true
+    restoreState = true
 }

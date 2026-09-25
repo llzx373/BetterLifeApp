@@ -854,6 +854,39 @@ release 目前回退 debug 签名,产物不能对外分发。这一步**不是�
 1. `datastore 1.2.1` 引入了一个原生库 `libdatastore_shared_counter.so`,构建时提示「Unable to strip」并被原样打进包里(debug / release 都出现)。不影响功能,但 APK 会因此略微变大。
 2. release 产物里已经出现了 `baselineProfiles/` 目录 —— 那是 Compose 等库**自带**的 baseline profile 被 AGP 合并进来的结果,**不等于本项目有自己的启动 profile**。B8 要做的仍是自己那一份。
 
+#### P3-B1 · 导航壳:NavigationSuiteScaffold + 类型安全路由(2026-09-24 已完成)
+
+三件事一起做,因为互相咬合:换导航组件、改路由形式、把起始路由从 Composable 挪进 ViewModel。
+
+| 改造 | 之前 | 现在 |
+|---|---|---|
+| 导航组件 | 固定 `NavigationBar`,大屏也是底部一条 | `NavigationSuiteScaffold`:compact 出 ShortNavigationBar,medium/expanded 自动换 WideNavigationRail |
+| 路由 | `"entry/{entryId}"` 字符串 + `navArgument`,散在 6 处 | `@Serializable` 路由对象 + `composable<EntryRoute>` + `toRoute()` |
+| 起始路由 | `produceState` 在 Composable 里直接读 DataStore | `SettingsViewModel.UiState` 的 `loaded` + `onboardingDone` |
+
+**动手前先确认的两件事(读了 sources jar,不是靠猜)**
+
+1. `NavigationSuiteScaffold` 的 `content` 槽**不接收 `PaddingValues`**。它的实现内部会 `consumeWindowInsets(...)`,按当前导航组件类型消费对应边的 inset(ShortNavigationBar 消费 bottom 等)。所以内层各屏自己的 `Scaffold` 不会重复加边距,`NavHost` 直接用 `Modifier.fillMaxSize()` 就行。
+2. 这套 API **不需要 `@OptIn`**(sources 里没有实验性注解)。
+
+**刻意没做的简化**:四个 tab 各自写死具体路由类型(`it.navigate(TodayRoute) { tabOptions() }`),没有统一收进一个 `route: Any` 参数。类型安全路由的序列化信息来自路由对象的**静态类型**,退化成 `Any` 会把这层保障丢掉。
+
+**验证**
+
+| 项 | 结果 |
+|---|---|
+| `testDebugUnitTest` / `lint` / `assembleRelease` | 全绿 / 0 error / 通过 |
+| 编译警告 | 0 |
+| **宽度自适应(有图)** | 新增 `AppNavScreenshotTest`:412dp 渲出**底部导航栏**,900dp 渲出**左侧 WideNavigationRail** —— §11 里「600dp / 840dp 宽度下导航自动切换」这半条不再只是断言 |
+
+**顺带:截图网抓到了第一条真问题**
+
+换完导航壳跑校验,今日页 4 张全挂、待办页 4 张全过。原因跟导航壳无关 —— 是**今日页的预览自己依赖真实时钟**:头部渲染「问候语 + 日期」,基线是前一日傍晚生成的(晚上好 / September 24),复验时已变成次日中午(中午好 / September 25)。也就是说这条基线**每小时和每天都会自己失效**,留着等于给 CI 埋一颗定时炸弹。
+
+改法是把时钟提到外面:`GreetingHeader(streak, now: LocalDateTime)`、`greetingResForHour(hour)` 抽成纯函数、`TodayContent` 也接一个 `now`,预览传固定的 `LocalDateTime.of(2026, 9, 24, 20, 30)`。这同时是真实的可测性改善 —— 时间相关的渲染从此可以被固定住。
+
+**尚未做的部分**:§7.3 要求 600dp+ 时条目库变 list-detail 双栏 —— 那是 B2。
+
 ---
 
 
