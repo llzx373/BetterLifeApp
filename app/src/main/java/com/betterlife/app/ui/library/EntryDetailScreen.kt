@@ -77,6 +77,7 @@ import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
 import com.betterlife.app.ui.common.RatioBadge
 import com.betterlife.app.ui.common.TodoBadge
+import com.betterlife.app.ui.common.predictiveBackTransition
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.LibraryViewModel
 import kotlinx.coroutines.Dispatchers
@@ -114,6 +115,7 @@ fun EntryDetailScreen(
     val copiedMessage = stringResource(R.string.detail_copied)
 
     Scaffold(
+        modifier = predictiveBackTransition(onBack),
         topBar = {
             TopAppBar(
                 title = { Text(entryId) },

@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
 import com.betterlife.app.ai.ChatMessage
+import com.betterlife.app.ui.common.predictiveBackTransition
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.ChatViewModel
 import com.betterlife.app.viewmodel.SettingsViewModel
@@ -83,6 +84,7 @@ fun ChatScreen(
     }
 
     Scaffold(
+        modifier = predictiveBackTransition(onBack),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.title_chat)) },
