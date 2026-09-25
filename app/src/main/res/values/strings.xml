@@ -90,6 +90,7 @@
     <string name="library_title">条目库</string>
     <string name="library_search_hint">搜条目,如:戒烟、体检、午睡</string>
     <string name="library_no_match">没有匹配的条目</string>
+    <string name="library_pick_chapter">从左边的目录挑一章</string>
     <string name="library_chapter_overline">第 %1$d 章</string>
     <string name="library_entry_count">%1$d 条</string>
     <string name="library_sort_ratio">性价比</string>

@@ -1,4 +1,6 @@
 // 章内条目列表:顶部排序切换(性价比 / 证据等级 / 原书顺序) + 条目行,点击进详情
+//
+// 列表本体抽成 SectionListContent:单栏时它是整屏内容,双栏时它是右栏。
 package com.betterlife.app.ui.library
 
 import androidx.compose.foundation.clickable
@@ -34,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
 import com.betterlife.app.data.EntryDto
+import com.betterlife.app.data.SectionDto
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
 import com.betterlife.app.ui.common.RatioBadge
@@ -73,23 +76,41 @@ fun SectionScreen(
             )
         },
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            SortRow(selected = state.sort, onSelect = vm::setSort)
+        SectionListContent(
+            state = state,
+            section = section,
+            onSelectSort = vm::setSort,
+            onOpenEntry = onOpenEntry,
+            modifier = Modifier.padding(padding),
+        )
+    }
+}
 
-            LazyColumn(contentPadding = PaddingValues(bottom = Spacing.space4)) {
-                section?.intro?.takeIf { it.isNotBlank() }?.let { intro ->
-                    item {
-                        Text(
-                            intro,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space2),
-                        )
-                    }
+/** 章内列表本体:排序切换 + 章导语 + 条目行。单栏时它是整屏内容,双栏时它是右栏。 */
+@Composable
+internal fun SectionListContent(
+    state: LibraryViewModel.UiState,
+    section: SectionDto?,
+    onSelectSort: (EntrySort) -> Unit,
+    onOpenEntry: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxSize()) {
+        SortRow(selected = state.sort, onSelect = onSelectSort)
+
+        LazyColumn(contentPadding = PaddingValues(bottom = Spacing.space4)) {
+            section?.intro?.takeIf { it.isNotBlank() }?.let { intro ->
+                item {
+                    Text(
+                        intro,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space2),
+                    )
                 }
-                items(state.sectionEntries, key = { it.id }) { entry ->
-                    EntryRow(entry = entry, onClick = { onOpenEntry(entry.id) })
-                }
+            }
+            items(state.sectionEntries, key = { it.id }) { entry ->
+                EntryRow(entry = entry, onClick = { onOpenEntry(entry.id) })
             }
         }
     }

@@ -107,6 +107,9 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
     implementation(libs.compose.material3.adaptive.navigation.suite)
+    // 条目库的大屏 list-detail
+    implementation(libs.compose.material3.adaptive.layout)
+    implementation(libs.compose.material3.adaptive.navigation)
     implementation(libs.compose.material.icons.core)
     implementation(libs.compose.material.icons.extended)
     debugImplementation(libs.compose.ui.tooling)

@@ -887,6 +887,43 @@ release 目前回退 debug 签名,产物不能对外分发。这一步**不是�
 
 **尚未做的部分**:§7.3 要求 600dp+ 时条目库变 list-detail 双栏 —— 那是 B2。
 
+#### P3-B2 · 条目库大屏双栏(2026-09-24 已完成)
+
+**做法**:把两屏的内容各自抽成可复用的无状态部分,再给大屏套一层 list-detail。
+
+| 抽出 | 从哪来 | 去处 |
+|---|---|---|
+| `LibraryCatalogContent` | `LibraryScreen` 内联的标题 + 搜索 + 目录 | 单栏时是整屏,双栏时是左栏 |
+| `SectionListContent` | `SectionScreen` 内联的排序切换 + 条目列表 | 单栏时是整屏内容,双栏时是右栏 |
+
+`LibraryTwoPane` 用 `ListDetailPaneScaffold`(左目录 / 右章内条目)。**只在 `screenWidthDp >= 600` 时启用** —— 窄屏继续走原来的单栏 + 路由,**主形态零改动、零回归风险**。大屏适配不该以手机体验为代价。
+
+**踩到的一个坑(差点让双栏变成单栏)**
+
+详情栏必须被列入 pane 值,否则**即使 900dp 也只渲染左栏**。所以选了章之后要显式 `navigator.navigateTo(ListDetailPaneScaffoldRole.Detail)`,光把内容写进 `detailPane` 槽是不够的。这一点靠读文档看不出来,是画图验证出来的。
+
+**一个明确的取舍:用了实验性 API**
+
+`ListDetailPaneScaffold` 与 `rememberListDetailPaneScaffoldNavigator` 都标着 `@ExperimentalMaterial3AdaptiveApi`(整个 `adaptive-navigation` 构件都是)。§10 说「不在 P1/P2 使用实验性 API」,所以这是个需要说明的选择:
+
+- **选它**:§7.3 点名的就是这个组件,它的价值在**折叠屏铰链避让**——手写分栏拿不到;而且 opt-in 被限制在 `LibraryScreen.kt` 一个文件里,和项目已有的 `@OptIn(ExperimentalMaterial3Api::class)`(SectionScreen 的 TopAppBar)是同一个尺度。
+- **不选的手写方案**(`Row` + `weight` 按宽度分栏):本仓库确实有手写优先的先例(`CostMeter` 手搓而不引入图表库),但那条先例的理由是「不需要依赖」,而这里依赖已经因为其它原因进来了,手写反而丢掉铰链能力。
+
+**验证**
+
+| 项 | 结果 |
+|---|---|
+| `testDebugUnitTest` / `lint` / `assembleRelease` | 全绿 / 0 error / 通过 |
+| 编译警告 | 0 |
+| **双栏(有图)** | 新增 `LibraryScreenScreenshotTest`:900dp 渲出**左目录 + 右章内条目**两栏且排序切换在位;412dp 渲出原来的单栏目录 |
+
+**没做的部分:≥840dp 的第三栏**
+
+§7.3 的矩阵里 ≥840dp 应当是 list-detail + 三栏(章 / 条目 / 条目详情)。现在条目详情仍是**整屏路由**,所以 840dp 上是两栏 + 整屏详情。
+
+补齐需要在详情栏里再嵌一层 list-detail,并且要为内层设计返回行为(内层折叠成单栏时,系统返回该退回条目列表)。这属于动导航与返回语义的改动,和 B3(预测性返回)是同一块地,放在 B3 之后再做更稳 —— 现在做等于把两处返回逻辑分开写两遍。
+
+
 ---
 
 
