@@ -110,7 +110,12 @@ internal fun SectionListContent(
                 }
             }
             items(state.sectionEntries, key = { it.id }) { entry ->
-                EntryRow(entry = entry, onClick = { onOpenEntry(entry.id) })
+                EntryRow(
+                    entry = entry,
+                    onClick = { onOpenEntry(entry.id) },
+                    // 排序切换时列表项 cross-fade + 位移,而不是硬跳(§6.2)
+                    modifier = Modifier.animateItem(),
+                )
             }
         }
     }
@@ -148,7 +153,7 @@ private fun sortLabel(sort: EntrySort): Int = when (sort) {
 }
 
 @Composable
-private fun EntryRow(entry: EntryDto, onClick: () -> Unit) {
+private fun EntryRow(entry: EntryDto, onClick: () -> Unit, modifier: Modifier = Modifier) {
     ListItem(
         overlineContent = { Text(entry.id) },
         supportingContent = {
@@ -159,7 +164,7 @@ private fun EntryRow(entry: EntryDto, onClick: () -> Unit) {
                 if (entry.todo) TodoBadge()
             }
         },
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = modifier.clickable(onClick = onClick),
     ) {
         Text(entry.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }

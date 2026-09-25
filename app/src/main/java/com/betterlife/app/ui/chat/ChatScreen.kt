@@ -4,6 +4,8 @@
 // 无 Key 横幅走 secondaryContainer,避免和口径色里的「别踩线」撞色。
 package com.betterlife.app.ui.chat
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.keyframes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,10 +42,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -51,9 +55,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
 import com.betterlife.app.ai.ChatMessage
 import com.betterlife.app.ui.common.predictiveBackTransition
+import com.betterlife.app.ui.theme.LocalMotionLevel
+import com.betterlife.app.ui.theme.MotionLevel
 import com.betterlife.app.ui.theme.Spacing
+import com.betterlife.app.ui.theme.motionEffectsSpec
 import com.betterlife.app.viewmodel.ChatViewModel
 import com.betterlife.app.viewmodel.SettingsViewModel
+import kotlinx.coroutines.launch
 
 private val BubbleMaxWidth = 300.dp
 private val ThinkingIndicatorWidth = 40.dp
@@ -242,6 +250,11 @@ private fun ThinkingRow(entryCount: Int) {
     }
 }
 
+/** 气泡入场三拍:0.95 → 1.02 → 1.0,同时淡入。节奏按 §6.2 */
+private const val BUBBLE_POP_FROM = 0.95f
+private const val BUBBLE_POP_PEAK = 1.02f
+private const val BUBBLE_POP_MILLIS = 250
+
 /** 气泡:用户侧大圆角右对齐,助手侧小圆角左对齐,方向感不靠颜色也能看出来 */
 @Composable
 private fun Bubble(text: String, isUser: Boolean, isError: Boolean) {
@@ -257,6 +270,33 @@ private fun Bubble(text: String, isUser: Boolean, isError: Boolean) {
     }
     val shape = if (isUser) MaterialTheme.shapes.large else MaterialTheme.shapes.extraSmall
 
+    // 入场三拍。关闭/减弱档停在终态不动。
+    // 已知取舍:LazyColumn 的 item 被回收后再滚回来会重播一次;只播「新消息」需要
+    // 把消息 id 与已播集合提到 VM,不等这笔复杂度。
+    val level = LocalMotionLevel.current
+    // 协程里不是 Composable 上下文,spec 必须先取出来
+    val effects = motionEffectsSpec<Float>()
+    val scale = remember { Animatable(1f) }
+    val alpha = remember { Animatable(1f) }
+    LaunchedEffect(level) {
+        if (level != MotionLevel.STANDARD) {
+            scale.snapTo(1f)
+            alpha.snapTo(1f)
+            return@LaunchedEffect
+        }
+        scale.snapTo(BUBBLE_POP_FROM)
+        alpha.snapTo(0f)
+        launch { alpha.animateTo(1f, animationSpec = effects) }
+        scale.animateTo(
+            targetValue = 1f,
+            animationSpec = keyframes {
+                durationMillis = BUBBLE_POP_MILLIS
+                BUBBLE_POP_PEAK at BUBBLE_POP_MILLIS / 2
+                1f at BUBBLE_POP_MILLIS
+            },
+        )
+    }
+
     Box(modifier = Modifier.fillMaxWidth()) {
         Surface(
             color = container,
@@ -264,7 +304,12 @@ private fun Bubble(text: String, isUser: Boolean, isError: Boolean) {
             shape = shape,
             modifier = Modifier
                 .align(if (isUser) Alignment.CenterEnd else Alignment.CenterStart)
-                .widthIn(max = BubbleMaxWidth),
+                .widthIn(max = BubbleMaxWidth)
+                .graphicsLayer {
+                    scaleX = scale.value
+                    scaleY = scale.value
+                    this.alpha = alpha.value
+                },
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = Spacing.space3, vertical = Spacing.space2),

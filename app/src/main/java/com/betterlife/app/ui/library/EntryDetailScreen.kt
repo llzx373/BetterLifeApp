@@ -11,6 +11,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -211,37 +212,44 @@ fun EntryDetailScreen(
                 }
             }
 
-            HorizontalFloatingToolbar(
-                expanded = true,
+            // 工具条从底部滑入(§6.2)。用 MutableTransitionState 才能在首帧就播,
+            // 直接 visible = true 的 AnimatedVisibility 不会播入场
+            MotionEntrance(
+                visibleState = remember { MutableTransitionState(true) },
                 modifier = Modifier.align(Alignment.BottomCenter),
-                colors = FloatingToolbarDefaults.standardFloatingToolbarColors(),
+                slideFromBottom = true,
             ) {
-                ToolbarAction(
-                    icon = Icons.Filled.Add,
-                    labelRes = R.string.detail_add_todo,
-                    onClick = {
-                        vm.addToTodo(e.id)
-                        scope.launch { snackbar.showSnackbar(addedTodoMessage) }
-                    },
-                )
-                ToolbarAction(
-                    icon = if (e.id in favorites) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                    labelRes = if (e.id in favorites) R.string.detail_unfavorite else R.string.detail_favorite,
-                    onClick = { vm.toggleFavorite(e.id) },
-                )
-                ToolbarAction(
-                    icon = Icons.Filled.ContentCopy,
-                    labelRes = R.string.detail_copy,
-                    onClick = {
-                        copyToClipboard(context, e.shareText())
-                        scope.launch { snackbar.showSnackbar(copiedMessage) }
-                    },
-                )
-                ToolbarAction(
-                    icon = Icons.Filled.Share,
-                    labelRes = R.string.detail_share,
-                    onClick = { shareEntry(context, e.shareText()) },
-                )
+                HorizontalFloatingToolbar(
+                    expanded = true,
+                    colors = FloatingToolbarDefaults.standardFloatingToolbarColors(),
+                ) {
+                    ToolbarAction(
+                        icon = Icons.Filled.Add,
+                        labelRes = R.string.detail_add_todo,
+                        onClick = {
+                            vm.addToTodo(e.id)
+                            scope.launch { snackbar.showSnackbar(addedTodoMessage) }
+                        },
+                    )
+                    ToolbarAction(
+                        icon = if (e.id in favorites) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                        labelRes = if (e.id in favorites) R.string.detail_unfavorite else R.string.detail_favorite,
+                        onClick = { vm.toggleFavorite(e.id) },
+                    )
+                    ToolbarAction(
+                        icon = Icons.Filled.ContentCopy,
+                        labelRes = R.string.detail_copy,
+                        onClick = {
+                            copyToClipboard(context, e.shareText())
+                            scope.launch { snackbar.showSnackbar(copiedMessage) }
+                        },
+                    )
+                    ToolbarAction(
+                        icon = Icons.Filled.Share,
+                        labelRes = R.string.detail_share,
+                        onClick = { shareEntry(context, e.shareText()) },
+                    )
+                }
             }
         }
     }

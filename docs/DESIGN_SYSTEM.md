@@ -973,6 +973,46 @@ release 目前回退 debug 签名,产物不能对外分发。这一步**不是�
 
 预览外壳(`PreviewSurface` / `PreviewScreen`)统一传 `MotionLevel.OFF`,所以**以后新加的预览默认就是确定性的**,不用每个作者自己记得关动效。
 
+#### P3-B4 · 动效清单(2026-09-24 已完成)
+
+§6.2 的清单逐条落地。**所有动效的 spec 都从 `MotionLevel` 取**,关闭档直接跳过动画。
+
+| §6.2 场景 | 做法 | 状态 |
+|---|---|---|
+| 打卡 | 勾图标三拍 `keyframes` 0.9 → 1.15 → 1.0(250ms)+ 触觉;按钮切换的 `AnimatedContent` 也走 motionScheme | ✅ |
+| 卡片下沉 | P2 就有的 `animateItem()` + 300ms 沉降延迟 | ✅(既有) |
+| 全部完成 | 一句话淡入 + 一次形变(`MotionEntrance` + 0.96 缩放) | ✅ |
+| 聊天气泡入场 | 三拍 0.95 → 1.02 → 1.0 + 淡入 | ✅ |
+| 工具条出现 | 从底部滑入(`slideInVertically` 半高 + 淡入) | ✅ |
+| 排序切换 | 列表项 `animateItem()`,cross-fade + 位移 | ✅ |
+| 列表项点击 | ripple,系统自带 | ✅(无需代码) |
+| 口径分组展开 | 今日页的口径分组目前**只有标题、不可展开**,没有可展开的交互 | ⏸ 无处可加 |
+| FAB → 对话页 container transform | 需要 `SharedTransitionLayout`(实验性)或手写共享元素 | ⏸ 见文末 |
+
+**四条实现约束(踩过才知道)**
+
+1. **`transitionSpec` 与协程里不是 Composable 上下文** —— `motionSpatialSpec()` 是 `@Composable` 的,必须先在 Composable 作用域里取出来再传进去,否则编译不过。
+2. **`slideInVertically` 要的是 `FiniteAnimationSpec<IntOffset>`,不是 `<Float>`**。所以两个 spec helper 改成了**泛型** —— MotionScheme 的 spec 本来就是泛型的,写死成 Float 反而到处要转。
+3. **减弱档下「位移/缩放 spec」是 `snap()`**,于是 `MotionEntrance` 自动退化成「只有淡入」,不需要在每个调用点再写一遍分支。
+4. 三拍一律用 `keyframes` 显式给出(**0.9 → 1.15 → 1.0**),终点停在 1.0。§6.2 要求「有阻尼的弹簧,不是弹跳球」—— 显式关键帧比给它一个 bouncy spring 更可控,也不会在末尾弹一下。
+
+**验证**
+
+| 项 | 结果 |
+|---|---|
+| `testDebugUnitTest` / `lint` / `assembleRelease` | 43/43 全绿 / 0 error / 通过 |
+| 编译警告 | 0 |
+| **既有基线一张都没失效** | `validateDebugScreenshotTest` 通过。**这条比测试本身更有意义**:它证明 B5 的 OFF 路径确实让「有动效的屏」在静态帧上稳定 —— 动效加上去了,而截图没被搅乱 |
+
+**动效正确性只能真机走查**
+
+截图只能锁静态终态。三拍的手感、250ms 是否偏慢、卡片下沉与形变会不会「打架」,这些按定义拍不出来。§11 里相关项保持未勾,标注需真机走查。
+
+**没做的两项与理由**
+
+- **口径分组展开**:今日页的口径分组只有标题,没有展开/收起这个交互,「高度弹簧」无处可加。要做等于新增一个交互,超出「把清单里的动效加上」的范围。
+- **FAB → 对话页 container transform**:Compose 的共享元素要么用 `SharedTransitionLayout`(实验性),要么手写一套锚点传递。§10 的纪律是不押注实验 API,而手写共享元素在这一屏的收益(一个 FAB 的起手过渡)不抵复杂度。真要做,单独议。
+
 ---
 
 

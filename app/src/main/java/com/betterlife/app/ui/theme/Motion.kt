@@ -62,9 +62,14 @@ fun areSystemAnimationsDisabled(context: Context): Boolean = runCatching {
     ) == 0f
 }.getOrDefault(false)
 
-/** 淡入淡出类动效的时长。 */
+/**
+ * 淡入淡出类动效的时长。
+ *
+ * 泛型是为了能直接喂给 `slideInVertically` 这类需要 `FiniteAnimationSpec<IntOffset>` 的 API ——
+ * MotionScheme 的 spec 本身就是泛型的,写死成 Float 反而要到处转。
+ */
 @Composable
-fun motionEffectsSpec(): FiniteAnimationSpec<Float> = when (LocalMotionLevel.current) {
+fun <T> motionEffectsSpec(): FiniteAnimationSpec<T> = when (LocalMotionLevel.current) {
     MotionLevel.STANDARD -> MaterialTheme.motionScheme.defaultEffectsSpec()
     MotionLevel.REDUCED -> tween(durationMillis = REDUCED_FADE_MILLIS)
     MotionLevel.OFF -> snap()
@@ -72,7 +77,7 @@ fun motionEffectsSpec(): FiniteAnimationSpec<Float> = when (LocalMotionLevel.cur
 
 /** 位移/缩放类动效。减弱档起一律瞬时 —— 也就是「只保留淡入」。 */
 @Composable
-fun motionSpatialSpec(): FiniteAnimationSpec<Float> = when (LocalMotionLevel.current) {
+fun <T> motionSpatialSpec(): FiniteAnimationSpec<T> = when (LocalMotionLevel.current) {
     MotionLevel.STANDARD -> MaterialTheme.motionScheme.defaultSpatialSpec()
     MotionLevel.REDUCED, MotionLevel.OFF -> snap()
 }

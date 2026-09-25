@@ -5,7 +5,9 @@
 package com.betterlife.app.ui.today
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -64,6 +66,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -85,8 +88,12 @@ import com.betterlife.app.ui.common.GradeBadge
 import com.betterlife.app.ui.common.lensGroupTitle
 import com.betterlife.app.ui.common.MotionEntrance
 import com.betterlife.app.ui.theme.LocalLensColors
+import com.betterlife.app.ui.theme.LocalMotionLevel
+import com.betterlife.app.ui.theme.MotionLevel
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.ui.theme.lensIcon
+import com.betterlife.app.ui.theme.motionEffectsSpec
+import com.betterlife.app.ui.theme.motionSpatialSpec
 import com.betterlife.app.viewmodel.LibraryViewModel
 import com.betterlife.app.viewmodel.TodayViewModel
 import kotlinx.coroutines.delay
@@ -389,6 +396,11 @@ private fun DailyTaskCard(
     }
 }
 
+/** 打卡勾的三拍:0.9 → 1.15 → 1.0。节奏按 §6.2 的「入场 250ms」 */
+private const val CHECK_POP_FROM = 0.9f
+private const val CHECK_POP_PEAK = 1.15f
+private const val CHECK_POP_MILLIS = 250
+
 /** 打卡动作:未完成是「打卡 + 更多」分裂按钮,已完成收成一个可撤销的按钮 */
 @Composable
 private fun TaskAction(
@@ -397,66 +409,124 @@ private fun TaskAction(
     onSwap: () -> Unit,
     onDrop: () -> Unit,
 ) {
-    val haptics = LocalHapticFeedback.current
+    // 关闭档不套 AnimatedContent:静态帧否则可能抓到按钮切换的中间态
+    if (LocalMotionLevel.current == MotionLevel.OFF) {
+        TaskActionContent(done, onToggle, onSwap, onDrop)
+        return
+    }
+    // transitionSpec 不是 Composable 上下文,spec 必须先取出来
+    val spatial = motionSpatialSpec<Float>()
+    val effects = motionEffectsSpec<Float>()
     AnimatedContent(
         targetState = done,
         transitionSpec = {
-            (scaleIn(initialScale = 0.9f) + fadeIn()) togetherWith (scaleOut(targetScale = 0.9f) + fadeOut())
+            (scaleIn(initialScale = 0.9f, animationSpec = spatial) +
+                fadeIn(animationSpec = effects)) togetherWith
+                (scaleOut(targetScale = 0.9f, animationSpec = spatial) +
+                    fadeOut(animationSpec = effects))
         },
         label = "taskAction",
     ) { isDone ->
-        if (isDone) {
-            FilledTonalButton(onClick = {
-                haptics.performHapticFeedback(HapticFeedbackType.ToggleOff)
-                onToggle()
-            }) {
-                Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(Spacing.space4))
-                Spacer(Modifier.width(Spacing.space1))
-                Text(stringResource(R.string.today_task_undo))
-            }
-        } else {
-            SplitButtonLayout(
-                leadingButton = {
-                    SplitButtonDefaults.LeadingButton(onClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
-                        onToggle()
-                    }) {
-                        Text(stringResource(R.string.today_task_check))
-                    }
-                },
-                trailingButton = {
-                    var menuOpen by remember { mutableStateOf(false) }
-                    Box {
-                        SplitButtonDefaults.TrailingButton(
-                            checked = menuOpen,
-                            onCheckedChange = { menuOpen = it },
-                        ) {
-                            Icon(
-                                Icons.Filled.MoreVert,
-                                contentDescription = stringResource(R.string.today_task_menu),
-                            )
-                        }
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.today_action_swap)) },
-                                onClick = {
-                                    menuOpen = false
-                                    onSwap()
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.today_action_drop)) },
-                                onClick = {
-                                    menuOpen = false
-                                    onDrop()
-                                },
-                            )
-                        }
-                    }
-                },
-            )
-        }
+        TaskActionContent(isDone, onToggle, onSwap, onDrop)
     }
+}
+
+@Composable
+private fun TaskActionContent(
+    done: Boolean,
+    onToggle: () -> Unit,
+    onSwap: () -> Unit,
+    onDrop: () -> Unit,
+) {
+    val haptics = LocalHapticFeedback.current
+    if (done) {
+        FilledTonalButton(onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.ToggleOff)
+            onToggle()
+        }) {
+            CheckPopIcon()
+            Spacer(Modifier.width(Spacing.space1))
+            Text(stringResource(R.string.today_task_undo))
+        }
+    } else {
+        SplitButtonLayout(
+            leadingButton = {
+                SplitButtonDefaults.LeadingButton(onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
+                    onToggle()
+                }) {
+                    Text(stringResource(R.string.today_task_check))
+                }
+            },
+            trailingButton = {
+                var menuOpen by remember { mutableStateOf(false) }
+                Box {
+                    SplitButtonDefaults.TrailingButton(
+                        checked = menuOpen,
+                        onCheckedChange = { menuOpen = it },
+                    ) {
+                        Icon(
+                            Icons.Filled.MoreVert,
+                            contentDescription = stringResource(R.string.today_task_menu),
+                        )
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.today_action_swap)) },
+                            onClick = {
+                                menuOpen = false
+                                onSwap()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.today_action_drop)) },
+                            onClick = {
+                                menuOpen = false
+                                onDrop()
+                            },
+                        )
+                    }
+                }
+            },
+        )
+    }
+}
+
+/**
+ * 打卡勾:一次三拍形变。这是全 App 最高频的动作,值得一次明确的反馈。
+ *
+ * 触觉只是**加强**,形变才是主反馈 —— 不能把触觉当唯一反馈(§6.3)。
+ * 关闭与减弱档直接停在终态,不动。
+ */
+@Composable
+private fun CheckPopIcon() {
+    val level = LocalMotionLevel.current
+    val scale = remember { Animatable(1f) }
+    LaunchedEffect(level) {
+        if (level != MotionLevel.STANDARD) {
+            scale.snapTo(1f)
+            return@LaunchedEffect
+        }
+        scale.snapTo(CHECK_POP_FROM)
+        scale.animateTo(
+            targetValue = 1f,
+            animationSpec = keyframes {
+                durationMillis = CHECK_POP_MILLIS
+                CHECK_POP_PEAK at CHECK_POP_MILLIS / 3
+                1f at CHECK_POP_MILLIS
+            },
+        )
+    }
+    Icon(
+        Icons.Filled.Check,
+        contentDescription = null,
+        modifier = Modifier
+            .size(Spacing.space4)
+            .graphicsLayer {
+                scaleX = scale.value
+                scaleY = scale.value
+            },
+    )
 }
 
 /** 全部完成:一句话 + 一次形变,不弹窗、不放彩带 */
