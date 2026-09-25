@@ -5,12 +5,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.betterlife.app.data.AppSettings
 import com.betterlife.app.ui.AppNav
 import com.betterlife.app.ui.theme.BetterLifeTheme
+import com.betterlife.app.ui.theme.MotionLevel
 import com.betterlife.app.ui.theme.ThemeMode
+import com.betterlife.app.ui.theme.areSystemAnimationsDisabled
+import com.betterlife.app.ui.theme.effectiveMotionLevel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -20,12 +24,20 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // 主题模式是持久化设置，在这里订阅，切换即时生效（无需重启 Activity）
+        // 主题模式与动效档位都是持久化设置，在这里订阅，切换即时生效（无需重启 Activity）
         val settingsStore = (application as BetterLifeApp).container.settingsStore
         setContent {
             val settings by settingsStore.settingsFlow
                 .collectAsStateWithLifecycle(initialValue = AppSettings())
-            BetterLifeTheme(themeMode = ThemeMode.fromKey(settings.themeMode)) {
+            // 系统「移除动画」优先于用户档位，且只需读一次
+            val systemAnimationsOff = remember { areSystemAnimationsDisabled(this) }
+            BetterLifeTheme(
+                themeMode = ThemeMode.fromKey(settings.themeMode),
+                motionLevel = effectiveMotionLevel(
+                    MotionLevel.fromKey(settings.motionLevel),
+                    systemAnimationsOff,
+                ),
+            ) {
                 AppNav()
             }
         }

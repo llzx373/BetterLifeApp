@@ -19,14 +19,14 @@
 | 待办 | 每日习惯 + 一次性待办,勾选完成 |
 | 条目库 | 33 章 601 条完整浏览、搜索、六栏详情(成本/说人话/收益/证据/来源/备注) |
 | AI 问答 | 本地检索书中条目 + 大模型回答,注明「第 X 节第 Y 条」;无 Key 时降级为规则回答 |
-| 设置 | API Key、每日提醒时间(本地通知)、档案修改、关于 |
+| 设置 | API Key、每日提醒时间(本地通知)、主题与动效档位、档案修改、关于 |
 
 ## 构建
 
 环境:JDK 17+(本项目在 JDK 21 上验证)、Android SDK(**platform-37 + build-tools 36.0.0**)。`local.properties` 里配置 `sdk.dir`。
 
 ```bash
-./gradlew testDebugUnitTest   # 40 个单元测试
+./gradlew testDebugUnitTest   # 43 个单元测试
 ./gradlew assembleDebug       # 产出 app/build/outputs/apk/debug/app-debug.apk
 ./gradlew assembleRelease     # 产出 app/build/outputs/apk/release/app-release.apk(R8 压缩)
 ./gradlew lint                # 静态检查(abortOnError:有错误即构建失败)

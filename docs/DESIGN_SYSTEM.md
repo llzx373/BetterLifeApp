@@ -942,6 +942,37 @@ release 目前回退 debug 签名,产物不能对外分发。这一步**不是�
 
 预测性返回是**手势过程中的中间态**,不是静态终态 —— 基线只能拍到「手势结束之后」的样子,拍不到手指拖到一半的形态。这条验收只能真机手动走查,**不要假装它有自动回归**。
 
+#### P3-B5 · 动效降级三档(2026-09-24 已完成)
+
+**为什么排在 B4 前面**:见 A1 的那条发现 —— 截图拍的是静态帧,靠入场动画出现的内容会被拍成空白。而 B4 的全部工作就是到处加入场动画,没有「关闭」这条路径,每加一处就多一处没法回归的视觉。
+
+**三档 × 系统设置**
+
+| 档位 | 位移 / 缩放 | 淡入淡出 |
+|---|---|---|
+| 标准(默认) | `motionScheme.defaultSpatialSpec()` | `defaultEffectsSpec()` |
+| 减弱 | 瞬时(整档抽掉) | 100ms |
+| 关闭 | 跳过动画 | 跳过动画 |
+
+- 设置页新增「动效」区,三选一,DataStore 持久化(`motion_level`)。
+- **系统「移除动画」优先于用户档位**:合成逻辑抽成纯函数 `effectiveMotionLevel(userLevel, systemAnimationsDisabled)` 并配 3 个单测。真机上很难反复复现系统设置,写成单测才守得住。
+- 系统设置读 `Settings.Global.ANIMATOR_DURATION_SCALE`。Compose 的动画核心也会读协程上下文里的 `MotionDurationScale`(`scaleFactor` 为 0 时「下一帧回调就结束」,值同源),但**应用层不该把「要不要降级」交给框架的隐式行为** —— 自己显式合成一次,它才是本项目的规格。
+
+**统一入口 `MotionEntrance`**
+
+新增 `ui/common/MotionEntrance.kt`,替掉散在各处的 `AnimatedVisibility`(今日页「全部完成」卡、详情页折叠段、设置页免责声明)。关闭档走的是 `if (visible) Box { content() }`,**根本不进动画** —— 只把时长调到 0 是不够的,那仍会经过一帧 `alpha = 0` 的中间态。
+
+**验证**
+
+| 项 | 结果 |
+|---|---|
+| `testDebugUnitTest` | **43/43 通过**(新增 `MotionLevelTest` 3 例) |
+| `lint` / `assembleRelease` | 0 error / 通过 |
+| `validateDebugScreenshotTest` | 通过 |
+| **今日页「全部完成」基线补上了** | 这张图在 A1 时因为拍到空白被撤掉;B5 之后预览走 OFF 路径,拍到了真实的「安静的庆祝」卡 |
+
+预览外壳(`PreviewSurface` / `PreviewScreen`)统一传 `MotionLevel.OFF`,所以**以后新加的预览默认就是确定性的**,不用每个作者自己记得关动效。
+
 ---
 
 

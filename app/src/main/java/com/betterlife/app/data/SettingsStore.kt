@@ -21,6 +21,7 @@ data class AppSettings(
     val reminderEnabled: Boolean = false,
     val onboardingDone: Boolean = false,
     val themeMode: String = SettingsStore.DEFAULT_THEME_MODE,
+    val motionLevel: String = SettingsStore.DEFAULT_MOTION_LEVEL,
 )
 
 class SettingsStore(private val context: Context) {
@@ -34,6 +35,7 @@ class SettingsStore(private val context: Context) {
         val REMINDER_ENABLED = booleanPreferencesKey("reminder_enabled")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         val THEME_MODE = stringPreferencesKey("theme_mode")
+        val MOTION_LEVEL = stringPreferencesKey("motion_level")
     }
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -46,6 +48,7 @@ class SettingsStore(private val context: Context) {
             reminderEnabled = p[Keys.REMINDER_ENABLED] ?: false,
             onboardingDone = p[Keys.ONBOARDING_DONE] ?: false,
             themeMode = p[Keys.THEME_MODE] ?: DEFAULT_THEME_MODE,
+            motionLevel = p[Keys.MOTION_LEVEL] ?: DEFAULT_MOTION_LEVEL,
         )
     }
 
@@ -75,7 +78,14 @@ class SettingsStore(private val context: Context) {
         context.dataStore.edit { it[Keys.THEME_MODE] = modeKey }
     }
 
+    suspend fun setMotionLevel(levelKey: String) {
+        context.dataStore.edit { it[Keys.MOTION_LEVEL] = levelKey }
+    }
+
     companion object {
         const val DEFAULT_THEME_MODE = "brand_green"
+
+        /** 默认「标准」。降级是给需要的用户的选项,不该是所有人的默认 */
+        const val DEFAULT_MOTION_LEVEL = "standard"
     }
 }

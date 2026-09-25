@@ -14,6 +14,8 @@ import androidx.compose.ui.platform.LocalContext
 fun BetterLifeTheme(
     themeMode: ThemeMode = ThemeMode.BRAND_GREEN,
     darkTheme: Boolean = isSystemInDarkTheme(),
+    /** 动效档位。预览传 OFF,否则入场动画的中间态会被截图拍成空白(见 design 文档 §8 P3-A1)。 */
+    motionLevel: MotionLevel = MotionLevel.STANDARD,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -27,7 +29,10 @@ fun BetterLifeTheme(
     // 口径色不跟随壁纸：Material You 会把四个语义色洗掉，失去区分度（见 DESIGN_SYSTEM §3.1）
     val lensColors = if (dark) darkLensColors else lightLensColors
 
-    CompositionLocalProvider(LocalLensColors provides lensColors) {
+    CompositionLocalProvider(
+        LocalLensColors provides lensColors,
+        LocalMotionLevel provides motionLevel,
+    ) {
         MaterialExpressiveTheme(
             colorScheme = colorScheme,
             motionScheme = AppMotionScheme,

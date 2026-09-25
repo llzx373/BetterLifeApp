@@ -11,7 +11,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -75,6 +74,7 @@ import com.betterlife.app.data.EntryDto
 import com.betterlife.app.ui.common.CostMeter
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
+import com.betterlife.app.ui.common.MotionEntrance
 import com.betterlife.app.ui.common.RatioBadge
 import com.betterlife.app.ui.common.TodoBadge
 import com.betterlife.app.ui.common.predictiveBackTransition
@@ -393,7 +393,7 @@ private fun CollapsibleSection(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            AnimatedVisibility(visible = expanded) {
+            MotionEntrance(visible = expanded) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(Spacing.space2),
                     modifier = Modifier.padding(top = Spacing.space2),

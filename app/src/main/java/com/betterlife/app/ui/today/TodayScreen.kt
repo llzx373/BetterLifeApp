@@ -5,7 +5,6 @@
 package com.betterlife.app.ui.today
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -84,6 +83,7 @@ import com.betterlife.app.ui.common.CostMeter
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
 import com.betterlife.app.ui.common.lensGroupTitle
+import com.betterlife.app.ui.common.MotionEntrance
 import com.betterlife.app.ui.theme.LocalLensColors
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.ui.theme.lensIcon
@@ -463,11 +463,7 @@ private fun TaskAction(
 @Composable
 private fun AllDoneCard(count: Int, onReview: () -> Unit, modifier: Modifier = Modifier) {
     val visible = remember { MutableTransitionState(false).apply { targetState = true } }
-    AnimatedVisibility(
-        visibleState = visible,
-        enter = fadeIn() + scaleIn(initialScale = 0.96f),
-        modifier = modifier,
-    ) {
+    MotionEntrance(visibleState = visible, modifier = modifier, scaleFrom = 0.96f) {
         Card(
             shape = MaterialTheme.shapes.large,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),

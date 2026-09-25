@@ -128,3 +128,30 @@ fun TodayReady() {
         )
     }
 }
+
+/**
+ * 全部完成是「安静的庆祝」：卡片收起，只留一句话，不弹窗不放彩带。
+ *
+ * 这张基线在 B5 之前是**画不出来**的 —— 那张卡靠入场动画出现，静态帧抓到的是
+ * alpha=0，一片空白。B5 给了「关闭动效」这条路径，预览走 OFF 才拍得到它。
+ */
+@PreviewTest
+@FourFoldScreenPreview
+@Composable
+fun TodayAllDone() {
+    PreviewScreen {
+        TodayContent(
+            state = TodayViewModel.UiState.Ready(todayTasks(allDone = true)),
+            libraryState = libraryState,
+            now = FIXED_NOW,
+            onToggle = {},
+            onSwap = {},
+            onDrop = {},
+            onOpenEntry = {},
+            onAddTodo = {},
+            onOpenLibrary = {},
+            onEditProfile = {},
+            contentPadding = PaddingValues(Spacing.space4),
+        )
+    }
+}

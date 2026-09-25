@@ -248,6 +248,10 @@
     <string name="settings_reminder_enable">开启提醒</string>
     <string name="settings_reminder_time">提醒时间</string>
     <string name="settings_section_theme">主题</string>
+    <string name="settings_section_motion">动效</string>
+    <string name="motion_standard">标准</string>
+    <string name="motion_reduced">减弱</string>
+    <string name="motion_off">关闭</string>
     <string name="theme_brand">品牌绿（默认）</string>
     <string name="theme_material_you">跟随系统壁纸</string>
     <string name="theme_dark">深色优先</string>

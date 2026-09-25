@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.betterlife.app.ui.theme.BetterLifeTheme
+import com.betterlife.app.ui.theme.MotionLevel
 import com.betterlife.app.ui.theme.Spacing
 
 /** 组件级预览：跟随内容大小，四种组合。 */
@@ -48,20 +49,23 @@ internal annotation class FourFoldScreenPreview
  *
  * 深色靠 `uiMode` 触发，`BetterLifeTheme` 默认跟随 `isSystemInDarkTheme()`，
  * 走的就是真实运行时那条分支，不是另写一套配色。
+ *
+ * **动效一律传 OFF**：基线拍的是静态帧，入场动画里的中间态（alpha=0）会被拍成空白，
+ * 那种基线比没有更糟。关掉动效才有确定性的图（见 docs/DESIGN_SYSTEM.md §8 P3-A1）。
  */
 @Composable
 internal fun PreviewSurface(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    BetterLifeTheme {
+    BetterLifeTheme(motionLevel = MotionLevel.OFF) {
         Surface(color = MaterialTheme.colorScheme.surface, modifier = modifier) {
             Box(Modifier.padding(Spacing.space4)) { content() }
         }
     }
 }
 
-/** 整屏预览的外壳：真实主题 + 铺满，屏幕边距交给各屏自己的 contentPadding。 */
+/** 整屏预览的外壳：真实主题 + 铺满，屏幕边距交给各屏自己的 contentPadding。动效同样关掉。 */
 @Composable
 internal fun PreviewScreen(content: @Composable () -> Unit) {
-    BetterLifeTheme {
+    BetterLifeTheme(motionLevel = MotionLevel.OFF) {
         Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxSize()) {
             content()
         }

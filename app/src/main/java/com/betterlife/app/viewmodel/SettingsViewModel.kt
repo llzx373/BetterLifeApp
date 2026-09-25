@@ -11,6 +11,7 @@ import com.betterlife.app.ai.LlmClient
 import com.betterlife.app.data.AppSettings
 import com.betterlife.app.data.SettingsStore
 import com.betterlife.app.tasks.ReminderScheduler
+import com.betterlife.app.ui.theme.MotionLevel
 import com.betterlife.app.ui.theme.ThemeMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -99,6 +100,12 @@ class SettingsViewModel(
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch(Dispatchers.IO) {
             settingsStore.setThemeMode(mode.key)
+        }
+    }
+
+    fun setMotionLevel(level: MotionLevel) {
+        viewModelScope.launch(Dispatchers.IO) {
+            settingsStore.setMotionLevel(level.key)
         }
     }
 

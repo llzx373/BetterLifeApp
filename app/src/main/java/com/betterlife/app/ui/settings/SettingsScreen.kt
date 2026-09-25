@@ -9,7 +9,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -80,6 +79,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
+import com.betterlife.app.ui.common.MotionEntrance
+import com.betterlife.app.ui.theme.MotionLevel
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.ui.theme.ThemeMode
 import com.betterlife.app.viewmodel.SettingsViewModel
@@ -325,6 +326,20 @@ fun SettingsScreen(
                 }
             }
 
+            SectionTitle(stringResource(R.string.settings_section_motion))
+
+            val currentMotionLevel = MotionLevel.fromKey(settings.motionLevel)
+            val motionLevels = MotionLevel.entries
+            motionLevels.forEachIndexed { index, level ->
+                SegmentedListItem(
+                    selected = currentMotionLevel == level,
+                    onClick = { vm.setMotionLevel(level) },
+                    shapes = ListItemDefaults.segmentedShapes(index = index, count = motionLevels.size),
+                ) {
+                    Text(motionLevelLabel(level))
+                }
+            }
+
             SectionTitle(stringResource(R.string.settings_section_profile))
 
             SegmentedListItem(
@@ -419,7 +434,7 @@ private fun DisclaimerSection() {
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            AnimatedVisibility(visible = expanded) {
+            MotionEntrance(visible = expanded) {
                 Text(
                     text = stringResource(R.string.settings_disclaimer),
                     style = MaterialTheme.typography.bodySmall,
@@ -437,5 +452,14 @@ private fun themeModeLabel(mode: ThemeMode): String = stringResource(
         ThemeMode.BRAND_GREEN -> R.string.theme_brand
         ThemeMode.MATERIAL_YOU -> R.string.theme_material_you
         ThemeMode.DARK -> R.string.theme_dark
+    },
+)
+
+@Composable
+private fun motionLevelLabel(level: MotionLevel): String = stringResource(
+    when (level) {
+        MotionLevel.STANDARD -> R.string.motion_standard
+        MotionLevel.REDUCED -> R.string.motion_reduced
+        MotionLevel.OFF -> R.string.motion_off
     },
 )
