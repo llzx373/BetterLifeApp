@@ -81,7 +81,7 @@ Kotlin + Jetpack Compose(Material 3)· Room · DataStore · WorkManager · Navig
 构建:AGP 9.4.1(内置 Kotlin 支持)· Kotlin 2.4.20 · KSP 2.3.12 · Gradle 9.7.1。
 SDK:最低 Android 8.0(API 26),目标 Android 16(API 36),compileSdk 37。
 
-详细架构与二次开发指引见 [docs/DESIGN.md](docs/DESIGN.md);设计系统与 M3 Expressive 改造路线见 [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)。
+详细架构与二次开发指引见 [docs/DESIGN.md](docs/DESIGN.md);设计系统与 M3 Expressive 改造路线见 [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md);**接下来该做什么见 [todo.md](todo.md)**(含发布前必须项、已知缺口与「不要做的事」)。
 
 ## 内容出处与许可
 
