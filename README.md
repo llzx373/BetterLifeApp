@@ -26,7 +26,7 @@
 环境:JDK 17+(本项目在 JDK 21 上验证)、Android SDK(**platform-37 + build-tools 36.0.0**)。`local.properties` 里配置 `sdk.dir`。
 
 ```bash
-./gradlew testDebugUnitTest   # 43 个单元测试
+./gradlew testDebugUnitTest   # 47 个单元测试
 ./gradlew assembleDebug       # 产出 app/build/outputs/apk/debug/app-debug.apk
 ./gradlew assembleRelease     # 产出 app/build/outputs/apk/release/app-release.apk(R8 压缩)
 ./gradlew lint                # 静态检查(abortOnError:有错误即构建失败)
