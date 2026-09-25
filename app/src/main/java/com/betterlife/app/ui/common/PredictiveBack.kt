@@ -25,10 +25,13 @@ private const val MAX_ALPHA_FADE = 0.3f
 /**
  * 给当前屏挂上预测性返回。[onBack] 在手势完成时被调用一次。
  *
- * 用法:`Scaffold(modifier = predictiveBackTransition(onBack)) { ... }`
+ * 用法:`Scaffold(modifier = Modifier.predictiveBackTransition(onBack)) { ... }`
+ *
+ * 写成 Modifier 的扩展而不是 `fun predictiveBackTransition(): Modifier` —— 后者没法
+ * 与其它 modifier 链式组合,Compose 的 lint 也会报 `ModifierFactoryExtensionFunction`。
  */
 @Composable
-internal fun predictiveBackTransition(onBack: () -> Unit): Modifier {
+internal fun Modifier.predictiveBackTransition(onBack: () -> Unit): Modifier {
     var progress by remember { mutableFloatStateOf(0f) }
 
     PredictiveBackHandler(enabled = true) { events ->
@@ -41,10 +44,12 @@ internal fun predictiveBackTransition(onBack: () -> Unit): Modifier {
         }
     }
 
-    return Modifier.graphicsLayer {
-        val scale = 1f - MAX_SCALE_SHRINK * progress
-        scaleX = scale
-        scaleY = scale
-        alpha = 1f - MAX_ALPHA_FADE * progress
-    }
+    return this.then(
+        Modifier.graphicsLayer {
+            val scale = 1f - MAX_SCALE_SHRINK * progress
+            scaleX = scale
+            scaleY = scale
+            alpha = 1f - MAX_ALPHA_FADE * progress
+        },
+    )
 }

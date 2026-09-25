@@ -92,7 +92,7 @@ fun ChatScreen(
     }
 
     Scaffold(
-        modifier = predictiveBackTransition(onBack),
+        modifier = Modifier.predictiveBackTransition(onBack),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.title_chat)) },

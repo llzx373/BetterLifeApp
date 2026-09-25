@@ -49,7 +49,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -71,7 +72,7 @@ private val ShareBarWidth = 40.dp
 private val ShareBarHeight = 4.dp
 
 /** 超过这个宽度才有放两栏的余地(600dp 是 M3 的 medium 断点) */
-internal const val TWO_PANE_MIN_WIDTH = 600
+internal val TWO_PANE_MIN_WIDTH = 600.dp
 
 @Composable
 fun LibraryScreen(
@@ -81,7 +82,13 @@ fun LibraryScreen(
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
 
-    if (LocalConfiguration.current.screenWidthDp >= TWO_PANE_MIN_WIDTH) {
+    // 用 WindowInfo.containerSize 而不是 Configuration.screenWidthDp:后者在不同 targetSdk 下
+    // inset 行为不同、而且被取整,分屏与折叠屏上会判错(Compose 自带 lint 也会报这条)。
+    val windowInfo = LocalWindowInfo.current
+    val density = LocalDensity.current
+    val wideEnough = with(density) { windowInfo.containerSize.width.toDp() } >= TWO_PANE_MIN_WIDTH
+
+    if (wideEnough) {
         LibraryTwoPane(
             state = state,
             onQueryChange = vm::search,

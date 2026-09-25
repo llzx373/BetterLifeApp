@@ -116,7 +116,7 @@ fun EntryDetailScreen(
     val copiedMessage = stringResource(R.string.detail_copied)
 
     Scaffold(
-        modifier = predictiveBackTransition(onBack),
+        modifier = Modifier.predictiveBackTransition(onBack),
         topBar = {
             TopAppBar(
                 title = { Text(entryId) },
