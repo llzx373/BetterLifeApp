@@ -18,7 +18,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -40,6 +39,7 @@ import com.betterlife.app.data.SectionDto
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
 import com.betterlife.app.ui.common.RatioBadge
+import com.betterlife.app.ui.common.SafeListItem
 import com.betterlife.app.ui.common.TodoBadge
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.EntrySort
@@ -154,7 +154,7 @@ private fun sortLabel(sort: EntrySort): Int = when (sort) {
 
 @Composable
 private fun EntryRow(entry: EntryDto, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    ListItem(
+    SafeListItem(
         overlineContent = { Text(entry.id) },
         supportingContent = {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {

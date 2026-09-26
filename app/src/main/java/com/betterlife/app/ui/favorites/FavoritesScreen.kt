@@ -18,7 +18,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -36,6 +35,7 @@ import com.betterlife.app.R
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
 import com.betterlife.app.ui.common.RatioBadge
+import com.betterlife.app.ui.common.SafeListItem
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.FavoritesViewModel
 
@@ -95,7 +95,7 @@ fun FavoritesScreen(
             contentPadding = PaddingValues(vertical = Spacing.space2),
         ) {
             items(state.entries, key = { it.id }) { entry ->
-                ListItem(
+                SafeListItem(
                     overlineContent = { Text(entry.id) },
                     supportingContent = {
                         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
