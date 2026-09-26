@@ -36,7 +36,24 @@ jobs:
       - name: 静态检查（abortOnError，有 error 即失败）
         run: ./gradlew lint
 
+      # 配置了 BETTERLIFE_KEYSTORE_BASE64 secret 时还原正式密钥库；
+      # 没配置（如 fork/本地 act）则跳过，release 自动回退 debug 签名。
+      - name: 还原正式签名密钥库
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.BETTERLIFE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            echo "keystoreFile=$RUNNER_TEMP/release.keystore" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: 构建 release
+        env:
+          BETTERLIFE_KEYSTORE_FILE: ${{ steps.signing.outputs.keystoreFile }}
+          BETTERLIFE_KEYSTORE_PASSWORD: ${{ secrets.BETTERLIFE_KEYSTORE_PASSWORD }}
+          BETTERLIFE_KEY_ALIAS: ${{ secrets.BETTERLIFE_KEY_ALIAS }}
+          BETTERLIFE_KEY_PASSWORD: ${{ secrets.BETTERLIFE_KEY_PASSWORD }}
         run: ./gradlew assembleRelease
 
   # 截图回归单独一个作业：它是最容易因环境差异变红的一环，
