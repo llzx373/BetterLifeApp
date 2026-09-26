@@ -27,17 +27,9 @@ jobs:
       - name: 配 Gradle（含依赖缓存）
         uses: gradle/actions/setup-gradle@v4
 
-      # android-actions/setup-android@v3 已不可用（上游 issue #537：Google 停发
-      # sdkmanager 的 tools 包）。ubuntu-latest 镜像自带 cmdline-tools，
-      # 直接用 sdkmanager 装项目需要的平台即可。
-      - name: 配 Android SDK（诊断：列出可用的 android-3x 平台）
-        run: |
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          echo "===== stable channel ====="
-          "$SDKMANAGER" --list 2>/dev/null | grep "platforms;android-3" | head -10
-          echo "===== canary channel ====="
-          "$SDKMANAGER" --list --channel=3 2>/dev/null | grep "platforms;android-3" | head -10
-
+      # 不需要 android-actions/setup-android（v3 已随上游 issue #537 失效）：
+      # ubuntu-latest 镜像自带的 Android SDK 已包含 compileSdk 37 所需平台，
+      # 实测无需再装任何包即可通过全部构建。
       - name: 单元测试
         run: ./gradlew testDebugUnitTest
 
@@ -83,17 +75,8 @@ jobs:
       - name: 配 Gradle（含依赖缓存）
         uses: gradle/actions/setup-gradle@v4
 
-      # android-actions/setup-android@v3 已不可用（上游 issue #537：Google 停发
-      # sdkmanager 的 tools 包）。ubuntu-latest 镜像自带 cmdline-tools，
-      # 直接用 sdkmanager 装项目需要的平台即可。
-      - name: 配 Android SDK（诊断：列出可用的 android-3x 平台）
-        run: |
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          echo "===== stable channel ====="
-          "$SDKMANAGER" --list 2>/dev/null | grep "platforms;android-3" | head -10
-          echo "===== canary channel ====="
-          "$SDKMANAGER" --list --channel=3 2>/dev/null | grep "platforms;android-3" | head -10
-
+      # 不需要 android-actions/setup-android（v3 已随上游 issue #537 失效）：
+      # ubuntu-latest 镜像自带的 Android SDK 已包含 compileSdk 37 所需平台。
       - name: 截图回归
         run: ./gradlew validateDebugScreenshotTest
 
