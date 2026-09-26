@@ -30,11 +30,13 @@ jobs:
       # android-actions/setup-android@v3 已不可用（上游 issue #537：Google 停发
       # sdkmanager 的 tools 包）。ubuntu-latest 镜像自带 cmdline-tools，
       # 直接用 sdkmanager 装项目需要的平台即可。
-      - name: 配 Android SDK
+      - name: 配 Android SDK（诊断：列出可用的 android-3x 平台）
         run: |
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          yes | "$SDKMANAGER" --licenses > /dev/null
-          "$SDKMANAGER" "platforms;android-37"
+          echo "===== stable channel ====="
+          "$SDKMANAGER" --list 2>/dev/null | grep "platforms;android-3" | head -10
+          echo "===== canary channel ====="
+          "$SDKMANAGER" --list --channel=3 2>/dev/null | grep "platforms;android-3" | head -10
 
       - name: 单元测试
         run: ./gradlew testDebugUnitTest
@@ -84,11 +86,13 @@ jobs:
       # android-actions/setup-android@v3 已不可用（上游 issue #537：Google 停发
       # sdkmanager 的 tools 包）。ubuntu-latest 镜像自带 cmdline-tools，
       # 直接用 sdkmanager 装项目需要的平台即可。
-      - name: 配 Android SDK
+      - name: 配 Android SDK（诊断：列出可用的 android-3x 平台）
         run: |
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          yes | "$SDKMANAGER" --licenses > /dev/null
-          "$SDKMANAGER" "platforms;android-37"
+          echo "===== stable channel ====="
+          "$SDKMANAGER" --list 2>/dev/null | grep "platforms;android-3" | head -10
+          echo "===== canary channel ====="
+          "$SDKMANAGER" --list --channel=3 2>/dev/null | grep "platforms;android-3" | head -10
 
       - name: 截图回归
         run: ./gradlew validateDebugScreenshotTest
