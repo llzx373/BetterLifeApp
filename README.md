@@ -43,7 +43,27 @@ CI 见 [`.github/workflows/ci.yml`](.github/workflows/ci.yml):`build` 作业跑�
 
 ### 发布构建与签名
 
-正式签名从仓库根目录的 `keystore.properties` 读取。该文件与密钥库都**不入库**(见 `.gitignore`):
+正式签名有三种配置方式,按优先级:**环境变量 > 根目录 `.env` > `keystore.properties`**(三者都不入库,见 `.gitignore`)。
+
+日常开发推荐 `.env`:复制 `.env.example` 为 `.env` 并填入真实值(值不要加引号):
+
+```bash
+BETTERLIFE_KEYSTORE_FILE=D:\path\to\your-release.keystore
+BETTERLIFE_KEYSTORE_PASSWORD=...
+BETTERLIFE_KEY_ALIAS=betterlife
+BETTERLIFE_KEY_PASSWORD=...
+```
+
+CI 或临时打包可用环境变量(同名):
+
+```bash
+export BETTERLIFE_KEYSTORE_FILE=/absolute/path/to/your-release.keystore
+export BETTERLIFE_KEYSTORE_PASSWORD=...
+export BETTERLIFE_KEY_ALIAS=...
+export BETTERLIFE_KEY_PASSWORD=...
+```
+
+`keystore.properties` 仍兼容旧格式:
 
 ```properties
 storeFile=/absolute/path/to/release.jks
@@ -58,7 +78,7 @@ keyPassword=...
 keytool -genkeypair -v -keystore release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias betterlife
 ```
 
-`keystore.properties` 不存在时,release 构建会**回退到 debug 签名并打印警告** —— 这样任何机器上都能跑通 `assembleRelease`,但产出物不能用于正式分发。
+三者都未配置时,release 构建会**回退到 debug 签名并打印警告** —— 这样任何机器上都能跑通 `assembleRelease`,但产出物不能用于正式分发。
 
 ## 内容管线
 

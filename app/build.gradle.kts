@@ -9,15 +9,55 @@ plugins {
     alias(libs.plugins.baselineprofile)
 }
 
-// 正式签名从 keystore.properties 读取（该文件与密钥库均不入库）。
-// 文件缺失时回退到 debug 签名，保证 assembleRelease 在任何机器上都能产出可安装的包。
-val keystorePropertiesFile = rootProject.file("keystore.properties")
+// 正式签名的读取优先级：环境变量 > 根目录 .env > keystore.properties（三者均不入库）。
+// 全部缺失时回退到 debug 签名，保证 assembleRelease 在任何机器上都能产出可安装的包。
 val keystoreProperties = Properties().apply {
-    if (keystorePropertiesFile.exists()) {
-        keystorePropertiesFile.inputStream().use { load(it) }
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
     }
 }
-val hasReleaseKeystore = keystorePropertiesFile.exists()
+
+// .env 按 KEY=VALUE 逐行解析：不用 java.util.Properties，避免反斜杠被当作转义符
+// （Windows 路径里的 \U 会被误解析成 Unicode 转义）。值可带成对的单/双引号。
+val dotenv: Map<String, String> = run {
+    val file = rootProject.file(".env")
+    if (!file.exists()) {
+        emptyMap()
+    } else {
+        file.readLines().mapNotNull { line ->
+            val trimmed = line.trim()
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                return@mapNotNull null
+            }
+            val eq = trimmed.indexOf('=')
+            if (eq <= 0) {
+                return@mapNotNull null
+            }
+            val key = trimmed.substring(0, eq).trim()
+            var value = trimmed.substring(eq + 1).trim()
+            if (value.length >= 2 && value.first() == value.last() &&
+                (value.first() == '"' || value.first() == '\'')
+            ) {
+                value = value.substring(1, value.length - 1)
+            }
+            key to value
+        }.toMap()
+    }
+}
+
+fun signingProperty(envName: String, propName: String): String? =
+    System.getenv(envName)?.takeIf { it.isNotBlank() }
+        ?: dotenv[envName]?.takeIf { it.isNotBlank() }
+        ?: keystoreProperties.getProperty(propName)?.takeIf { it.isNotBlank() }
+
+val releaseStoreFile = signingProperty("BETTERLIFE_KEYSTORE_FILE", "storeFile")
+val releaseStorePassword = signingProperty("BETTERLIFE_KEYSTORE_PASSWORD", "storePassword")
+val releaseKeyAlias = signingProperty("BETTERLIFE_KEY_ALIAS", "keyAlias")
+val releaseKeyPassword = signingProperty("BETTERLIFE_KEY_PASSWORD", "keyPassword")
+val hasReleaseKeystore = listOf(
+    releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword,
+).all { it != null }
 
 android {
     namespace = "com.betterlife.app"
@@ -37,10 +77,10 @@ android {
     signingConfigs {
         if (hasReleaseKeystore) {
             create("release") {
-                storeFile = file(keystoreProperties.getProperty("storeFile"))
-                storePassword = keystoreProperties.getProperty("storePassword")
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
             }
         }
     }
@@ -57,8 +97,8 @@ android {
                 signingConfigs.getByName("release")
             } else {
                 logger.warn(
-                    "keystore.properties 不存在：release 构建回退到 debug 签名。" +
-                        "正式发布前请创建密钥库与 keystore.properties（见 README 的「发布构建」一节）。"
+                    "未配置正式签名（环境变量、.env 与 keystore.properties 均缺失）：release 构建回退到 debug 签名。" +
+                        "正式发布前请配置签名（见 README 的「发布构建」一节）。"
                 )
                 signingConfigs.getByName("debug")
             }

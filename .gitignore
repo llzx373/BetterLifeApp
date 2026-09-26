@@ -11,6 +11,7 @@ build/
 local.properties
 
 # 签名材料：绝不入库
+.env
 keystore.properties
 *.jks
 *.keystore
