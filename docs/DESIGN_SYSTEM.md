@@ -360,6 +360,8 @@ space12= 48dp   // 空状态、页面底部避让 FAB
 
 **验收**:发送后 200ms 内出现反馈;信号差时能看到明确的失败恢复路径(重试按钮),不是干等。
 
+**键盘约定(2026-09-26 起)**:含输入框的页面必须满足两点——MainActivity 已统一声明 `windowSoftInputMode="adjustResize"`,页面侧在内容根布局加 `Modifier.imePadding()`、可滚动列表加 `Modifier.imeNestedScroll()`。禁止依赖系统默认 softInputMode(多数 ROM 会退化成 adjustPan,与 imePadding 叠加造成输入框不贴键盘的双重位移)。
+
 ### 5.7 设置页(`SettingsScreen.kt`,270 行)
 
 **模式:Configure。**
