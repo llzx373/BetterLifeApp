@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import com.android.tools.screenshot.PreviewTest
 import com.betterlife.app.data.EntryKeys
+import com.betterlife.app.data.health.StepsState
 import com.betterlife.app.ui.FourFoldScreenPreview
 import com.betterlife.app.ui.PreviewScreen
 import com.betterlife.app.ui.fakeEntry
@@ -116,6 +117,8 @@ fun TodayReady() {
         TodayContent(
             state = TodayViewModel.UiState.Ready(todayTasks(allDone = false)),
             libraryState = libraryState,
+            // Unavailable 不渲染卡片：保持这张基线只盯三级层级，步数卡有自己的组件级基线
+            stepsState = StepsState.Unavailable,
             now = FIXED_NOW,
             onToggle = {},
             onSwap = {},
@@ -123,6 +126,7 @@ fun TodayReady() {
             onOpenEntry = {},
             onAddTodo = {},
             onDismissEntry = {},
+            onAuthorizeSteps = {},
             onStartTimer = {},
             onOpenLibrary = {},
             onEditProfile = {},
@@ -145,6 +149,7 @@ fun TodayAllDone() {
         TodayContent(
             state = TodayViewModel.UiState.Ready(todayTasks(allDone = true)),
             libraryState = libraryState,
+            stepsState = StepsState.Unavailable,
             now = FIXED_NOW,
             onToggle = {},
             onSwap = {},
@@ -152,6 +157,7 @@ fun TodayAllDone() {
             onOpenEntry = {},
             onAddTodo = {},
             onDismissEntry = {},
+            onAuthorizeSteps = {},
             onStartTimer = {},
             onOpenLibrary = {},
             onEditProfile = {},

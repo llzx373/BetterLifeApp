@@ -4,6 +4,9 @@
 // 推荐是分段列表 —— 601 条里的 5 条不该长得和「今天必须做的事」一样。
 package com.betterlife.app.ui.today
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.MutableTransitionState
@@ -88,11 +91,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.health.connect.client.PermissionController
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
 import com.betterlife.app.data.EntryDto
 import com.betterlife.app.data.db.TaskEntity
+import com.betterlife.app.data.health.HealthConnectRepository
+import com.betterlife.app.data.health.StepsSource
+import com.betterlife.app.data.health.StepsState
 import com.betterlife.app.recommend.ScoredEntry
 import com.betterlife.app.ui.common.CostMeter
 import com.betterlife.app.ui.common.DisputeBadge
@@ -109,6 +117,7 @@ import com.betterlife.app.ui.theme.lensIcon
 import com.betterlife.app.ui.theme.motionEffectsSpec
 import com.betterlife.app.ui.theme.motionSpatialSpec
 import com.betterlife.app.viewmodel.LibraryViewModel
+import com.betterlife.app.viewmodel.StepsViewModel
 import com.betterlife.app.viewmodel.TodayViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -133,15 +142,39 @@ fun TodayScreen(
     onStartTimer: (Long) -> Unit,
     todayVm: TodayViewModel = viewModel(factory = TodayViewModel.Factory),
     libraryVm: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
+    stepsVm: StepsViewModel = viewModel(factory = StepsViewModel.Factory),
 ) {
     val todayState by todayVm.uiState.collectAsStateWithLifecycle()
     val libraryState by libraryVm.uiState.collectAsStateWithLifecycle()
+    val stepsState by stepsVm.uiState.collectAsStateWithLifecycle()
 
     // 「不再推荐」的结果反馈走这个宿主:撤销即把 DISMISSED 状态清掉
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val dismissedMessage = stringResource(R.string.today_dismissed)
     val undoLabel = stringResource(R.string.action_undo)
+
+    // 步数数据源按门面给的 source 发起对应的授权流程;授权结果回来都统一 refresh 重判
+    val healthPermissionLauncher = rememberLauncherForActivityResult(
+        PermissionController.createRequestPermissionResultContract(),
+    ) { stepsVm.refresh() }
+    val sensorPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { stepsVm.refresh() }
+    val onAuthorizeSteps = {
+        when ((stepsState as? StepsState.Unauthorized)?.source ?: StepsSource.SENSOR) {
+            StepsSource.HEALTH_CONNECT ->
+                healthPermissionLauncher.launch(setOf(HealthConnectRepository.READ_STEPS_PERMISSION))
+            StepsSource.SENSOR ->
+                sensorPermissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+        }
+    }
+
+    // Health Connect 路径没有实时流，回前台时重读一次快照
+    LifecycleResumeEffect(stepsVm) {
+        stepsVm.refresh()
+        onPauseOrDispose { }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -174,6 +207,7 @@ fun TodayScreen(
             is TodayViewModel.UiState.Ready -> TodayContent(
                 state = state,
                 libraryState = libraryState,
+                stepsState = stepsState,
                 now = LocalDateTime.now(),
                 onToggle = todayVm::toggleTask,
                 onSwap = todayVm::swapTask,
@@ -187,6 +221,7 @@ fun TodayScreen(
                         if (result == SnackbarResult.ActionPerformed) libraryVm.restoreEntry(entryId)
                     }
                 },
+                onAuthorizeSteps = onAuthorizeSteps,
                 onStartTimer = onStartTimer,
                 onOpenLibrary = onOpenLibrary,
                 onEditProfile = onEditProfile,
@@ -201,6 +236,7 @@ fun TodayScreen(
 internal fun TodayContent(
     state: TodayViewModel.UiState.Ready,
     libraryState: LibraryViewModel.UiState,
+    stepsState: StepsState,
     now: LocalDateTime,
     onToggle: (TaskEntity) -> Unit,
     onSwap: (TaskEntity) -> Unit,
@@ -208,6 +244,7 @@ internal fun TodayContent(
     onOpenEntry: (String) -> Unit,
     onAddTodo: (String) -> Unit,
     onDismissEntry: (String) -> Unit,
+    onAuthorizeSteps: () -> Unit,
     onStartTimer: (Long) -> Unit,
     onOpenLibrary: () -> Unit,
     onEditProfile: () -> Unit,
@@ -242,6 +279,17 @@ internal fun TodayContent(
                 now = now,
                 modifier = Modifier.padding(horizontal = Spacing.space4),
             )
+        }
+
+        // 步数卡片只在有数据或待授权时出现;Loading / Unavailable 不渲染(模拟器上就是没有卡片)
+        if (stepsState is StepsState.Available || stepsState is StepsState.Unauthorized) {
+            item(key = "steps") {
+                StepsCard(
+                    state = stepsState,
+                    onAuthorize = onAuthorizeSteps,
+                    modifier = Modifier.padding(horizontal = Spacing.space4),
+                )
+            }
         }
 
         item(key = "tasks-title") {

@@ -189,6 +189,8 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)
+    // 今日步数：Health Connect 优先，不可用降级到本机计步传感器
+    implementation(libs.androidx.health.connect)
     // 把打包进来的 baseline profile 真正装上（API < 33 尤其需要）
     implementation(libs.androidx.profileinstaller)
 

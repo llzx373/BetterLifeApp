@@ -116,6 +116,13 @@
     <string name="timer_finished_done">已自动完成打卡</string>
     <string name="task_timer_desc">开始计时</string>
 
+    <!-- 今日步数卡片 -->
+    <string name="steps_card_title">今日步数</string>
+    <string name="steps_source_health_connect">来自健康数据平台</string>
+    <string name="steps_source_sensor">本机计步</string>
+    <string name="steps_authorize_hint">授权读取运动数据，在这里显示今日步数</string>
+    <string name="steps_authorize">授权读取</string>
+
     <!-- 条目库 -->
     <string name="library_title">条目库</string>
     <string name="library_search_hint">搜条目,如:戒烟、体检、午睡</string>

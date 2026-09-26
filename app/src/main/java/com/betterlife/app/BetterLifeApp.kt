@@ -10,6 +10,9 @@ import com.betterlife.app.data.NetworkMonitor
 import com.betterlife.app.data.ProfileRepository
 import com.betterlife.app.data.SettingsStore
 import com.betterlife.app.data.db.AppDatabase
+import com.betterlife.app.data.health.HealthConnectRepository
+import com.betterlife.app.data.health.SensorStepsRepository
+import com.betterlife.app.data.health.StepsRepository
 import com.betterlife.app.recommend.DailyTaskPlanner
 import com.betterlife.app.recommend.RecommendationEngine
 import com.betterlife.app.tasks.ReminderScheduler
@@ -54,6 +57,11 @@ class AppContainer(private val context: Context) {
     }
 
     val reminderScheduler: ReminderScheduler by lazy { ReminderScheduler(context) }
+
+    /** 今日步数：Health Connect 优先，传感器兜底，门面内部决定走哪条 */
+    val stepsRepository: StepsRepository by lazy {
+        StepsRepository(HealthConnectRepository(context), SensorStepsRepository(context))
+    }
 
     val llmClient: LlmClient by lazy { LlmClient(settingsStore) }
 
