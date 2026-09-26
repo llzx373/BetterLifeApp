@@ -27,8 +27,13 @@ jobs:
       - name: 配 Gradle（含依赖缓存）
         uses: gradle/actions/setup-gradle@v4
 
+      # android-actions/setup-android@v3 已不可用（上游 issue #537：Google 停发
+      # sdkmanager 的 tools 包）。ubuntu-latest 镜像自带 cmdline-tools，
+      # 直接用 sdkmanager 装项目需要的平台即可。
       - name: 配 Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager "platforms;android-37"
 
       - name: 单元测试
         run: ./gradlew testDebugUnitTest
@@ -75,8 +80,13 @@ jobs:
       - name: 配 Gradle（含依赖缓存）
         uses: gradle/actions/setup-gradle@v4
 
+      # android-actions/setup-android@v3 已不可用（上游 issue #537：Google 停发
+      # sdkmanager 的 tools 包）。ubuntu-latest 镜像自带 cmdline-tools，
+      # 直接用 sdkmanager 装项目需要的平台即可。
       - name: 配 Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager "platforms;android-37"
 
       - name: 截图回归
         run: ./gradlew validateDebugScreenshotTest
