@@ -25,6 +25,12 @@
 > 小米用户需先在「小米运动健康 → 我的 → 三方资料管理」里开启对 Health Connect 的授权。
 > 设备没有 Health Connect 时自动降级为本机计步传感器(需授予「身体活动」权限)。
 
+## 界面截图
+
+| 今日 | 待办 | 条目库 | 专注计时 | AI 问答 |
+| --- | --- | --- | --- | --- |
+| <img src="docs/screenshots/01-today.png" width="200"> | <img src="docs/screenshots/02-todo.png" width="200"> | <img src="docs/screenshots/03-library.png" width="200"> | <img src="docs/screenshots/04-timer.png" width="200"> | <img src="docs/screenshots/05-chat.png" width="200"> |
+
 ## 构建
 
 环境:JDK 17+(本项目在 JDK 21 上验证)、Android SDK(**platform-37 + build-tools 36.0.0**)。`local.properties` 里配置 `sdk.dir`。
