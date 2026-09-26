@@ -18,8 +18,8 @@
 | # | 事项 | 为什么 | 怎么验 |
 |---|---|---|---|
 | A1 | **补 Room 迁移** | `AppDatabase` 现在是 `version 3` + `fallbackToDestructiveMigration(dropAllTables = true)`,且 `exportSchema = false`。**未发布时这样最省事;一旦发布,任何 schema 变更都会静默删掉用户数据**。发布前必须补真实 `Migration`,并把 `exportSchema` 打开(目录里没有 schema 就写不了迁移测试) | 加 `MigrationTestHelper` 用例 + `exportSchema = true`,跑 `testDebugUnitTest` |
-| A2 | **正式签名密钥库** | 见文件开头。密钥一旦丢失不可恢复,保管方式需由项目所有者决定 | `assembleRelease` 产出已签名包;`README` 的「发布构建与签名」有生成命令 |
-| A3 | **CI 首次跑通** | `.github/workflows/ci.yml` 已写好但**从未跑过**。最容易出问题的是 `screenshot` 作业:仓库里的基线是在 **Windows** 上渲染的,runner 是 Linux | 推一次看两个作业是否都绿;若截图报 diff,按 `docs/DESIGN_SYSTEM.md` §8 P3-A2 的三步处理(先看图区分真回归与亚像素差异) |
+| A2 | ~~**正式签名密钥库**~~(已完成 2026-09-26) | 密钥库已生成(不入库),签名配置按 环境变量 > `.env` > `keystore.properties` 读取,GitHub Actions 已配 secrets 自动正式签名 | `assembleRelease` 产出正式签名包;CI release 步骤无回退警告 |
+| A3 | ~~**CI 首次跑通**~~(已完成 2026-09-26) | build/screenshot 两作业全绿;`setup-android@v3` 因上游 #537 失效已移除(runner 镜像自带 SDK 足够);主分支已从 master 改名为 main | 最近一次 main 分支运行两作业全绿 |
 | A4 | **真机走查 4 项** | 这几项按定义截图拍不出来,`docs/DESIGN_SYSTEM.md` §11 里以 `[~]` 挂着 | ① 预测性返回动画在条目详情/聊天页可见;② TalkBack 走完 归档→打卡→待办→搜索→详情→聊天→设置;③ 200% 字体下引导页/设置页/详情页不破版;④ 动效手感与时长(打卡三拍、气泡入场、卡片下沉是否互相打架) |
 
 ---
@@ -28,7 +28,8 @@
 
 已全部修复(2026-09):提醒权限被拒/被收回的界面反馈(设置页 snackbar + 警告行)、全局离线提示(网络监听 + 壳层横幅)、
 引导页保存中/失败状态、今日页骨架屏与平板 hover、搜索历史记录、单任务独立提醒时间。
-原条目见 git 历史。
+2026-09-26 追加完成:屏蔽不需要的建议(长按推荐卡片 + 已屏蔽管理页)、番茄钟倒计时页(自选时长、结束自动打卡)、
+AI 对话输入框贴键盘(manifest 补 adjustResize)。原条目见 git 历史。
 
 ---
 
@@ -50,7 +51,7 @@
 
 | # | 事项 | 说明 |
 |---|---|---|
-| D1 | **Health Connect 接入** | 步数/睡眠/运动自动核销每日任务。接入点已明确:`TaskManager.completeTask` 与 `DailyTaskPlanner`。注意需要 Google Play 的健康数据申报 |
+| D1 | **Health Connect 接入**(部分完成 2026-09-26) | 今日步数卡片已上线:HC 优先、传感器(TYPE_STEP_COUNTER+零点基线)兜底、未授权一键跳授权页。**未做**:步数/睡眠/运动自动核销每日任务(接入点仍是 `TaskManager.completeTask` 与 `DailyTaskPlanner`)、睡眠/运动记录读取、Google Play 健康数据申报 |
 | D2 | 数据图表 | 连续天数、完成率趋势。§10 禁止引入图表库 → 手写 `Canvas` |
 | D3 | 成就系统 | ⚠️ **需要先做设计决定**:与 §1 第 4 条「不贩卖焦虑」正面冲突(徽章/等级/排行榜和「你落后了」是同一类东西)。§10 写明「真要做,单独设计」 |
 
