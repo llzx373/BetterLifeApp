@@ -12,12 +12,16 @@ import java.time.LocalDate
 
 /**
  * 任务协调层：把 DailyTaskPlanner 的规划结果落到 Room，并处理打卡、待办与连续天数。
+ *
+ * 同时持有 [ReminderScheduler]：凡是动到任务生命周期（新建/打卡/删除/恢复/改提醒时间）
+ * 的地方都在这里同步重排或取消对应的单任务提醒 work，ViewModel 不需要各自编排。
  */
 class TaskManager(
     private val taskDao: TaskDao,
     private val entryStateDao: EntryStateDao,
     private val planner: DailyTaskPlanner,
     private val entryRepository: EntryRepository,
+    private val reminderScheduler: ReminderScheduler,
 ) {
 
     /** 当天没有任何 DAILY 任务时，按档案规划并插入；幂等，可反复调用 */
@@ -29,13 +33,28 @@ class TaskManager(
         val planned = planner.plan(date, profile, data.entries, data.rules, excluded)
         if (planned.isEmpty()) return
         val now = System.currentTimeMillis()
-        taskDao.insertAll(planned.map {
-            TaskEntity(entryId = it.id, type = TaskEntity.TYPE_DAILY, date = dateStr, createdAt = now)
-        })
+        // 继承同条目最近一次设过的提醒时间：每天的任务是新建的行，
+        // 不继承的话「每天 8:30 提醒我」只生效一天。
+        val tasks = planned.map {
+            TaskEntity(
+                entryId = it.id,
+                type = TaskEntity.TYPE_DAILY,
+                date = dateStr,
+                remindAtMinutes = taskDao.lastDailyReminderMinutes(it.id),
+                createdAt = now,
+            )
+        }
+        val ids = taskDao.insertAll(tasks)
+        tasks.zip(ids).forEach { (task, id) ->
+            task.remindAtMinutes?.let { reminderScheduler.scheduleTaskReminder(id, it) }
+        }
     }
 
-    suspend fun completeTask(taskId: Long) =
+    suspend fun completeTask(taskId: Long) {
         taskDao.markDone(taskId, System.currentTimeMillis())
+        // 已完成的任务的提醒 work 触发时也会自查 done 跳过，提前取消省一次唤醒
+        reminderScheduler.cancelTaskReminder(taskId)
+    }
 
     suspend fun uncompleteTask(taskId: Long) = taskDao.markUndone(taskId)
 
@@ -54,12 +73,27 @@ class TaskManager(
         )
     }
 
-    suspend fun deleteTask(taskId: Long) = taskDao.delete(taskId)
+    suspend fun deleteTask(taskId: Long) {
+        taskDao.delete(taskId)
+        reminderScheduler.cancelTaskReminder(taskId)
+    }
 
     /** 撤销删除:按原 taskId 把任务写回,顺序与状态都保持不变 */
     suspend fun restoreTask(task: TaskEntity) {
         taskDao.insert(task)
+        task.remindAtMinutes?.let { reminderScheduler.scheduleTaskReminder(task.taskId, it) }
     }
+
+    /** 设置/清除单任务提醒时间（一天内分钟数，null = 跟随全局汇总），并同步重排 work */
+    suspend fun setTaskReminder(taskId: Long, minutes: Int?) {
+        taskDao.setReminder(taskId, minutes)
+        if (minutes != null) reminderScheduler.scheduleTaskReminder(taskId, minutes)
+        else reminderScheduler.cancelTaskReminder(taskId)
+    }
+
+    suspend fun getTask(taskId: Long): TaskEntity? = taskDao.getTask(taskId)
+
+    suspend fun markNotified(taskId: Long) = taskDao.markNotified(taskId)
 
     /**
      * 换一条：把当前条目标记为「不再推荐」（DISMISSED，会被推荐引擎排除），
@@ -71,7 +105,7 @@ class TaskManager(
     suspend fun replaceTodayTask(profile: Profile, task: TaskEntity, date: LocalDate = LocalDate.now()) {
         val dateStr = date.toString()
         addEntryState(task.entryId, EntryStateEntity.STATE_DISMISSED)
-        taskDao.delete(task.taskId)
+        deleteTask(task.taskId)
         val data = entryRepository.entriesData()
         val taken = entryStateDao.excludedIds().toSet() + taskDao.dailyEntryIds(dateStr)
         val next = planner.plan(date, profile, data.entries, data.rules, taken).firstOrNull() ?: return

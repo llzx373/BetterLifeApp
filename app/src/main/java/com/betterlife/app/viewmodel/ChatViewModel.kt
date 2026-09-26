@@ -9,7 +9,8 @@ import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.ai.AiAdvisor
 import com.betterlife.app.ai.ChatMessage
 import com.betterlife.app.data.EntryRepository
-import com.betterlife.app.data.ProfileRepository
+import com.betterlife.app.data.Profile
+import com.betterlife.app.data.ProfileRepo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +21,7 @@ import kotlinx.coroutines.withContext
 
 class ChatViewModel(
     private val aiAdvisor: AiAdvisor,
-    private val profileRepository: ProfileRepository,
+    private val profileRepository: ProfileRepo,
     private val entryRepository: EntryRepository,
 ) : ViewModel() {
 
@@ -55,9 +56,33 @@ class ChatViewModel(
         )
         viewModelScope.launch(Dispatchers.IO) {
             val profile = profileRepository.profileFlow.first()
-                ?: com.betterlife.app.data.Profile()
+                ?: Profile()
             val data = entryRepository.entriesData()
             val result = aiAdvisor.ask(profile, question, data.entries, data.rules)
+            val reply = result.fold(
+                onSuccess = { ChatUiMessage(ChatMessage.ROLE_ASSISTANT, it) },
+                onFailure = { ChatUiMessage(ChatMessage.ROLE_ASSISTANT, it.message.orEmpty(), isError = true) },
+            )
+            withContext(Dispatchers.Main) {
+                _uiState.value = _uiState.value.copy(
+                    asking = false,
+                    messages = _uiState.value.messages + reply,
+                )
+            }
+        }
+    }
+
+    /** 已触发过解读的条目：旋转重建 Composition 会重放 LaunchedEffect,不能重复发 */
+    private val explainedEntryIds = mutableSetOf<String>()
+
+    /** 条目详情页跳进来的自动解读:只发 assistant 消息,不伪造一条用户提问 */
+    fun explainEntry(entryId: String) {
+        if (!explainedEntryIds.add(entryId) || _uiState.value.asking) return
+        _uiState.value = _uiState.value.copy(asking = true)
+        viewModelScope.launch(Dispatchers.IO) {
+            val profile = profileRepository.profileFlow.first() ?: Profile()
+            val data = entryRepository.entriesData()
+            val result = aiAdvisor.explainEntry(profile, entryId, data.entries)
             val reply = result.fold(
                 onSuccess = { ChatUiMessage(ChatMessage.ROLE_ASSISTANT, it) },
                 onFailure = { ChatUiMessage(ChatMessage.ROLE_ASSISTANT, it.message.orEmpty(), isError = true) },

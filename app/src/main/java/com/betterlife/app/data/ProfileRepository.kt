@@ -91,6 +91,10 @@ data class Profile(
     }
 }
 
+/** 目标勾选/取消勾选：checked=true 加入 goals、false 移除，幂等 */
+fun Profile.toggleGoal(goal: Goal, checked: Boolean): Profile =
+    copy(goals = if (checked) goals + goal else goals - goal)
+
 // ---------- Profile <-> ProfileEntity 映射（纯函数，可单测） ----------
 
 private inline fun <reified T : Enum<T>> enumByKey(key: String, default: T, keyOf: (T) -> String): T =
@@ -140,10 +144,16 @@ fun Profile.toEntity(): ProfileEntity = ProfileEntity(
     goals = goals.joinToString(",") { it.key },
 )
 
-class ProfileRepository(private val dao: ProfileDao) {
-    val profileFlow: Flow<Profile?> = dao.profileFlow().map { it?.toProfile() }
+/** 档案存取的窄接口：ViewModel 只依赖它，测试里可用内存 fake 替换 */
+interface ProfileRepo {
+    val profileFlow: Flow<Profile?>
+    suspend fun save(profile: Profile)
+}
+
+class ProfileRepository(private val dao: ProfileDao) : ProfileRepo {
+    override val profileFlow: Flow<Profile?> = dao.profileFlow().map { it?.toProfile() }
 
     suspend fun getProfile(): Profile? = dao.getProfile()?.toProfile()
 
-    suspend fun save(profile: Profile) = dao.upsert(profile.toEntity())
+    override suspend fun save(profile: Profile) = dao.upsert(profile.toEntity())
 }

@@ -13,14 +13,20 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.MainActivity
 import com.betterlife.app.R
+import com.betterlife.app.data.db.TaskEntity
 import java.time.Duration
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 /**
@@ -32,6 +38,12 @@ class ReminderScheduler(private val context: Context) {
         const val WORK_NAME = "daily_reminder"
         const val CHANNEL_ID = "daily"
         const val NOTIFICATION_ID = 1001
+
+        /** 单任务提醒的 unique work 名前缀，按 taskId 一一对应 */
+        const val TASK_WORK_PREFIX = "remind_task_"
+
+        /** 单任务通知的 id 基准，与全局汇总通知（[NOTIFICATION_ID]）区分开 */
+        const val TASK_NOTIFICATION_ID_BASE = 20000
 
         fun ensureChannel(context: Context) {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -65,6 +77,26 @@ class ReminderScheduler(private val context: Context) {
     fun cancel() {
         WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
     }
+
+    /**
+     * 给单条任务排到点精准触发的一次性 work（按 taskId 命名，重排即 REPLACE）。
+     * [minutesOfDay] 是一天内的分钟数；已过点则顺延到明天（见 [nextTriggerMillis]）。
+     */
+    fun scheduleTaskReminder(taskId: Long, minutesOfDay: Int) {
+        ensureChannel(context)
+        val now = System.currentTimeMillis()
+        val triggerAt = nextTriggerMillis(now, minutesOfDay, ZoneId.systemDefault())
+        val request = OneTimeWorkRequestBuilder<TaskReminderWorker>()
+            .setInitialDelay(triggerAt - now, TimeUnit.MILLISECONDS)
+            .setInputData(workDataOf(TaskReminderWorker.KEY_TASK_ID to taskId))
+            .build()
+        WorkManager.getInstance(context)
+            .enqueueUniqueWork(TASK_WORK_PREFIX + taskId, ExistingWorkPolicy.REPLACE, request)
+    }
+
+    fun cancelTaskReminder(taskId: Long) {
+        WorkManager.getInstance(context).cancelUniqueWork(TASK_WORK_PREFIX + taskId)
+    }
 }
 
 class DailyReminderWorker(
@@ -83,11 +115,7 @@ class DailyReminderWorker(
     }
 
     private fun notifyUndone(undone: Int) {
-        // Android 13+ 需要运行时通知权限，未授权则静默跳过
-        if (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS)
-            != PackageManager.PERMISSION_GRANTED
-        ) return
+        if (!hasNotificationPermission(applicationContext)) return
 
         ReminderScheduler.ensureChannel(applicationContext)
         val text = if (undone > 0) {
@@ -101,7 +129,7 @@ class DailyReminderWorker(
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(applicationContext.getString(R.string.notification_daily_title))
             .setContentText(text)
-            .setContentIntent(contentIntent())
+            .setContentIntent(reminderContentIntent(applicationContext))
             .setAutoCancel(true)
             .build()
         try {
@@ -111,20 +139,73 @@ class DailyReminderWorker(
             // 权限被收回等情况，忽略
         }
     }
+}
 
-    /**
-     * 点通知回到 App。
-     * targetSdk 31 起 PendingIntent 必须显式声明可变性；这里不需要外部修改，用 FLAG_IMMUTABLE。
-     */
-    private fun contentIntent(): PendingIntent {
-        val intent = Intent(applicationContext, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+/** 单任务提醒：到点查任务，没完成才发一条带任务标题的通知，发完置 notified。 */
+class TaskReminderWorker(
+    appContext: Context,
+    params: WorkerParameters,
+) : CoroutineWorker(appContext, params) {
+
+    override suspend fun doWork(): Result {
+        val taskId = inputData.getLong(KEY_TASK_ID, -1L)
+        if (taskId < 0) return Result.success()
+        val container = (applicationContext as BetterLifeApp).container
+        val task = container.taskManager.getTask(taskId) ?: return Result.success()
+        if (task.done || task.notified) return Result.success()
+        // DAILY 任务只在自己的日期当天提醒：昨天任务的遗留 work 今天触发时直接跳过，
+        // 次日的新任务会在创建时（ensureTodayTasks）继承提醒时间并排自己的 work。
+        if (task.type == TaskEntity.TYPE_DAILY && task.date != LocalDate.now().toString()) {
+            return Result.success()
         }
-        return PendingIntent.getActivity(
-            applicationContext,
-            0,
-            intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
+        val title = container.entryRepository.entriesData().byId[task.entryId]?.title ?: task.entryId
+        notifyTask(task.taskId, title)
+        container.taskManager.markNotified(task.taskId)
+        return Result.success()
     }
+
+    private fun notifyTask(taskId: Long, entryTitle: String) {
+        if (!hasNotificationPermission(applicationContext)) return
+
+        ReminderScheduler.ensureChannel(applicationContext)
+        val notification = NotificationCompat.Builder(applicationContext, ReminderScheduler.CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(applicationContext.getString(R.string.notification_task_title))
+            .setContentText(applicationContext.getString(R.string.notification_task_body, entryTitle))
+            .setContentIntent(reminderContentIntent(applicationContext))
+            .setAutoCancel(true)
+            .build()
+        try {
+            NotificationManagerCompat.from(applicationContext)
+                .notify(ReminderScheduler.TASK_NOTIFICATION_ID_BASE + taskId.toInt(), notification)
+        } catch (_: SecurityException) {
+            // 权限被收回等情况，忽略
+        }
+    }
+
+    companion object {
+        const val KEY_TASK_ID = "taskId"
+    }
+}
+
+/** Android 13+ 需要运行时通知权限，未授权则静默跳过 */
+private fun hasNotificationPermission(context: Context): Boolean =
+    Build.VERSION.SDK_INT < 33 ||
+        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+        PackageManager.PERMISSION_GRANTED
+
+/**
+ * 点通知回到 App。
+ * targetSdk 31 起 PendingIntent 必须显式声明可变性；这里不需要外部修改，用 FLAG_IMMUTABLE。
+ */
+private fun reminderContentIntent(context: Context): PendingIntent {
+    val intent = Intent(context, MainActivity::class.java).apply {
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+    }
+    return PendingIntent.getActivity(
+        context,
+        0,
+        intent,
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
 }

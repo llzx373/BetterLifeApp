@@ -1,21 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  自适应图标前景层。
+  自适应图标前景层：一株两片叶子的嫩芽，寓意「把日子过得更好」。
   视口 108x108，可绘制区域只有中间 72x72（安全区），四周会被各厂商的蒙版裁掉。
-  这里把 24x24 的对勾放大 3 倍（=72）再平移 18 居中，正好落在安全区内。
+  叶片尖 (28,30)/(80,30) 到茎底 (54,80) 全部落在安全区内。
+  注意：Theme.BetterLife.Splash 的 windowSplashScreenAnimatedIcon 直接引用本 drawable，
+  改形状时启动画面会跟着变。
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group
-        android:scaleX="3"
-        android:scaleY="3"
-        android:translateX="18"
-        android:translateY="18">
-        <path
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M9,16.17 L4.83,12 l-1.42,1.41 L9,19 21,7 l-1.41,-1.41 z" />
-    </group>
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,64 C40,64 30,52 28,30 C44,30 54,44 54,64 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,64 C68,64 78,52 80,30 C64,30 54,44 54,64 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M52,64 L52,76 A2,2 0 0 0 56,76 L56,64 Z" />
 </vector>

@@ -17,7 +17,7 @@
 
 | # | 事项 | 为什么 | 怎么验 |
 |---|---|---|---|
-| A1 | **补 Room 迁移** | `AppDatabase` 现在是 `version 2` + `fallbackToDestructiveMigration(dropAllTables = true)`,且 `exportSchema = false`。**未发布时这样最省事;一旦发布,任何 schema 变更都会静默删掉用户数据**。发布前必须补真实 `Migration`,并把 `exportSchema` 打开(目录里没有 schema 就写不了迁移测试) | 加 `MigrationTestHelper` 用例 + `exportSchema = true`,跑 `testDebugUnitTest` |
+| A1 | **补 Room 迁移** | `AppDatabase` 现在是 `version 3` + `fallbackToDestructiveMigration(dropAllTables = true)`,且 `exportSchema = false`。**未发布时这样最省事;一旦发布,任何 schema 变更都会静默删掉用户数据**。发布前必须补真实 `Migration`,并把 `exportSchema` 打开(目录里没有 schema 就写不了迁移测试) | 加 `MigrationTestHelper` 用例 + `exportSchema = true`,跑 `testDebugUnitTest` |
 | A2 | **正式签名密钥库** | 见文件开头。密钥一旦丢失不可恢复,保管方式需由项目所有者决定 | `assembleRelease` 产出已签名包;`README` 的「发布构建与签名」有生成命令 |
 | A3 | **CI 首次跑通** | `.github/workflows/ci.yml` 已写好但**从未跑过**。最容易出问题的是 `screenshot` 作业:仓库里的基线是在 **Windows** 上渲染的,runner 是 Linux | 推一次看两个作业是否都绿;若截图报 diff,按 `docs/DESIGN_SYSTEM.md` §8 P3-A2 的三步处理(先看图区分真回归与亚像素差异) |
 | A4 | **真机走查 4 项** | 这几项按定义截图拍不出来,`docs/DESIGN_SYSTEM.md` §11 里以 `[~]` 挂着 | ① 预测性返回动画在条目详情/聊天页可见;② TalkBack 走完 归档→打卡→待办→搜索→详情→聊天→设置;③ 200% 字体下引导页/设置页/详情页不破版;④ 动效手感与时长(打卡三拍、气泡入场、卡片下沉是否互相打架) |
@@ -26,16 +26,9 @@
 
 ## B · 已识别的功能缺口
 
-不阻塞发布,但都是真缺口。
-
-| # | 事项 | 说明 |
-|---|---|---|
-| B1 | **提醒权限被拒/被系统收回** | 设置页现在只处理「请求权限」,用户拒了、或系统事后收回,**界面没有任何反馈,提醒会静默失效**。属于 §7.1 九状态里的一项 |
-| B2 | 单任务独立提醒时间 | `DESIGN.md` 的已知取舍:目前只有全局提醒时间,待办页也不展示提醒时间 |
-| B3 | 全局离线提示 | 需要连通性监听(独立功能)。现在断网时各屏的失败态是分散的 |
-| B4 | 引导页「保存中 / 保存失败」状态 | §7.1 里未做的一项。引导页是唯一有流失率风险的页面 |
-| B5 | 今日页骨架屏、平板 hover 态 | §7.1 剩余项。hover 只在接鼠标的大屏上有意义 |
-| B6 | 搜索历史记录 | §7.1 里搜索缺的状态之一 |
+已全部修复(2026-09):提醒权限被拒/被收回的界面反馈(设置页 snackbar + 警告行)、全局离线提示(网络监听 + 壳层横幅)、
+引导页保存中/失败状态、今日页骨架屏与平板 hover、搜索历史记录、单任务独立提醒时间。
+原条目见 git 历史。
 
 ---
 
@@ -65,9 +58,7 @@
 
 ## E · 等你决定
 
-| # | 事项 | 现状与建议 |
-|---|---|---|
-| E1 | **日期语言一致性** | 今日页的日期用 `DateTimeFormatter.ofLocalizedDate`,**跟随系统 locale**。但其余文案只有中文 —— 英文设备上会出现「晚上好 / Thursday, September 24, 2026」这种中英混排。既然目前只支持简体中文,建议**锁中文 locale**让界面自洽,等真做多语言时再放回跟随系统。改动约 3 行 |
+暂无。(E1 日期语言一致性已按建议落地:今日页日期锁中文 locale,见 `TodayScreen.kt` 的 `formatFullDateZh`。)
 
 ---
 

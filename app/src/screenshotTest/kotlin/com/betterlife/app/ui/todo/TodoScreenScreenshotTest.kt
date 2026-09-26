@@ -90,6 +90,7 @@ fun TodoBothSections() {
             onToggle = {},
             onOpenEntry = {},
             onDelete = {},
+            onSetReminder = { _, _ -> },
         )
     }
 }

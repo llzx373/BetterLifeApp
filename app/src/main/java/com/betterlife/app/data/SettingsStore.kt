@@ -24,7 +24,14 @@ data class AppSettings(
     val motionLevel: String = SettingsStore.DEFAULT_MOTION_LEVEL,
 )
 
-class SettingsStore(private val context: Context) {
+/** 设置存取的窄接口：ViewModel 只依赖它，测试里可用内存 fake 替换 */
+interface SettingsGateway {
+    val settingsFlow: Flow<AppSettings>
+    suspend fun setOnboardingDone(done: Boolean)
+    suspend fun current(): AppSettings
+}
+
+class SettingsStore(private val context: Context) : SettingsGateway {
 
     private object Keys {
         val API_BASE_URL = stringPreferencesKey("api_base_url")
@@ -36,9 +43,12 @@ class SettingsStore(private val context: Context) {
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val MOTION_LEVEL = stringPreferencesKey("motion_level")
+
+        // 有序历史:stringSet 不保序,用单条 string 以 \n 分隔存列表(新词在前)
+        val SEARCH_HISTORY = stringPreferencesKey("search_history")
     }
 
-    val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { p ->
+    override val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { p ->
         AppSettings(
             apiBaseUrl = p[Keys.API_BASE_URL] ?: "",
             apiKey = p[Keys.API_KEY] ?: "",
@@ -52,7 +62,7 @@ class SettingsStore(private val context: Context) {
         )
     }
 
-    suspend fun current(): AppSettings = settingsFlow.first()
+    override suspend fun current(): AppSettings = settingsFlow.first()
 
     suspend fun setApiConfig(baseUrl: String, apiKey: String, model: String) {
         context.dataStore.edit {
@@ -70,7 +80,7 @@ class SettingsStore(private val context: Context) {
         }
     }
 
-    suspend fun setOnboardingDone(done: Boolean) {
+    override suspend fun setOnboardingDone(done: Boolean) {
         context.dataStore.edit { it[Keys.ONBOARDING_DONE] = done }
     }
 
@@ -82,10 +92,31 @@ class SettingsStore(private val context: Context) {
         context.dataStore.edit { it[Keys.MOTION_LEVEL] = levelKey }
     }
 
+    /** 最近搜索,新词在前。不进 AppSettings:它是条目库的局部状态,不该每次设置变化都跟着重组 */
+    val searchHistoryFlow: Flow<List<String>> = context.dataStore.data.map { p ->
+        p[Keys.SEARCH_HISTORY].orEmpty()
+            .split(SEARCH_HISTORY_SEPARATOR)
+            .filter { it.isNotBlank() }
+    }
+
+    suspend fun addSearchHistory(query: String) {
+        context.dataStore.edit { p ->
+            val old = p[Keys.SEARCH_HISTORY].orEmpty()
+                .split(SEARCH_HISTORY_SEPARATOR)
+                .filter { it.isNotBlank() }
+            val updated = (listOf(query.trim()) + old.filter { it != query.trim() })
+                .take(MAX_SEARCH_HISTORY)
+            p[Keys.SEARCH_HISTORY] = updated.joinToString(SEARCH_HISTORY_SEPARATOR)
+        }
+    }
+
     companion object {
         const val DEFAULT_THEME_MODE = "brand_green"
 
         /** 默认「标准」。降级是给需要的用户的选项,不该是所有人的默认 */
         const val DEFAULT_MOTION_LEVEL = "standard"
+
+        const val MAX_SEARCH_HISTORY = 10
+        private const val SEARCH_HISTORY_SEPARATOR = "\n"
     }
 }

@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -101,6 +102,7 @@ private sealed interface DetailState {
 fun EntryDetailScreen(
     entryId: String,
     onBack: () -> Unit,
+    onExplain: (String) -> Unit,
     vm: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
 ) {
     val context = LocalContext.current
@@ -248,6 +250,11 @@ fun EntryDetailScreen(
                         icon = Icons.Filled.Share,
                         labelRes = R.string.detail_share,
                         onClick = { shareEntry(context, e.shareText()) },
+                    )
+                    ToolbarAction(
+                        icon = Icons.Filled.AutoAwesome,
+                        labelRes = R.string.detail_explain,
+                        onClick = { onExplain(e.id) },
                     )
                 }
             }

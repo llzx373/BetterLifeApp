@@ -42,6 +42,8 @@ data class TaskEntity(
     val done: Boolean = false,
     val doneAt: Long? = null,
     val notified: Boolean = false,
+    /** 一天内的分钟数（0-1439）；null = 不单独提醒，跟随全局汇总通知 */
+    val remindAtMinutes: Int? = null,
     val createdAt: Long = 0L,
 ) {
     companion object {

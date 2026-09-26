@@ -48,6 +48,23 @@ interface TaskDao {
     @Query("UPDATE tasks SET done = 0, doneAt = NULL WHERE taskId = :taskId")
     suspend fun markUndone(taskId: Long)
 
+    @Query("SELECT * FROM tasks WHERE taskId = :taskId")
+    suspend fun getTask(taskId: Long): TaskEntity?
+
+    /** 设置/清除单任务提醒时间；改时间同时清掉 notified，让新时间的提醒能再发 */
+    @Query("UPDATE tasks SET remindAtMinutes = :minutes, notified = 0 WHERE taskId = :taskId")
+    suspend fun setReminder(taskId: Long, minutes: Int?)
+
+    @Query("UPDATE tasks SET notified = 1 WHERE taskId = :taskId")
+    suspend fun markNotified(taskId: Long)
+
+    /** 同条目最近一次设过提醒的 DAILY 任务的时间，新建次日任务时继承 */
+    @Query(
+        "SELECT remindAtMinutes FROM tasks WHERE entryId = :entryId AND type = 'DAILY'" +
+            " AND remindAtMinutes IS NOT NULL ORDER BY taskId DESC LIMIT 1"
+    )
+    suspend fun lastDailyReminderMinutes(entryId: String): Int?
+
     @Query("DELETE FROM tasks WHERE taskId = :taskId")
     suspend fun delete(taskId: Long)
 

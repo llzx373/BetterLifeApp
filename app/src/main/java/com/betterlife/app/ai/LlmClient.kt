@@ -1,6 +1,6 @@
 package com.betterlife.app.ai
 
-import com.betterlife.app.data.SettingsStore
+import com.betterlife.app.data.SettingsGateway
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -53,9 +53,9 @@ private data class ErrorResponse(
 
 /**
  * OpenAI 兼容的 chat completions 客户端。
- * baseUrl 与 apiKey 每次调用时从 SettingsStore 读取，改设置立即生效。
+ * baseUrl 与 apiKey 每次调用时从 SettingsGateway 读取，改设置立即生效。
  */
-class LlmClient(private val settings: SettingsStore) {
+class LlmClient(private val settings: SettingsGateway) {
 
     companion object {
         /** 预设服务商 */

@@ -15,6 +15,9 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,7 +43,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
@@ -48,7 +50,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SplitButtonDefaults
@@ -66,6 +68,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -87,6 +91,8 @@ import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
 import com.betterlife.app.ui.common.lensGroupTitle
 import com.betterlife.app.ui.common.MotionEntrance
+import com.betterlife.app.ui.common.ReminderTimeLabel
+import com.betterlife.app.ui.common.SafeListItem
 import com.betterlife.app.ui.theme.LocalLensColors
 import com.betterlife.app.ui.theme.LocalMotionLevel
 import com.betterlife.app.ui.theme.MotionLevel
@@ -97,9 +103,11 @@ import com.betterlife.app.ui.theme.motionSpatialSpec
 import com.betterlife.app.viewmodel.LibraryViewModel
 import com.betterlife.app.viewmodel.TodayViewModel
 import kotlinx.coroutines.delay
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import java.util.Locale
 
 /** 打卡后卡片停在原位的时间:等勾选的形变做完再下沉 */
 private const val REORDER_DELAY_MS = 300L
@@ -127,8 +135,13 @@ fun TodayScreen(
         },
     ) { padding ->
         when (val state = todayState) {
-            TodayViewModel.UiState.Loading -> CenteredBox(Modifier.fillMaxSize().padding(padding)) {
-                CircularProgressIndicator()
+            // 骨架屏按 Ready 布局画占位:用户第一眼就知道内容会落在哪,
+            // 居中转圈只会让人觉得「什么都没加载出来」
+            TodayViewModel.UiState.Loading -> {
+                val skeletonVisible = remember { MutableTransitionState(false).apply { targetState = true } }
+                MotionEntrance(visibleState = skeletonVisible) {
+                    TodaySkeleton(Modifier.fillMaxSize().padding(padding))
+                }
             }
 
             TodayViewModel.UiState.Empty -> NoProfileState(
@@ -316,13 +329,14 @@ internal fun greetingResForHour(hour: Int): Int = when (hour) {
     else -> R.string.today_greeting_evening
 }
 
+/** 问候日期固定中文格式，不随系统 locale 变化（避免英文设备上中英混排） */
+internal fun formatFullDateZh(date: LocalDate): String =
+    date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(Locale.CHINA))
+
 @Composable
 private fun GreetingHeader(streak: Int, now: LocalDateTime, modifier: Modifier = Modifier) {
     val greeting = stringResource(greetingResForHour(now.hour))
-    // 日期格式交给系统 locale,不再硬编码中文
-    val date = remember(now) {
-        now.toLocalDate().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL))
-    }
+    val date = remember(now) { formatFullDateZh(now.toLocalDate()) }
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(greeting, style = MaterialTheme.typography.headlineSmall)
@@ -363,14 +377,20 @@ private fun DailyTaskCard(
     modifier: Modifier = Modifier,
 ) {
     val done = item.task.done
+    // 平板/桌面指针悬停时抬一档容器层级,给个「指到了」的反馈;触控下 hoverable 无开销
+    val interactionSource = remember { MutableInteractionSource() }
+    val hovered by interactionSource.collectIsHoveredAsState()
     Card(
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(
             // 完成态退到背景:更低的容器层级 + 更弱的文字
-            containerColor = if (done) MaterialTheme.colorScheme.surfaceContainerLowest
-            else MaterialTheme.colorScheme.surfaceContainerLow,
+            containerColor = when {
+                hovered -> MaterialTheme.colorScheme.surfaceContainerHighest
+                done -> MaterialTheme.colorScheme.surfaceContainerLowest
+                else -> MaterialTheme.colorScheme.surfaceContainerLow
+            },
         ),
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().hoverable(interactionSource),
     ) {
         Column(Modifier.padding(Spacing.space4)) {
             Text(
@@ -389,6 +409,10 @@ private fun DailyTaskCard(
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            item.task.remindAtMinutes?.let {
+                Spacer(Modifier.height(Spacing.space2))
+                ReminderTimeLabel(it)
             }
             Spacer(Modifier.height(Spacing.space3))
             TaskAction(done = done, onToggle = onToggle, onSwap = onSwap, onDrop = onDrop)
@@ -587,6 +611,9 @@ private fun RecommendedRow(
     onAddTodo: () -> Unit,
 ) {
     val entry: EntryDto = scored.entry
+    // 与 DailyTaskCard 同一套 hover 先例:指针悬停抬到 surfaceContainerHighest
+    val interactionSource = remember { MutableInteractionSource() }
+    val hovered by interactionSource.collectIsHoveredAsState()
     val overline: (@Composable () -> Unit)? =
         if (entry.grade.isNotBlank() || entry.dispute) {
             {
@@ -599,8 +626,11 @@ private fun RecommendedRow(
             null
         }
 
-    ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
+    SafeListItem(
+        modifier = Modifier.hoverable(interactionSource).clickable(onClick = onClick),
+        colors = ListItemDefaults.colors(
+            containerColor = if (hovered) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent,
+        ),
         overlineContent = overline,
         supportingContent = {
             Column {
@@ -625,6 +655,40 @@ private fun RecommendedRow(
     ) {
         Text(entry.title, style = MaterialTheme.typography.titleSmall)
     }
+}
+
+/** 骨架屏:按 TodayContent 的真实结构摆占位块 —— 问候两行、一张任务卡、三条推荐行 */
+@Composable
+internal fun TodaySkeleton(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space4),
+        verticalArrangement = Arrangement.spacedBy(Spacing.space3),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.space2)) {
+            SkeletonBlock(Modifier.fillMaxWidth(0.45f).height(Spacing.space6))
+            SkeletonBlock(Modifier.fillMaxWidth(0.6f).height(Spacing.space4))
+        }
+        SkeletonBlock(Modifier.fillMaxWidth(0.3f).height(Spacing.space4))
+        // 任务卡:内边距 + 标题 + 两行正文 + 按钮,实测约 128dp
+        SkeletonBlock(
+            Modifier.fillMaxWidth().height(Spacing.space12 + Spacing.space12 + Spacing.space8),
+            shape = MaterialTheme.shapes.large,
+        )
+        SkeletonBlock(Modifier.fillMaxWidth(0.5f).height(Spacing.space4))
+        repeat(3) {
+            // ListItem 带 overline + supporting 的标准行高
+            SkeletonBlock(Modifier.fillMaxWidth().height(Spacing.space12 + Spacing.space6))
+        }
+    }
+}
+
+@Composable
+private fun SkeletonBlock(modifier: Modifier = Modifier, shape: Shape = MaterialTheme.shapes.small) {
+    Box(
+        modifier
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+    )
 }
 
 @Composable
@@ -682,9 +746,4 @@ private fun ErrorState(onRetry: () -> Unit, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(Spacing.space3))
         Button(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
     }
-}
-
-@Composable
-private fun CenteredBox(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Box(modifier, contentAlignment = Alignment.Center) { content() }
 }

@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,10 +31,15 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -45,10 +52,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
 import com.betterlife.app.data.db.TaskEntity
+import com.betterlife.app.ui.common.ReminderBellButton
 import com.betterlife.app.ui.theme.LocalLensColors
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.TodoViewModel
 import kotlinx.coroutines.launch
+import java.time.LocalTime
 
 private val ProgressRingSize = 20.dp
 private val ProgressRingStroke = 3.dp
@@ -85,6 +94,7 @@ fun TodoScreen(
                     if (result == SnackbarResult.ActionPerformed) vm.restore(item)
                 }
             },
+            onSetReminder = { task, minutes -> vm.setTaskReminder(task.taskId, minutes) },
         )
     }
 }
@@ -97,7 +107,11 @@ internal fun TodoContent(
     onToggle: (TaskEntity) -> Unit,
     onOpenEntry: (String) -> Unit,
     onDelete: (TodoViewModel.TodoItem) -> Unit,
+    onSetReminder: (TaskEntity, Int?) -> Unit,
 ) {
+    // 正在设置提醒时间的任务；非 null 时弹 TimePicker
+    var reminderTarget by remember { mutableStateOf<TaskEntity?>(null) }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(contentPadding),
         contentPadding = PaddingValues(Spacing.space4),
@@ -134,6 +148,7 @@ internal fun TodoContent(
                     item = item,
                     onToggle = { onToggle(item.task) },
                     onClick = { item.entry?.let { e -> onOpenEntry(e.id) } },
+                    onOpenReminder = { reminderTarget = item.task },
                 )
             }
         }
@@ -153,10 +168,60 @@ internal fun TodoContent(
                     onToggle = { onToggle(item.task) },
                     onClick = { item.entry?.let { e -> onOpenEntry(e.id) } },
                     onDelete = { onDelete(item) },
+                    onOpenReminder = { reminderTarget = item.task },
                 )
             }
         }
     }
+
+    reminderTarget?.let { target ->
+        ReminderTimeDialog(
+            task = target,
+            onConfirm = { minutes ->
+                reminderTarget = null
+                onSetReminder(target, minutes)
+            },
+            onDismiss = { reminderTarget = null },
+        )
+    }
+}
+
+/** 单任务提醒时间弹窗:沿用设置页的 TimePicker 用法;已有提醒时多一个「清除」出口 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReminderTimeDialog(
+    task: TaskEntity,
+    onConfirm: (Int?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    // 没设过就从当前时间起挑,设过就回显已设的时间
+    val initial = task.remindAtMinutes
+    val now = LocalTime.now()
+    val timeState = rememberTimePickerState(
+        initialHour = initial?.div(60) ?: now.hour,
+        initialMinute = initial?.mod(60) ?: now.minute,
+        is24Hour = true,
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.task_reminder_dialog_title)) },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(timeState.hour * 60 + timeState.minute) }) {
+                Text(stringResource(R.string.action_confirm))
+            }
+        },
+        dismissButton = {
+            Row {
+                if (task.remindAtMinutes != null) {
+                    TextButton(onClick = { onConfirm(null) }) {
+                        Text(stringResource(R.string.task_reminder_clear))
+                    }
+                }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            }
+        },
+        text = { TimePicker(state = timeState) },
+    )
 }
 
 @Composable
@@ -205,6 +270,7 @@ private fun HabitRow(
     item: TodoViewModel.TodoItem,
     onToggle: () -> Unit,
     onClick: () -> Unit,
+    onOpenReminder: () -> Unit,
 ) {
     val task = item.task
     val lensColors = LocalLensColors.current
@@ -224,6 +290,7 @@ private fun HabitRow(
             )
         }
         TaskText(item = item, modifier = Modifier.weight(1f))
+        ReminderBellButton(minutes = task.remindAtMinutes, onClick = onOpenReminder)
     }
 }
 
@@ -234,6 +301,7 @@ private fun OnceRow(
     onToggle: () -> Unit,
     onClick: () -> Unit,
     onDelete: () -> Unit,
+    onOpenReminder: () -> Unit,
 ) {
     val task = item.task
     Row(
@@ -248,6 +316,7 @@ private fun OnceRow(
             ),
         )
         TaskText(item = item, modifier = Modifier.weight(1f))
+        ReminderBellButton(minutes = task.remindAtMinutes, onClick = onOpenReminder)
         IconButton(onClick = onDelete) {
             Icon(
                 Icons.Filled.Delete,

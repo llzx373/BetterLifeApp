@@ -90,6 +90,7 @@ fun LibraryTwoPaneExpanded() {
         LibraryTwoPane(
             state = twoPaneState,
             onQueryChange = {},
+            onSearchSubmit = {},
             onSelectSection = {},
             onSelectSort = {},
             onOpenEntry = {},
@@ -111,6 +112,7 @@ fun LibraryCatalogCompact() {
         LibraryCatalogContent(
             state = compactState,
             onQueryChange = {},
+            onSearchSubmit = {},
             onOpenSection = {},
             onOpenEntry = {},
         )

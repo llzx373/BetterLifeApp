@@ -13,6 +13,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,14 +27,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -52,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -62,6 +67,7 @@ import com.betterlife.app.data.SectionDto
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
 import com.betterlife.app.ui.common.RatioBadge
+import com.betterlife.app.ui.common.SafeListItem
 import com.betterlife.app.ui.theme.LocalLensColors
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.ui.theme.lensIcon
@@ -92,6 +98,7 @@ fun LibraryScreen(
         LibraryTwoPane(
             state = state,
             onQueryChange = vm::search,
+            onSearchSubmit = vm::submitSearch,
             onSelectSection = vm::selectSection,
             onSelectSort = vm::setSort,
             onOpenEntry = onOpenEntry,
@@ -101,6 +108,7 @@ fun LibraryScreen(
             LibraryCatalogContent(
                 state = state,
                 onQueryChange = vm::search,
+                onSearchSubmit = vm::submitSearch,
                 onOpenSection = onOpenSection,
                 onOpenEntry = onOpenEntry,
                 modifier = Modifier.fillMaxSize().padding(padding),
@@ -120,6 +128,7 @@ fun LibraryScreen(
 internal fun LibraryTwoPane(
     state: LibraryViewModel.UiState,
     onQueryChange: (String) -> Unit,
+    onSearchSubmit: () -> Unit,
     onSelectSection: (Int) -> Unit,
     onSelectSort: (EntrySort) -> Unit,
     onOpenEntry: (String) -> Unit,
@@ -140,6 +149,7 @@ internal fun LibraryTwoPane(
                 LibraryCatalogContent(
                     state = state,
                     onQueryChange = onQueryChange,
+                    onSearchSubmit = onSearchSubmit,
                     onOpenSection = onSelectSection,
                     onOpenEntry = onOpenEntry,
                 )
@@ -167,6 +177,7 @@ internal fun LibraryTwoPane(
 internal fun LibraryCatalogContent(
     state: LibraryViewModel.UiState,
     onQueryChange: (String) -> Unit,
+    onSearchSubmit: () -> Unit,
     onOpenSection: (Int) -> Unit,
     onOpenEntry: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -186,6 +197,7 @@ internal fun LibraryCatalogContent(
         SearchField(
             query = state.query,
             onQueryChange = onQueryChange,
+            onSearchSubmit = onSearchSubmit,
             modifier = Modifier.padding(horizontal = Spacing.space4),
         )
         Spacer(Modifier.height(Spacing.space2))
@@ -193,12 +205,23 @@ internal fun LibraryCatalogContent(
         if (state.query.isNotBlank()) {
             SearchResults(results = state.searchResults, onOpenEntry = onOpenEntry)
         } else {
-            Catalog(
-                sections = state.sections,
-                sectionLens = state.sectionLens,
-                totalEntries = totalEntries,
-                onOpenSection = onOpenSection,
-            )
+            Column {
+                if (state.searchHistory.isNotEmpty()) {
+                    RecentSearches(
+                        history = state.searchHistory,
+                        onPick = { term ->
+                            onQueryChange(term)
+                            onSearchSubmit()
+                        },
+                    )
+                }
+                Catalog(
+                    sections = state.sections,
+                    sectionLens = state.sectionLens,
+                    totalEntries = totalEntries,
+                    onOpenSection = onOpenSection,
+                )
+            }
         }
     }
 }
@@ -218,6 +241,7 @@ private fun EmptyDetailPane() {
 private fun SearchField(
     query: String,
     onQueryChange: (String) -> Unit,
+    onSearchSubmit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     TextField(
@@ -226,6 +250,9 @@ private fun SearchField(
         modifier = modifier.fillMaxWidth(),
         placeholder = { Text(stringResource(R.string.library_search_hint)) },
         singleLine = true,
+        // 输入即搜照旧,IME 的搜索键是「提交」:这条词才会进历史
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { onSearchSubmit() }),
         shape = MaterialTheme.shapes.extraLarge,
         colors = TextFieldDefaults.colors(
             focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -245,6 +272,42 @@ private fun SearchField(
     )
 }
 
+/** 最近搜索:目录上方的一排可点词。样式跟目录区同一层级 —— 分段列表的世界里它是「轻标题 + 文字行」 */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RecentSearches(history: List<String>, onPick: (String) -> Unit) {
+    Column(modifier = Modifier.padding(horizontal = Spacing.space4)) {
+        Text(
+            text = stringResource(R.string.library_recent_searches),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.space2))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.space2),
+            verticalArrangement = Arrangement.spacedBy(Spacing.space1),
+        ) {
+            history.forEach { term ->
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    shape = MaterialTheme.shapes.extraLarge,
+                    modifier = Modifier.clip(MaterialTheme.shapes.extraLarge).clickable { onPick(term) },
+                ) {
+                    Text(
+                        text = term,
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = Spacing.space3, vertical = Spacing.space1),
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(Spacing.space2))
+    }
+}
+
 @Composable
 private fun SearchResults(results: List<RetrievedEntry>, onOpenEntry: (String) -> Unit) {
     if (results.isEmpty()) {
@@ -259,7 +322,7 @@ private fun SearchResults(results: List<RetrievedEntry>, onOpenEntry: (String) -
     LazyColumn(contentPadding = PaddingValues(bottom = Spacing.space4)) {
         items(results, key = { it.entry.id }) { scored ->
             val entry = scored.entry
-            ListItem(
+            SafeListItem(
                 overlineContent = { Text(entry.id) },
                 supportingContent = {
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
@@ -287,7 +350,7 @@ private fun Catalog(
     LazyColumn(contentPadding = PaddingValues(bottom = Spacing.space4)) {
         items(sections, key = { it.n }) { section ->
             val lens = sectionLens[section.n].orEmpty()
-            ListItem(
+            SafeListItem(
                 leadingContent = { LensMark(lens) },
                 overlineContent = {
                     Text(

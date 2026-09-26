@@ -74,6 +74,7 @@ private val SuggestionRes = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
+    entryId: String? = null,
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
     vm: ChatViewModel = viewModel(factory = ChatViewModel.Factory),
@@ -85,6 +86,11 @@ fun ChatScreen(
     val listState = rememberLazyListState()
 
     val noApiKey = settingsState.loaded && settingsState.settings.apiKey.isBlank()
+
+    // 条目详情页跳进来时自动解读一次;重复触发(旋转重建)由 VM 里的已解读集合挡住
+    LaunchedEffect(entryId) {
+        if (entryId != null) vm.explainEntry(entryId)
+    }
 
     // 新消息到达时滚到底部
     LaunchedEffect(state.messages.size) {

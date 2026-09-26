@@ -13,6 +13,7 @@ import com.betterlife.app.data.EntryDto
 import com.betterlife.app.data.EntryRepository
 import com.betterlife.app.data.ProfileRepository
 import com.betterlife.app.data.SectionDto
+import com.betterlife.app.data.SettingsStore
 import com.betterlife.app.data.db.EntryStateDao
 import com.betterlife.app.data.db.EntryStateEntity
 import com.betterlife.app.recommend.RecommendationEngine
@@ -32,6 +33,7 @@ class LibraryViewModel(
     private val taskManager: TaskManager,
     private val recommendationEngine: RecommendationEngine,
     private val retriever: EntryRetriever,
+    private val settingsStore: SettingsStore,
 ) : ViewModel() {
 
     data class UiState(
@@ -44,6 +46,8 @@ class LibraryViewModel(
         val recommended: LinkedHashMap<String, List<ScoredEntry>> = LinkedHashMap(),
         val query: String = "",
         val searchResults: List<RetrievedEntry> = emptyList(),
+        /** 最近提交的搜索词,新词在前;输入框为空时展示 */
+        val searchHistory: List<String> = emptyList(),
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -61,7 +65,7 @@ class LibraryViewModel(
                 sections = data.sections,
                 sectionLens = data.sections.associate { it.n to dominantLens(data, it.n) },
                 selectedSection = first?.n,
-                sectionEntries = first?.let { data.bySection[it.n].orEmpty() }.orEmpty(),
+                sectionEntries = first?.let { sortedSectionEntries(data, it.n, _uiState.value.sort) }.orEmpty(),
             )
 
             // 档案或条目状态变化时重算推荐
@@ -82,6 +86,12 @@ class LibraryViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             taskManager.favoriteIdsFlow().collect { ids -> _favorites.value = ids.toSet() }
         }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            settingsStore.searchHistoryFlow.collect { history ->
+                _uiState.value = _uiState.value.copy(searchHistory = history)
+            }
+        }
     }
 
     fun selectSection(n: Int) {
@@ -89,7 +99,7 @@ class LibraryViewModel(
             val data = entryRepository.entriesData()
             _uiState.value = _uiState.value.copy(
                 selectedSection = n,
-                sectionEntries = sortEntries(data.bySection[n].orEmpty(), _uiState.value.sort),
+                sectionEntries = sortedSectionEntries(data, n, _uiState.value.sort),
             )
         }
     }
@@ -116,6 +126,13 @@ class LibraryViewModel(
         viewModelScope.launch(Dispatchers.IO) { taskManager.addOneOffTodo(entryId) }
     }
 
+    /** 提交搜索:当前词非空白才进历史(输入即搜不产生历史,否则每敲一个字都是一条) */
+    fun submitSearch() {
+        val query = _uiState.value.query
+        if (query.isBlank()) return
+        viewModelScope.launch(Dispatchers.IO) { settingsStore.addSearchHistory(query) }
+    }
+
     /** 收藏开关;与「加入待办」是两回事,互不覆盖 */
     fun toggleFavorite(entryId: String) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -130,7 +147,7 @@ class LibraryViewModel(
                 val c = app.container
                 LibraryViewModel(
                     c.entryRepository, c.profileRepository, c.database.entryStateDao(),
-                    c.taskManager, c.recommendationEngine, c.entryRetriever,
+                    c.taskManager, c.recommendationEngine, c.entryRetriever, c.settingsStore,
                 )
             }
         }
@@ -168,4 +185,15 @@ internal fun sortEntries(entries: List<EntryDto>, sort: EntrySort): List<EntryDt
         compareBy<EntryDto> { gradeRank(it.grade) }.thenComparing(RecommendationEngine.ENTRY_COMPARATOR),
     )
     EntrySort.ORDER -> entries.sortedBy { it.id }
+}
+
+/** 某一章按当前排序方式取条目：首屏填充与切换章节都走它，保证两处结果一致 */
+internal fun sortedSectionEntries(data: EntriesData, sectionN: Int, sort: EntrySort): List<EntryDto> =
+    sortEntries(data.bySection[sectionN].orEmpty(), sort)
+
+/** 搜索历史更新:新词去重置顶,超长砍掉最旧的;空白词不进历史 */
+internal fun updateHistory(old: List<String>, new: String, max: Int = 10): List<String> {
+    val trimmed = new.trim()
+    if (trimmed.isEmpty()) return old
+    return (listOf(trimmed) + old.filter { it != trimmed }).take(max)
 }

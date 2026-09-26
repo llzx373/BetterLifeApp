@@ -32,6 +32,7 @@ import com.betterlife.app.R
 import com.betterlife.app.data.Goal
 import com.betterlife.app.data.Profile
 import com.betterlife.app.data.ProfileLabels
+import com.betterlife.app.data.toggleGoal
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.ProfileViewModel
 
@@ -83,11 +84,8 @@ fun MineScreen(
                             ToggleButton(
                                 checked = selected,
                                 onCheckedChange = { checked ->
-                                    vm.update {
-                                        it.copy(
-                                            goals = if (checked) it.goals + goal else it.goals - goal,
-                                        )
-                                    }
+                                    vm.update { it.toggleGoal(goal, checked) }
+                                    vm.save()
                                 },
                             ) { Text(stringResource(ProfileLabels.goal(goal))) }
                         }

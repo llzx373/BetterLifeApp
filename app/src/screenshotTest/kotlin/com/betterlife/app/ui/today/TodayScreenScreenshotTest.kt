@@ -155,3 +155,16 @@ fun TodayAllDone() {
         )
     }
 }
+
+/**
+ * 加载中的骨架屏:占位结构必须和 Ready 布局对得上（问候两行、一张卡、三条行）,
+ * 否则加载→就绪的瞬间整页会跳。
+ */
+@PreviewTest
+@FourFoldScreenPreview
+@Composable
+fun TodayLoadingSkeleton() {
+    PreviewScreen {
+        TodaySkeleton()
+    }
+}

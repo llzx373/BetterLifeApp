@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- 应用名（Manifest 的 android:label 引用此值，不再硬编码） -->
-    <string name="app_name">BetterLife</string>
+    <string name="app_name">美好生活</string>
 
     <!-- 每日提醒通知 -->
     <string name="notification_channel_daily_name">每日任务</string>
@@ -9,6 +9,10 @@
     <string name="notification_daily_title">BetterLife 每日任务</string>
     <string name="notification_daily_undone">今天还有 %1$d 条任务未完成</string>
     <string name="notification_daily_all_done">今日任务已全部完成，继续保持</string>
+
+    <!-- 单任务提醒通知 -->
+    <string name="notification_task_title">任务提醒</string>
+    <string name="notification_task_body">别忘了：%1$s</string>
 
     <!-- 通用动作 -->
     <string name="action_back">返回</string>
@@ -22,6 +26,9 @@
     <string name="action_cancel">取消</string>
     <string name="action_undo">撤销</string>
     <string name="common_load_failed">内容加载失败</string>
+
+    <!-- 全局离线横幅：说明影响范围,不只报错 -->
+    <string name="offline_banner">当前无网络连接，AI 问答暂不可用；浏览与打卡不受影响</string>
 
     <!-- 口径（先保命 / 守住钱 / 省精力 / 别踩线） -->
     <string name="lens_life">先保命</string>
@@ -86,10 +93,17 @@
     <string name="todo_once_empty">没有一次性待办。看到想做的事,点条目上的「加入待办」。</string>
     <string name="todo_deleted">已删除「%1$s」</string>
 
+    <!-- 单任务提醒时间 -->
+    <string name="task_reminder_set_desc">设置提醒时间</string>
+    <string name="task_reminder_edit_desc">修改提醒时间 %1$s</string>
+    <string name="task_reminder_dialog_title">这条任务的提醒时间</string>
+    <string name="task_reminder_clear">清除提醒</string>
+
     <!-- 条目库 -->
     <string name="library_title">条目库</string>
     <string name="library_search_hint">搜条目,如:戒烟、体检、午睡</string>
     <string name="library_no_match">没有匹配的条目</string>
+    <string name="library_recent_searches">最近搜索</string>
     <string name="library_pick_chapter">从左边的目录挑一章</string>
     <string name="library_chapter_overline">第 %1$d 章</string>
     <string name="library_entry_count">%1$d 条</string>
@@ -119,6 +133,7 @@
     <string name="detail_unfavorite">取消收藏</string>
     <string name="detail_copy">复制文本</string>
     <string name="detail_share">分享</string>
+    <string name="detail_explain">AI 解读</string>
     <string name="detail_copied">已复制到剪贴板</string>
     <string name="detail_cost_money">钱 %1$s</string>
     <string name="detail_cost_time">时间 %1$s</string>
@@ -182,6 +197,7 @@
     <string name="onboarding_next">下一步</string>
     <string name="onboarding_save">保存</string>
     <string name="onboarding_generate">生成我的建议</string>
+    <string name="onboarding_save_failed">保存失败，请检查存储空间后重试，已填内容不会丢失</string>
 
     <!-- 引导页字段 -->
     <string name="field_age">年龄段（必选）</string>
@@ -247,6 +263,9 @@
     <string name="settings_section_reminder">每日提醒</string>
     <string name="settings_reminder_enable">开启提醒</string>
     <string name="settings_reminder_time">提醒时间</string>
+    <string name="settings_reminder_denied">没有通知权限,提醒发不出来</string>
+    <string name="settings_reminder_revoked">通知权限已被关闭,提醒发不出来</string>
+    <string name="action_open_settings">去开启</string>
     <string name="settings_section_theme">主题</string>
     <string name="settings_section_motion">动效</string>
     <string name="motion_standard">标准</string>

@@ -3,7 +3,7 @@ package com.betterlife.app.ai
 import com.betterlife.app.data.EntryDto
 import com.betterlife.app.data.Profile
 import com.betterlife.app.data.RulesFile
-import com.betterlife.app.data.SettingsStore
+import com.betterlife.app.data.SettingsGateway
 import com.betterlife.app.recommend.RecommendationEngine
 
 /**
@@ -13,7 +13,7 @@ import com.betterlife.app.recommend.RecommendationEngine
 class AiAdvisor(
     private val llm: LlmClient,
     private val retriever: EntryRetriever,
-    private val settings: SettingsStore,
+    private val settings: SettingsGateway,
 ) {
 
     suspend fun ask(

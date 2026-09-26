@@ -119,6 +119,11 @@ class TodayViewModel(
         viewModelScope.launch(Dispatchers.IO) { taskManager.deleteTask(task.taskId) }
     }
 
+    /** 设置/清除单任务提醒时间（一天内分钟数，null = 清除、跟随全局汇总） */
+    fun setTaskReminder(taskId: Long, minutes: Int?) {
+        viewModelScope.launch(Dispatchers.IO) { taskManager.setTaskReminder(taskId, minutes) }
+    }
+
     companion object {
         private const val TAG = "TodayViewModel"
 

@@ -5,8 +5,11 @@
 package com.betterlife.app.ui.settings
 
 import android.Manifest
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -51,6 +55,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -64,6 +69,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.core.app.NotificationManagerCompat
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -76,6 +82,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
@@ -137,9 +144,33 @@ fun SettingsScreen(
         vm.setReminder(enabled, settings.reminderHour, settings.reminderMinute)
     }
     val context = LocalContext.current
+
+    // 拒绝通知权限时开关会被打回去,不说原因就像「开关坏了」;给个跳转系统设置的出口
+    val deniedMessage = stringResource(R.string.settings_reminder_denied)
+    val openSettingsAction = stringResource(R.string.action_open_settings)
     val notifLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { granted -> enableReminder(granted) }
+    ) { granted ->
+        enableReminder(granted)
+        if (!granted) {
+            scope.launch {
+                val result = snackbar.showSnackbar(
+                    message = deniedMessage,
+                    actionLabel = openSettingsAction,
+                )
+                if (result == SnackbarResult.ActionPerformed) {
+                    openNotificationSettings(context)
+                }
+            }
+        }
+    }
+
+    // 权限可能在本页之外被收回(系统设置里关掉);回到本页时重新核对一次
+    var notificationsEnabled by remember { mutableStateOf(true) }
+    LifecycleResumeEffect(Unit) {
+        notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+        onPauseOrDispose { }
+    }
 
     Scaffold(
         topBar = {
@@ -309,6 +340,31 @@ fun SettingsScreen(
                 Text(stringResource(R.string.settings_reminder_time))
             }
 
+            // 开关还开着、权限却没了:静默失效比关开关更糟,给一行明说 + 出口
+            if (reminderWarningNeeded(settings.reminderEnabled, notificationsEnabled)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.space1),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Filled.Notifications,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(Spacing.space4),
+                    )
+                    Spacer(Modifier.width(Spacing.space2))
+                    Text(
+                        text = stringResource(R.string.settings_reminder_revoked),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = { openNotificationSettings(context) }) {
+                        Text(stringResource(R.string.action_open_settings))
+                    }
+                }
+            }
+
             SectionTitle(stringResource(R.string.settings_section_theme))
 
             val themeModes = remember {
@@ -395,6 +451,17 @@ fun SettingsScreen(
 }
 
 private const val SOURCES_URL = "https://github.com/eternity4719/HowToLiveBetter"
+
+/** 提醒开着但通知权限不在时才需要警告行。提成纯函数,判定规则可以脱离 Android 环境测试 */
+internal fun reminderWarningNeeded(reminderEnabled: Boolean, notificationsEnabled: Boolean): Boolean =
+    reminderEnabled && !notificationsEnabled
+
+/** 跳系统通知设置;EXTRA_APP_PACKAGE 让 ROM 直接定位到本应用 */
+private fun openNotificationSettings(context: Context) {
+    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+    runCatching { context.startActivity(intent) }
+}
 
 @Composable
 private fun SectionTitle(text: String) {

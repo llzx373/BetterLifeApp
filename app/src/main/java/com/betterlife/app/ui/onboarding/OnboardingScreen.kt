@@ -15,12 +15,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -66,7 +68,7 @@ fun OnboardingScreen(
     vm: ProfileViewModel = viewModel(factory = ProfileViewModel.Factory),
 ) {
     val profile by vm.profile.collectAsStateWithLifecycle()
-    val saved by vm.saved.collectAsStateWithLifecycle()
+    val saveState by vm.saveState.collectAsStateWithLifecycle()
     val onboardingDone by vm.onboardingDone.collectAsStateWithLifecycle()
     val editMode = onboardingDone // 已完成引导 => 本次是编辑档案
 
@@ -74,8 +76,8 @@ fun OnboardingScreen(
     val scope = rememberCoroutineScope()
     val page = pagerState.currentPage
 
-    LaunchedEffect(saved) {
-        if (saved) onFinished()
+    LaunchedEffect(saveState) {
+        if (saveState is ProfileViewModel.SaveState.Success) onFinished()
     }
 
     Scaffold { padding ->
@@ -155,15 +157,33 @@ fun OnboardingScreen(
                         scope.launch { pagerState.animateScrollToPage(page + 1) }
                     }) { Text(stringResource(R.string.onboarding_next)) }
                 } else {
-                    Button(
-                        onClick = { vm.save(markOnboardingDone = true) },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(
-                            stringResource(
-                                if (editMode) R.string.onboarding_save else R.string.onboarding_generate,
-                            ),
-                        )
+                    Column(modifier = Modifier.weight(1f)) {
+                        if (saveState is ProfileViewModel.SaveState.Failed) {
+                            Text(
+                                text = stringResource(R.string.onboarding_save_failed),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            Spacer(Modifier.height(Spacing.space2))
+                        }
+                        Button(
+                            onClick = { vm.save(markOnboardingDone = true) },
+                            enabled = saveState !is ProfileViewModel.SaveState.Saving,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            if (saveState is ProfileViewModel.SaveState.Saving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(Spacing.space4),
+                                    strokeWidth = 2.dp,
+                                )
+                                Spacer(Modifier.width(Spacing.space2))
+                            }
+                            Text(
+                                stringResource(
+                                    if (editMode) R.string.onboarding_save else R.string.onboarding_generate,
+                                ),
+                            )
+                        }
                     }
                 }
             }

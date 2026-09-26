@@ -82,4 +82,33 @@ class LibrarySortingTest {
         val list = listOf(entry("01-03"), entry("01-01"), entry("01-02"))
         assertEquals(listOf("01-01", "01-02", "01-03"), sortEntries(list, EntrySort.ORDER).map { it.id })
     }
+
+    @Test
+    fun `首屏填充与切换排序结果一致`() {
+        val data = dataOf(
+            listOf(
+                entry("01-01", ratio = "一般"),
+                entry("01-02", ratio = "极高"),
+                entry("01-03", ratio = "高"),
+            ),
+        )
+        assertEquals(
+            sortEntries(data.bySection[1].orEmpty(), EntrySort.RATIO).map { it.id },
+            sortedSectionEntries(data, 1, EntrySort.RATIO).map { it.id },
+        )
+    }
+
+    @Test
+    fun `首屏默认按性价比排序而非原书序`() {
+        val data = dataOf(
+            listOf(
+                entry("01-01", ratio = "一般"),
+                entry("01-02", ratio = "极高"),
+            ),
+        )
+        assertEquals(
+            listOf("01-02", "01-01"),
+            sortedSectionEntries(data, 1, EntrySort.RATIO).map { it.id },
+        )
+    }
 }

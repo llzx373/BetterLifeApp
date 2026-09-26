@@ -7,6 +7,7 @@
 package com.betterlife.app.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -26,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -38,8 +40,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.R
 import com.betterlife.app.ui.chat.ChatScreen
+import com.betterlife.app.ui.common.OfflineBanner
 import com.betterlife.app.ui.favorites.FavoritesScreen
 import com.betterlife.app.ui.library.EntryDetailScreen
 import com.betterlife.app.ui.library.LibraryScreen
@@ -54,7 +58,7 @@ import kotlinx.serialization.Serializable
 import kotlin.reflect.KClass
 
 // ---- 路由 ----
-// 四个 tab 用 data object 就够了;带参的两个是 data class,参数即路由参数。
+// 四个 tab 用 data object 就够了;带参的(Section/Entry/Chat)是 data class,参数即路由参数。
 
 @Serializable
 data object TodayRoute
@@ -75,7 +79,7 @@ data class EntryRoute(val entryId: String)
 data object MineRoute
 
 @Serializable
-data object ChatRoute
+data class ChatRoute(val entryId: String? = null)
 
 @Serializable
 data object SettingsRoute
@@ -147,6 +151,10 @@ private fun AppScaffold(startDestination: Any) {
         if (selectedTab == null) navState.hide() else navState.show()
     }
 
+    // 初始值 true:启动时 NetworkMonitor 的第一帧快照还没到,先按在线处理,避免横幅闪一下。
+    val networkMonitor = (LocalContext.current.applicationContext as BetterLifeApp).container.networkMonitor
+    val online by networkMonitor.online.collectAsStateWithLifecycle(initialValue = true)
+
     NavigationSuiteScaffold(
         state = navState,
         navigationItems = {
@@ -161,15 +169,17 @@ private fun AppScaffold(startDestination: Any) {
             }
         },
     ) {
-        NavHost(
-            navController = navController,
-            startDestination = startDestination,
-            modifier = Modifier.fillMaxSize(),
-        ) {
+        Column(Modifier.fillMaxSize()) {
+            OfflineBanner(visible = !online)
+            NavHost(
+                navController = navController,
+                startDestination = startDestination,
+                modifier = Modifier.weight(1f),
+            ) {
             composable<TodayRoute> {
                 TodayScreen(
                     onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
-                    onOpenChat = { navController.navigate(ChatRoute) },
+                    onOpenChat = { navController.navigate(ChatRoute()) },
                     onEditProfile = { navController.navigate(OnboardingRoute) },
                     onOpenLibrary = { navController.navigate(LibraryRoute) { tabOptions() } },
                 )
@@ -194,13 +204,14 @@ private fun AppScaffold(startDestination: Any) {
                 EntryDetailScreen(
                     entryId = entry.toRoute<EntryRoute>().entryId,
                     onBack = { navController.popBackStack() },
+                    onExplain = { id -> navController.navigate(ChatRoute(id)) },
                 )
             }
             composable<MineRoute> {
                 MineScreen(
                     onOpenSettings = { navController.navigate(SettingsRoute) },
                     onEditProfile = { navController.navigate(OnboardingRoute) },
-                    onOpenChat = { navController.navigate(ChatRoute) },
+                    onOpenChat = { navController.navigate(ChatRoute()) },
                     onOpenFavorites = { navController.navigate(FavoritesRoute) },
                 )
             }
@@ -210,8 +221,9 @@ private fun AppScaffold(startDestination: Any) {
                     onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
                 )
             }
-            composable<ChatRoute> {
+            composable<ChatRoute> { entry ->
                 ChatScreen(
+                    entryId = entry.toRoute<ChatRoute>().entryId,
                     onBack = { navController.popBackStack() },
                     onOpenSettings = { navController.navigate(SettingsRoute) },
                 )
@@ -228,6 +240,7 @@ private fun AppScaffold(startDestination: Any) {
                         popUpTo(OnboardingRoute) { inclusive = true }
                     }
                 })
+            }
             }
         }
     }

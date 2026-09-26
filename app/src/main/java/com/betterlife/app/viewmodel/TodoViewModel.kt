@@ -69,6 +69,11 @@ class TodoViewModel(
         viewModelScope.launch(Dispatchers.IO) { taskManager.deleteTask(task.taskId) }
     }
 
+    /** 设置/清除单任务提醒时间（一天内分钟数，null = 清除、跟随全局汇总） */
+    fun setTaskReminder(taskId: Long, minutes: Int?) {
+        viewModelScope.launch(Dispatchers.IO) { taskManager.setTaskReminder(taskId, minutes) }
+    }
+
     /** 撤销删除:把同一条任务按原 id 写回 */
     fun restore(item: TodoItem) {
         viewModelScope.launch(Dispatchers.IO) { taskManager.restoreTask(item.task) }

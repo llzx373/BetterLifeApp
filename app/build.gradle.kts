@@ -27,6 +27,9 @@ android {
         applicationId = "com.betterlife.app"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
+        // 版本约定：versionName 三段式 —— 大重构迭代第一位、大特性更新迭代第二位、
+        // 正式版本迭代第三位；versionCode 即版本号后面的「-n」开发迭代号
+        // （0.1.0-1 ↔ versionCode 1），开发中只递增 versionCode。
         versionCode = 1
         versionName = "0.1.0"
     }
@@ -96,6 +99,24 @@ android {
         checkReleaseBuilds = true
         warningsAsErrors = false
     }
+}
+
+// APK 产物文件名用英文：BetterLife-<versionName>-<versionCode>.apk
+// AGP 9 移除了 applicationVariants DSL，无法直接配置输出文件名；assembleRelease
+// 在脚本评估时还未注册，用 matching+configureEach 惰性挂钩，构建完成后改名。
+val renameReleaseApk = tasks.register("renameReleaseApk") {
+    // 配置期取值（String/Int 可序列化），避免 doLast 闭包捕获 android 扩展导致配置缓存失败
+    val outDir = layout.buildDirectory.dir("outputs/apk/release")
+    val versionName = android.defaultConfig.versionName
+    val versionCode = android.defaultConfig.versionCode
+    doLast {
+        val built = outDir.get().asFile.resolve("app-release.apk")
+        val target = outDir.get().asFile.resolve("BetterLife-$versionName-$versionCode.apk")
+        if (built.exists()) built.renameTo(target)
+    }
+}
+tasks.matching { it.name == "assembleRelease" }.configureEach {
+    finalizedBy(renameReleaseApk)
 }
 
 dependencies {

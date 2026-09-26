@@ -1042,15 +1042,15 @@ release 目前回退 debug 签名,产物不能对外分发。这一步**不是�
 
 | 组件 | §7.1 列的缺失状态 | 现状 |
 |---|---|---|
-| 今日页 | hover / 骨架屏 / error / disabled | loading/empty/ready/error 四态 P2 已 sealed 化;骨架屏与 hover(平板鼠标)未做 |
-| 推荐列表 | loading / error / 空 / 离线 | 空已有;其余随今日页状态走 |
-| 搜索 | 加载中 / 错误 / 历史记录 | 无结果已有;历史记录是新功能,未做 |
+| 今日页 | hover / 骨架屏 / error / disabled | loading/empty/ready/error 四态 P2 已 sealed 化;骨架屏(`TodaySkeleton`)与 hover(任务卡/推荐行容器色)已补,骨架态有截图基线 |
+| 推荐列表 | loading / error / 空 / 离线 | 空已有;其余随今日页状态走;离线由全局横幅覆盖 |
+| 搜索 | 加载中 / 错误 / 历史记录 | 无结果已有;历史记录已做(DataStore 存最近 10 条,IME 搜索键提交,目录上方 chips 回填) |
 | 聊天 | 空 / 超时 / 429 | 空(示例问题)与 429 文案已有;超时归入「网络连接失败」 |
 | 设置保存 | 失败 / 进行中 | 「已保存」snackbar 已有。**刻意不做失败态**:DataStore 写本地文件没有有意义的失败路径,加一个永远不会出现的错误态是负债;真正要验「能不能用」由「测试连接」按钮承担 |
-| 提醒开关 | 权限被拒 / 被收回 | **见 C5** |
+| 提醒开关 | 权限被拒 / 被收回 | 已做:拒绝时 snackbar + 「去开启」跳系统通知设置;resume 时检测 `areNotificationsEnabled()`,被收回在开关下显示警告行 |
 | 条目详情 | 404 语义 | P2 已拆分「正在打开」与「没找到」 |
-| 引导页 | 保存中 / 保存失败 | 未做 |
-| 全局 | 离线 | 未做(要先有连通性监听,属于独立功能) |
+| 引导页 | 保存中 / 保存失败 | 已做:`ProfileViewModel.saveState`(Idle/Saving/Success/Failed),保存中禁用+转圈,失败显示可重试文案 |
+| 全局 | 离线 | 已做:`NetworkMonitor`(default network callback)+ 壳层 `OfflineBanner`,manifest 加了 `ACCESS_NETWORK_STATE` |
 
 **结论**:代码能保证的部分已完成;**TalkBack 全流程、焦点顺序、200% 下的引导页与设置页**必须真机走查 —— §11 里那几项保持未勾,并注明原因。
 

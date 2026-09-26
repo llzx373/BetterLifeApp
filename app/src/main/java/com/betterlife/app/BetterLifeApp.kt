@@ -6,6 +6,7 @@ import com.betterlife.app.ai.AiAdvisor
 import com.betterlife.app.ai.EntryRetriever
 import com.betterlife.app.ai.LlmClient
 import com.betterlife.app.data.EntryRepository
+import com.betterlife.app.data.NetworkMonitor
 import com.betterlife.app.data.ProfileRepository
 import com.betterlife.app.data.SettingsStore
 import com.betterlife.app.data.db.AppDatabase
@@ -34,6 +35,8 @@ class AppContainer(private val context: Context) {
 
     val settingsStore: SettingsStore by lazy { SettingsStore(context) }
 
+    val networkMonitor: NetworkMonitor by lazy { NetworkMonitor(context) }
+
     val profileRepository: ProfileRepository by lazy { ProfileRepository(database.profileDao()) }
 
     val recommendationEngine: RecommendationEngine by lazy { RecommendationEngine() }
@@ -46,6 +49,7 @@ class AppContainer(private val context: Context) {
             entryStateDao = database.entryStateDao(),
             planner = dailyTaskPlanner,
             entryRepository = entryRepository,
+            reminderScheduler = reminderScheduler,
         )
     }
 
