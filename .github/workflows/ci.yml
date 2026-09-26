@@ -32,8 +32,9 @@ jobs:
       # 直接用 sdkmanager 装项目需要的平台即可。
       - name: 配 Android SDK
         run: |
-          yes | sdkmanager --licenses > /dev/null
-          sdkmanager "platforms;android-37"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null
+          "$SDKMANAGER" "platforms;android-37"
 
       - name: 单元测试
         run: ./gradlew testDebugUnitTest
@@ -85,8 +86,9 @@ jobs:
       # 直接用 sdkmanager 装项目需要的平台即可。
       - name: 配 Android SDK
         run: |
-          yes | sdkmanager --licenses > /dev/null
-          sdkmanager "platforms;android-37"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null
+          "$SDKMANAGER" "platforms;android-37"
 
       - name: 截图回归
         run: ./gradlew validateDebugScreenshotTest
