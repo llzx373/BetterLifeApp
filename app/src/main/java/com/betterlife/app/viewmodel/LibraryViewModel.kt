@@ -140,6 +140,16 @@ class LibraryViewModel(
         }
     }
 
+    /** 不再推荐:标记 DISMISSED 后推荐列表随数据流自动收缩 */
+    fun dismissEntry(entryId: String) {
+        viewModelScope.launch(Dispatchers.IO) { taskManager.setDismissed(entryId, true) }
+    }
+
+    /** 撤销「不再推荐」,清除 DISMISSED 状态 */
+    fun restoreEntry(entryId: String) {
+        viewModelScope.launch(Dispatchers.IO) { taskManager.setDismissed(entryId, false) }
+    }
+
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {

@@ -13,8 +13,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -53,6 +56,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SplitButtonDefaults
 import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.Surface
@@ -63,6 +69,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -103,6 +110,7 @@ import com.betterlife.app.ui.theme.motionSpatialSpec
 import com.betterlife.app.viewmodel.LibraryViewModel
 import com.betterlife.app.viewmodel.TodayViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -127,7 +135,14 @@ fun TodayScreen(
     val todayState by todayVm.uiState.collectAsStateWithLifecycle()
     val libraryState by libraryVm.uiState.collectAsStateWithLifecycle()
 
+    // 「不再推荐」的结果反馈走这个宿主:撤销即把 DISMISSED 状态清掉
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val dismissedMessage = stringResource(R.string.today_dismissed)
+    val undoLabel = stringResource(R.string.action_undo)
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
             FloatingActionButton(onClick = onOpenChat) {
                 Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.title_chat))
@@ -163,6 +178,13 @@ fun TodayScreen(
                 onDrop = todayVm::dropTask,
                 onOpenEntry = onOpenEntry,
                 onAddTodo = libraryVm::addToTodo,
+                onDismissEntry = { entryId ->
+                    libraryVm.dismissEntry(entryId)
+                    scope.launch {
+                        val result = snackbar.showSnackbar(dismissedMessage, actionLabel = undoLabel)
+                        if (result == SnackbarResult.ActionPerformed) libraryVm.restoreEntry(entryId)
+                    }
+                },
                 onOpenLibrary = onOpenLibrary,
                 onEditProfile = onEditProfile,
                 contentPadding = padding,
@@ -182,6 +204,7 @@ internal fun TodayContent(
     onDrop: (TaskEntity) -> Unit,
     onOpenEntry: (String) -> Unit,
     onAddTodo: (String) -> Unit,
+    onDismissEntry: (String) -> Unit,
     onOpenLibrary: () -> Unit,
     onEditProfile: () -> Unit,
     contentPadding: PaddingValues,
@@ -310,6 +333,7 @@ internal fun TodayContent(
                             scored = scored,
                             onClick = { onOpenEntry(scored.entry.id) },
                             onAddTodo = { onAddTodo(scored.entry.id) },
+                            onDismiss = { onDismissEntry(scored.entry.id) },
                         )
                     }
                 }
@@ -603,17 +627,21 @@ private fun LensGroupHeader(lens: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** 推荐条目:分段列表行,不是卡片 */
+/** 推荐条目:分段列表行,不是卡片。点按进详情,长按出「不再推荐这条」菜单。 */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun RecommendedRow(
     scored: ScoredEntry,
     onClick: () -> Unit,
     onAddTodo: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     val entry: EntryDto = scored.entry
     // 与 DailyTaskCard 同一套 hover 先例:指针悬停抬到 surfaceContainerHighest
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
+    val haptics = LocalHapticFeedback.current
+    var menuOpen by remember { mutableStateOf(false) }
     val overline: (@Composable () -> Unit)? =
         if (entry.grade.isNotBlank() || entry.dispute) {
             {
@@ -626,34 +654,55 @@ private fun RecommendedRow(
             null
         }
 
-    SafeListItem(
-        modifier = Modifier.hoverable(interactionSource).clickable(onClick = onClick),
-        colors = ListItemDefaults.colors(
-            containerColor = if (hovered) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent,
-        ),
-        overlineContent = overline,
-        supportingContent = {
-            Column {
-                if (entry.human.isNotBlank()) {
-                    Text(
-                        text = entry.human,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(Spacing.space2))
+    Box {
+        SafeListItem(
+            modifier = Modifier
+                .hoverable(interactionSource)
+                .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = LocalIndication.current,
+                    onClick = onClick,
+                    onLongClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        menuOpen = true
+                    },
+                ),
+            colors = ListItemDefaults.colors(
+                containerColor = if (hovered) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent,
+            ),
+            overlineContent = overline,
+            supportingContent = {
+                Column {
+                    if (entry.human.isNotBlank()) {
+                        Text(
+                            text = entry.human,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(Spacing.space2))
+                    }
+                    CostMeter(entry)
                 }
-                CostMeter(entry)
-            }
-        },
-        trailingContent = {
-            IconButton(onClick = onAddTodo) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.today_add_todo_desc))
-            }
-        },
-    ) {
-        Text(entry.title, style = MaterialTheme.typography.titleSmall)
+            },
+            trailingContent = {
+                IconButton(onClick = onAddTodo) {
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.today_add_todo_desc))
+                }
+            },
+        ) {
+            Text(entry.title, style = MaterialTheme.typography.titleSmall)
+        }
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.today_dismiss_menu)) },
+                onClick = {
+                    menuOpen = false
+                    onDismiss()
+                },
+            )
+        }
     }
 }
 

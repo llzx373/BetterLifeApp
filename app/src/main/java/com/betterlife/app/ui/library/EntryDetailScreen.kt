@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.NotInterested
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -250,6 +251,15 @@ fun EntryDetailScreen(
                         icon = Icons.Filled.Share,
                         labelRes = R.string.detail_share,
                         onClick = { shareEntry(context, e.shareText()) },
+                    )
+                    // 「不再推荐」写 DISMISSED,推荐引擎会排除它;屏蔽后页面没有留着的意义,直接返回
+                    ToolbarAction(
+                        icon = Icons.Filled.NotInterested,
+                        labelRes = R.string.detail_dismiss,
+                        onClick = {
+                            vm.dismissEntry(e.id)
+                            onBack()
+                        },
                     )
                     ToolbarAction(
                         icon = Icons.Filled.AutoAwesome,

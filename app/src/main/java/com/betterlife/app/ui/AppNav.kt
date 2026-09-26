@@ -44,6 +44,7 @@ import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.R
 import com.betterlife.app.ui.chat.ChatScreen
 import com.betterlife.app.ui.common.OfflineBanner
+import com.betterlife.app.ui.dismissed.DismissedScreen
 import com.betterlife.app.ui.favorites.FavoritesScreen
 import com.betterlife.app.ui.library.EntryDetailScreen
 import com.betterlife.app.ui.library.LibraryScreen
@@ -86,6 +87,9 @@ data object SettingsRoute
 
 @Serializable
 data object FavoritesRoute
+
+@Serializable
+data object DismissedRoute
 
 @Serializable
 data object OnboardingRoute
@@ -213,10 +217,17 @@ private fun AppScaffold(startDestination: Any) {
                     onEditProfile = { navController.navigate(OnboardingRoute) },
                     onOpenChat = { navController.navigate(ChatRoute()) },
                     onOpenFavorites = { navController.navigate(FavoritesRoute) },
+                    onOpenDismissed = { navController.navigate(DismissedRoute) },
                 )
             }
             composable<FavoritesRoute> {
                 FavoritesScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
+                )
+            }
+            composable<DismissedRoute> {
+                DismissedScreen(
                     onBack = { navController.popBackStack() },
                     onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
                 )

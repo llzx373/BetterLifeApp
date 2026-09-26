@@ -43,6 +43,7 @@ fun MineScreen(
     onEditProfile: () -> Unit,
     onOpenChat: () -> Unit,
     onOpenFavorites: () -> Unit,
+    onOpenDismissed: () -> Unit,
     vm: ProfileViewModel = viewModel(factory = ProfileViewModel.Factory),
 ) {
     val profile by vm.profile.collectAsStateWithLifecycle()
@@ -103,6 +104,11 @@ fun MineScreen(
                     titleRes = R.string.mine_favorites,
                     subtitleRes = R.string.mine_favorites_sub,
                     onClick = onOpenFavorites,
+                ),
+                EntryItem(
+                    titleRes = R.string.mine_dismissed,
+                    subtitleRes = R.string.mine_dismissed_sub,
+                    onClick = onOpenDismissed,
                 ),
                 EntryItem(
                     titleRes = R.string.mine_chat,

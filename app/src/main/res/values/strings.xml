@@ -80,6 +80,8 @@
     <string name="today_action_swap">换一条</string>
     <string name="today_action_drop">今天不做</string>
     <string name="today_add_todo_desc">加入待办</string>
+    <string name="today_dismiss_menu">不再推荐这条</string>
+    <string name="today_dismissed">这条内容以后不会再推荐了</string>
 
     <!-- 待办页 -->
     <string name="todo_title">待办</string>
@@ -134,6 +136,7 @@
     <string name="detail_copy">复制文本</string>
     <string name="detail_share">分享</string>
     <string name="detail_explain">AI 解读</string>
+    <string name="detail_dismiss">不再推荐</string>
     <string name="detail_copied">已复制到剪贴板</string>
     <string name="detail_cost_money">钱 %1$s</string>
     <string name="detail_cost_time">时间 %1$s</string>
@@ -158,12 +161,19 @@
     <string name="favorites_title">我的收藏</string>
     <string name="favorites_empty">还没有收藏。在条目详情页点一下「收藏」,这里就会出现。</string>
 
+    <!-- 已屏蔽的建议 -->
+    <string name="dismissed_title">已屏蔽的建议</string>
+    <string name="dismissed_empty">没有屏蔽任何建议。长按推荐条目,或在条目详情页点「不再推荐」,不感兴趣的内容就会出现在这里。</string>
+    <string name="dismissed_action_restore">恢复</string>
+
     <!-- 我的 -->
     <string name="mine_title">我的</string>
     <string name="mine_profile_title">我的档案</string>
     <string name="mine_goals_hint">想改善什么?点一下即可增删</string>
     <string name="mine_favorites">我的收藏</string>
     <string name="mine_favorites_sub">详情页收藏过的条目</string>
+    <string name="mine_dismissed">已屏蔽的建议</string>
+    <string name="mine_dismissed_sub">管理「不再推荐」的条目</string>
     <string name="mine_age_segment">%1$s 岁段</string>
     <string name="mine_suffix_programmer"> · 程序员</string>
     <string name="mine_suffix_student"> · 学生</string>

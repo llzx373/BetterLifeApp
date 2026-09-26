@@ -144,6 +144,16 @@ class TaskManager(
     fun favoriteIdsFlow(): Flow<List<String>> =
         entryStateDao.entryIdsByStateFlow(EntryStateEntity.STATE_FAVORITE)
 
+    /** 「不再推荐」开关:DISMISSED 会被推荐引擎排除,不影响收藏/待办等其他状态 */
+    suspend fun setDismissed(entryId: String, dismissed: Boolean) {
+        if (dismissed) addEntryState(entryId, EntryStateEntity.STATE_DISMISSED)
+        else removeEntryState(entryId, EntryStateEntity.STATE_DISMISSED)
+    }
+
+    /** 已屏蔽（不再推荐）的条目 id */
+    fun dismissedIdsFlow(): Flow<List<String>> =
+        entryStateDao.entryIdsByStateFlow(EntryStateEntity.STATE_DISMISSED)
+
     fun todayTasksFlow(date: LocalDate = LocalDate.now()): Flow<List<TaskEntity>> =
         taskDao.dailyTasksFlow(date.toString())
 
