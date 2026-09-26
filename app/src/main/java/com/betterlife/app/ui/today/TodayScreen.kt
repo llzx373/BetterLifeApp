@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -129,6 +130,7 @@ fun TodayScreen(
     onOpenChat: () -> Unit,
     onEditProfile: () -> Unit,
     onOpenLibrary: () -> Unit,
+    onStartTimer: (Long) -> Unit,
     todayVm: TodayViewModel = viewModel(factory = TodayViewModel.Factory),
     libraryVm: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
 ) {
@@ -185,6 +187,7 @@ fun TodayScreen(
                         if (result == SnackbarResult.ActionPerformed) libraryVm.restoreEntry(entryId)
                     }
                 },
+                onStartTimer = onStartTimer,
                 onOpenLibrary = onOpenLibrary,
                 onEditProfile = onEditProfile,
                 contentPadding = padding,
@@ -205,6 +208,7 @@ internal fun TodayContent(
     onOpenEntry: (String) -> Unit,
     onAddTodo: (String) -> Unit,
     onDismissEntry: (String) -> Unit,
+    onStartTimer: (Long) -> Unit,
     onOpenLibrary: () -> Unit,
     onEditProfile: () -> Unit,
     contentPadding: PaddingValues,
@@ -282,6 +286,7 @@ internal fun TodayContent(
                     },
                     onSwap = { onSwap(item.task) },
                     onDrop = { onDrop(item.task) },
+                    onStartTimer = { onStartTimer(item.task.taskId) },
                     onOpenEntry = { item.entry?.let { onOpenEntry(it.id) } },
                     modifier = Modifier
                         .padding(horizontal = Spacing.space4)
@@ -397,6 +402,7 @@ private fun DailyTaskCard(
     onToggle: () -> Unit,
     onSwap: () -> Unit,
     onDrop: () -> Unit,
+    onStartTimer: () -> Unit,
     onOpenEntry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -439,7 +445,7 @@ private fun DailyTaskCard(
                 ReminderTimeLabel(it)
             }
             Spacer(Modifier.height(Spacing.space3))
-            TaskAction(done = done, onToggle = onToggle, onSwap = onSwap, onDrop = onDrop)
+            TaskAction(done = done, onToggle = onToggle, onSwap = onSwap, onDrop = onDrop, onStartTimer = onStartTimer)
         }
     }
 }
@@ -456,10 +462,11 @@ private fun TaskAction(
     onToggle: () -> Unit,
     onSwap: () -> Unit,
     onDrop: () -> Unit,
+    onStartTimer: () -> Unit,
 ) {
     // 关闭档不套 AnimatedContent:静态帧否则可能抓到按钮切换的中间态
     if (LocalMotionLevel.current == MotionLevel.OFF) {
-        TaskActionContent(done, onToggle, onSwap, onDrop)
+        TaskActionContent(done, onToggle, onSwap, onDrop, onStartTimer)
         return
     }
     // transitionSpec 不是 Composable 上下文,spec 必须先取出来
@@ -475,7 +482,7 @@ private fun TaskAction(
         },
         label = "taskAction",
     ) { isDone ->
-        TaskActionContent(isDone, onToggle, onSwap, onDrop)
+        TaskActionContent(isDone, onToggle, onSwap, onDrop, onStartTimer)
     }
 }
 
@@ -485,58 +492,73 @@ private fun TaskActionContent(
     onToggle: () -> Unit,
     onSwap: () -> Unit,
     onDrop: () -> Unit,
+    onStartTimer: () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
-    if (done) {
-        FilledTonalButton(onClick = {
-            haptics.performHapticFeedback(HapticFeedbackType.ToggleOff)
-            onToggle()
-        }) {
-            CheckPopIcon()
-            Spacer(Modifier.width(Spacing.space1))
-            Text(stringResource(R.string.today_task_undo))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (done) {
+            FilledTonalButton(onClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.ToggleOff)
+                onToggle()
+            }) {
+                CheckPopIcon()
+                Spacer(Modifier.width(Spacing.space1))
+                Text(stringResource(R.string.today_task_undo))
+            }
+        } else {
+            SplitButtonLayout(
+                leadingButton = {
+                    SplitButtonDefaults.LeadingButton(onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
+                        onToggle()
+                    }) {
+                        Text(stringResource(R.string.today_task_check))
+                    }
+                },
+                trailingButton = {
+                    var menuOpen by remember { mutableStateOf(false) }
+                    Box {
+                        SplitButtonDefaults.TrailingButton(
+                            checked = menuOpen,
+                            onCheckedChange = { menuOpen = it },
+                        ) {
+                            Icon(
+                                Icons.Filled.MoreVert,
+                                contentDescription = stringResource(R.string.today_task_menu),
+                            )
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.today_action_swap)) },
+                                onClick = {
+                                    menuOpen = false
+                                    onSwap()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.today_action_drop)) },
+                                onClick = {
+                                    menuOpen = false
+                                    onDrop()
+                                },
+                            )
+                        }
+                    }
+                },
+            )
+            // 计时入口只出现在未完成态：给已完成的任务计时会再触发一次打卡
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = onStartTimer) {
+                Icon(
+                    Icons.Filled.Timer,
+                    contentDescription = stringResource(R.string.task_timer_desc),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
-    } else {
-        SplitButtonLayout(
-            leadingButton = {
-                SplitButtonDefaults.LeadingButton(onClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
-                    onToggle()
-                }) {
-                    Text(stringResource(R.string.today_task_check))
-                }
-            },
-            trailingButton = {
-                var menuOpen by remember { mutableStateOf(false) }
-                Box {
-                    SplitButtonDefaults.TrailingButton(
-                        checked = menuOpen,
-                        onCheckedChange = { menuOpen = it },
-                    ) {
-                        Icon(
-                            Icons.Filled.MoreVert,
-                            contentDescription = stringResource(R.string.today_task_menu),
-                        )
-                    }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.today_action_swap)) },
-                            onClick = {
-                                menuOpen = false
-                                onSwap()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.today_action_drop)) },
-                            onClick = {
-                                menuOpen = false
-                                onDrop()
-                            },
-                        )
-                    }
-                }
-            },
-        )
     }
 }
 

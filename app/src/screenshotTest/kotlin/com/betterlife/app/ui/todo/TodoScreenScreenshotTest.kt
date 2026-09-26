@@ -91,6 +91,7 @@ fun TodoBothSections() {
             onOpenEntry = {},
             onDelete = {},
             onSetReminder = { _, _ -> },
+            onStartTimer = {},
         )
     }
 }

@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 离线横幅需要读网络状态（NetworkMonitor），非危险权限，安装即授予 -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 计时结束的振动提示，普通权限，安装即授予 -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:name=".BetterLifeApp"

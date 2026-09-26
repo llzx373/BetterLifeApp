@@ -22,7 +22,7 @@ class TaskManager(
     private val planner: DailyTaskPlanner,
     private val entryRepository: EntryRepository,
     private val reminderScheduler: ReminderScheduler,
-) {
+) : TimerTaskGateway {
 
     /** 当天没有任何 DAILY 任务时，按档案规划并插入；幂等，可反复调用 */
     suspend fun ensureTodayTasks(profile: Profile, date: LocalDate = LocalDate.now()) {
@@ -50,10 +50,15 @@ class TaskManager(
         }
     }
 
-    suspend fun completeTask(taskId: Long) {
+    override suspend fun completeTask(taskId: Long) {
         taskDao.markDone(taskId, System.currentTimeMillis())
         // 已完成的任务的提醒 work 触发时也会自查 done 跳过，提前取消省一次唤醒
         reminderScheduler.cancelTaskReminder(taskId)
+    }
+
+    override suspend fun taskTitle(taskId: Long): String? {
+        val task = taskDao.getTask(taskId) ?: return null
+        return entryRepository.entriesData().byId[task.entryId]?.title
     }
 
     suspend fun uncompleteTask(taskId: Long) = taskDao.markUndone(taskId)

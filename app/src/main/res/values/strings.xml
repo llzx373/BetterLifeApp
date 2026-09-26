@@ -101,6 +101,21 @@
     <string name="task_reminder_dialog_title">这条任务的提醒时间</string>
     <string name="task_reminder_clear">清除提醒</string>
 
+    <!-- 番茄钟计时 -->
+    <string name="timer_title">专注计时</string>
+    <string name="timer_duration_prompt">这次计多久</string>
+    <string name="timer_duration_minutes">%1$d 分钟</string>
+    <string name="timer_start">开始计时</string>
+    <string name="timer_pause">暂停</string>
+    <string name="timer_resume">继续</string>
+    <string name="timer_abandon">放弃</string>
+    <string name="timer_abandon_dialog_title">放弃这次计时？</string>
+    <string name="timer_abandon_dialog_text">放弃不会打卡，任务还在今天的列表里。</string>
+    <string name="timer_remaining_desc">剩余时间 %1$s</string>
+    <string name="timer_finished">时间到</string>
+    <string name="timer_finished_done">已自动完成打卡</string>
+    <string name="task_timer_desc">开始计时</string>
+
     <!-- 条目库 -->
     <string name="library_title">条目库</string>
     <string name="library_search_hint">搜条目,如:戒烟、体检、午睡</string>

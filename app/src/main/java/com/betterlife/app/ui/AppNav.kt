@@ -52,6 +52,7 @@ import com.betterlife.app.ui.library.SectionScreen
 import com.betterlife.app.ui.mine.MineScreen
 import com.betterlife.app.ui.onboarding.OnboardingScreen
 import com.betterlife.app.ui.settings.SettingsScreen
+import com.betterlife.app.ui.timer.TimerScreen
 import com.betterlife.app.ui.today.TodayScreen
 import com.betterlife.app.ui.todo.TodoScreen
 import com.betterlife.app.viewmodel.SettingsViewModel
@@ -90,6 +91,9 @@ data object FavoritesRoute
 
 @Serializable
 data object DismissedRoute
+
+@Serializable
+data class TimerRoute(val taskId: Long)
 
 @Serializable
 data object OnboardingRoute
@@ -186,10 +190,14 @@ private fun AppScaffold(startDestination: Any) {
                     onOpenChat = { navController.navigate(ChatRoute()) },
                     onEditProfile = { navController.navigate(OnboardingRoute) },
                     onOpenLibrary = { navController.navigate(LibraryRoute) { tabOptions() } },
+                    onStartTimer = { id -> navController.navigate(TimerRoute(id)) },
                 )
             }
             composable<TodoRoute> {
-                TodoScreen(onOpenEntry = { id -> navController.navigate(EntryRoute(id)) })
+                TodoScreen(
+                    onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
+                    onStartTimer = { id -> navController.navigate(TimerRoute(id)) },
+                )
             }
             composable<LibraryRoute> {
                 LibraryScreen(
@@ -230,6 +238,12 @@ private fun AppScaffold(startDestination: Any) {
                 DismissedScreen(
                     onBack = { navController.popBackStack() },
                     onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
+                )
+            }
+            composable<TimerRoute> { entry ->
+                TimerScreen(
+                    taskId = entry.toRoute<TimerRoute>().taskId,
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable<ChatRoute> { entry ->

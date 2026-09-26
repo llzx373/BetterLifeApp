@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,6 +66,7 @@ private val ProgressRingStroke = 3.dp
 @Composable
 fun TodoScreen(
     onOpenEntry: (String) -> Unit,
+    onStartTimer: (Long) -> Unit,
     vm: TodoViewModel = viewModel(factory = TodoViewModel.Factory),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -95,6 +97,7 @@ fun TodoScreen(
                 }
             },
             onSetReminder = { task, minutes -> vm.setTaskReminder(task.taskId, minutes) },
+            onStartTimer = { task -> onStartTimer(task.taskId) },
         )
     }
 }
@@ -108,6 +111,7 @@ internal fun TodoContent(
     onOpenEntry: (String) -> Unit,
     onDelete: (TodoViewModel.TodoItem) -> Unit,
     onSetReminder: (TaskEntity, Int?) -> Unit,
+    onStartTimer: (TaskEntity) -> Unit,
 ) {
     // 正在设置提醒时间的任务；非 null 时弹 TimePicker
     var reminderTarget by remember { mutableStateOf<TaskEntity?>(null) }
@@ -149,6 +153,7 @@ internal fun TodoContent(
                     onToggle = { onToggle(item.task) },
                     onClick = { item.entry?.let { e -> onOpenEntry(e.id) } },
                     onOpenReminder = { reminderTarget = item.task },
+                    onStartTimer = { onStartTimer(item.task) },
                 )
             }
         }
@@ -169,6 +174,7 @@ internal fun TodoContent(
                     onClick = { item.entry?.let { e -> onOpenEntry(e.id) } },
                     onDelete = { onDelete(item) },
                     onOpenReminder = { reminderTarget = item.task },
+                    onStartTimer = { onStartTimer(item.task) },
                 )
             }
         }
@@ -271,6 +277,7 @@ private fun HabitRow(
     onToggle: () -> Unit,
     onClick: () -> Unit,
     onOpenReminder: () -> Unit,
+    onStartTimer: () -> Unit,
 ) {
     val task = item.task
     val lensColors = LocalLensColors.current
@@ -290,6 +297,8 @@ private fun HabitRow(
             )
         }
         TaskText(item = item, modifier = Modifier.weight(1f))
+        // 计时入口只出现在未完成态：给已完成的任务计时会再触发一次打卡
+        if (!task.done) TimerEntryButton(onStartTimer)
         ReminderBellButton(minutes = task.remindAtMinutes, onClick = onOpenReminder)
     }
 }
@@ -302,6 +311,7 @@ private fun OnceRow(
     onClick: () -> Unit,
     onDelete: () -> Unit,
     onOpenReminder: () -> Unit,
+    onStartTimer: () -> Unit,
 ) {
     val task = item.task
     Row(
@@ -316,6 +326,7 @@ private fun OnceRow(
             ),
         )
         TaskText(item = item, modifier = Modifier.weight(1f))
+        if (!task.done) TimerEntryButton(onStartTimer)
         ReminderBellButton(minutes = task.remindAtMinutes, onClick = onOpenReminder)
         IconButton(onClick = onDelete) {
             Icon(
@@ -324,6 +335,17 @@ private fun OnceRow(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+private fun TimerEntryButton(onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Icon(
+            Icons.Filled.Timer,
+            contentDescription = stringResource(R.string.task_timer_desc),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
