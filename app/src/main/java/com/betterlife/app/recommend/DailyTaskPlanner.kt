@@ -17,7 +17,7 @@ import java.time.LocalDate
  * 排序稳定（ratio → grade → cs → id），再按日期 hash 做确定性轮换：
  * 同一天、同一批候选结果必然相同；不同日期起点偏移不同，每天最多 maxDaily 条。
  */
-class DailyTaskPlanner(private val maxDaily: Int = 3) {
+class DailyTaskPlanner(val maxDaily: Int = 3) {
 
     fun plan(
         date: LocalDate,

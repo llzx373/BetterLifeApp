@@ -1,8 +1,12 @@
 package com.betterlife.app.viewmodel
 
+import com.betterlife.app.data.AppSettings
+import com.betterlife.app.data.SettingsGateway
 import com.betterlife.app.tasks.TimerTaskGateway
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.resetMain
@@ -25,6 +29,12 @@ class TimerViewModelTest {
         override suspend fun completeTask(taskId: Long) {
             completedTaskIds += taskId
         }
+    }
+
+    private class FakeSettingsGateway : SettingsGateway {
+        override val settingsFlow: Flow<AppSettings> = MutableStateFlow(AppSettings())
+        override suspend fun setOnboardingDone(done: Boolean) = Unit
+        override suspend fun current(): AppSettings = AppSettings()
     }
 
     @Before
@@ -61,7 +71,7 @@ class TimerViewModelTest {
 
     @Test
     fun `加载后进入选时长态并带出任务标题`() = runTest {
-        val vm = TimerViewModel(taskId = 7, gateway = FakeGateway())
+        val vm = TimerViewModel(taskId = 7, gateway = FakeGateway(), settings = FakeSettingsGateway())
 
         awaitSetup(vm)
 
@@ -70,7 +80,7 @@ class TimerViewModelTest {
 
     @Test
     fun `任务已删除时退回空标题的选时长态`() = runTest {
-        val vm = TimerViewModel(taskId = 7, gateway = FakeGateway().apply { title = null })
+        val vm = TimerViewModel(taskId = 7, gateway = FakeGateway().apply { title = null }, settings = FakeSettingsGateway())
 
         awaitSetup(vm)
 
@@ -81,7 +91,7 @@ class TimerViewModelTest {
     fun `时钟走过时长后自动打卡并进入完成态`() = runTest {
         val gateway = FakeGateway()
         var now = 0L
-        val vm = TimerViewModel(taskId = 7, gateway = gateway, clock = { now })
+        val vm = TimerViewModel(taskId = 7, gateway = gateway, settings = FakeSettingsGateway(), clock = { now })
         awaitSetup(vm)
 
         vm.start(60_000L)
@@ -104,7 +114,7 @@ class TimerViewModelTest {
     @Test
     fun `放弃不打卡`() = runTest {
         val gateway = FakeGateway()
-        val vm = TimerViewModel(taskId = 7, gateway = gateway)
+        val vm = TimerViewModel(taskId = 7, gateway = gateway, settings = FakeSettingsGateway())
         awaitSetup(vm)
 
         vm.start(60_000L)

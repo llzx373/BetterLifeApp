@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "rules": [
+    { "entryId": "02-11", "type": "steps", "threshold": 7000 },
+    { "entryId": "02-13", "type": "sleep", "threshold": 7 }
+  ]
+}

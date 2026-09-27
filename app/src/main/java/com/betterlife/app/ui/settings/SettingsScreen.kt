@@ -1,4 +1,4 @@
-// 设置页:AI 服务商/API Key(含连接自检)、每日提醒、主题、档案入口、关于与免责
+// 设置页:AI 供应商卡片(启用/禁用/测试/扫描模型)、番茄钟铃声、每日提醒、主题、档案入口、关于与免责
 //
 // 分组用表达性分段 ListItem 连成一组,不再靠 HorizontalDivider 划线;
 // 输入框走 rememberSaveable,旋转设备不丢已经敲进去的内容。
@@ -8,6 +8,8 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -21,9 +23,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -39,12 +44,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenu
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItemDefaults
@@ -56,6 +57,7 @@ import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -72,9 +74,8 @@ import androidx.compose.runtime.setValue
 import androidx.core.app.NotificationManagerCompat
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -86,19 +87,17 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
+import com.betterlife.app.data.AiProvider
 import com.betterlife.app.ui.common.MotionEntrance
 import com.betterlife.app.ui.theme.MotionLevel
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.ui.theme.ThemeMode
 import com.betterlife.app.viewmodel.SettingsViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-
-private data class PresetOption(
-    val label: String,
-    val baseUrl: String,
-    val model: String,
-    val isCustom: Boolean = false,
-)
+import kotlinx.coroutines.withContext
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -112,38 +111,98 @@ fun SettingsScreen(
     val currentThemeMode = ThemeMode.fromKey(settings.themeMode)
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val haptics = LocalHapticFeedback.current
     val uriHandler = LocalUriHandler.current
 
-    val customLabel = stringResource(R.string.settings_custom)
     val savedMessage = stringResource(R.string.settings_saved)
-    val presets = remember(vm.presets) {
-        vm.presets.map { PresetOption(it.label, it.baseUrl, it.model) } +
-            PresetOption("", "", "", isCustom = true)
-    }
-    val presetLabels = presets.map { if (it.isCustom) customLabel else it.label }
-
-    var baseUrl by rememberSaveable { mutableStateOf("") }
-    var apiKey by rememberSaveable { mutableStateOf("") }
-    var model by rememberSaveable { mutableStateOf("") }
-    var initialized by rememberSaveable { mutableStateOf(false) }
-    // 只在真实配置读出来之后填一次表单,之后完全交给用户
-    LaunchedEffect(state.loaded) {
-        if (state.loaded && !initialized) {
-            baseUrl = settings.apiBaseUrl
-            apiKey = settings.apiKey
-            model = settings.apiModel
-            initialized = true
-        }
-    }
+    val deletedProviderMessage = stringResource(R.string.settings_provider_deleted)
+    val newProviderName = stringResource(R.string.settings_provider_default_name)
 
     var showTimePicker by remember { mutableStateOf(false) }
-    var keyVisible by rememberSaveable { mutableStateOf(false) }
+    // 待确认的导入文件内容：读文件成功后才弹确认框,确认才真导入
+    var pendingImportJson by remember { mutableStateOf<String?>(null) }
+    var showClearChatConfirm by remember { mutableStateOf(false) }
 
     val enableReminder: (Boolean) -> Unit = { enabled ->
         vm.setReminder(enabled, settings.reminderHour, settings.reminderMinute)
     }
     val context = LocalContext.current
+    val resources = LocalResources.current
+
+    // 导出:系统文件选择器给目标 uri,拿到后由 VM 生成 JSON 并写流;结果走 dataAction → snackbar
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        if (uri != null) {
+            vm.exportBackup { json ->
+                context.contentResolver.openOutputStream(uri)?.use { out ->
+                    out.write(json.toByteArray(Charsets.UTF_8))
+                } ?: error("openOutputStream returned null")
+            }
+        }
+    }
+
+    // 导入:先读文件内容存起来,弹确认框;读不出来直接报失败,不进确认流程
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val json = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.openInputStream(uri)
+                            ?.bufferedReader()?.use { it.readText() }
+                    }.getOrNull()
+                }
+                if (json == null) {
+                    snackbar.showSnackbar(resources.getString(R.string.settings_import_failed, ""))
+                } else {
+                    pendingImportJson = json
+                }
+            }
+        }
+    }
+
+    // 导出/导入结果一次性消费:弹完 snackbar 就归位,避免重组后重复弹
+    LaunchedEffect(state.dataAction) {
+        when (val action = state.dataAction) {
+            is SettingsViewModel.DataAction.Exported -> {
+                snackbar.showSnackbar(resources.getString(R.string.settings_export_ok))
+                vm.consumeDataAction()
+            }
+
+            is SettingsViewModel.DataAction.Imported -> {
+                snackbar.showSnackbar(resources.getString(R.string.settings_import_ok, action.rows))
+                vm.consumeDataAction()
+            }
+
+            is SettingsViewModel.DataAction.ExportFailed -> {
+                snackbar.showSnackbar(
+                    resources.getString(R.string.settings_export_failed) + " " + action.detail,
+                )
+                vm.consumeDataAction()
+            }
+
+            is SettingsViewModel.DataAction.ImportFailed -> {
+                snackbar.showSnackbar(resources.getString(R.string.settings_import_failed, action.detail))
+                vm.consumeDataAction()
+            }
+
+            else -> {}
+        }
+    }
+
+    // 系统铃声选择器:返回 null 表示用户在 picker 里选了「无」,按恢复默认处理
+    val ringtoneLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val uri: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+        }
+        vm.setTimerRingtone(uri?.toString().orEmpty())
+    }
 
     // 拒绝通知权限时开关会被打回去,不说原因就像「开关坏了」;给个跳转系统设置的出口
     val deniedMessage = stringResource(R.string.settings_reminder_denied)
@@ -203,108 +262,80 @@ fun SettingsScreen(
         ) {
             SectionTitle(stringResource(R.string.settings_section_ai))
 
-            var expanded by remember { mutableStateOf(false) }
-            val selectedIndex = presets.indexOfFirst { it.baseUrl == baseUrl && it.model == model }
-            val selectedLabel = presetLabels.getOrElse(selectedIndex) { customLabel }
-            ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-                OutlinedTextField(
-                    value = selectedLabel,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text(stringResource(R.string.settings_provider)) },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+            settings.aiProviders.forEach { provider ->
+                ProviderCard(
+                    provider = provider,
+                    isActive = settings.activeProviderId == provider.id,
+                    testState = state.testStates[provider.id] ?: SettingsViewModel.ConnectionTest.Idle,
+                    scanState = state.scanStates[provider.id] ?: SettingsViewModel.ScanState.Idle,
+                    onSave = { updated ->
+                        vm.saveProvider(updated)
+                        scope.launch { snackbar.showSnackbar(savedMessage) }
+                    },
+                    onDelete = {
+                        vm.deleteProvider(provider.id)
+                        scope.launch { snackbar.showSnackbar(deletedProviderMessage) }
+                    },
+                    onSetActive = { vm.setActiveProvider(provider.id) },
+                    onSetEnabled = { vm.setProviderEnabled(provider.id, it) },
+                    onTest = { vm.testProvider(provider.id) },
+                    onScan = { baseUrl, apiKey -> vm.scanModels(provider.id, baseUrl, apiKey) },
+                    onScanDismissed = { vm.clearScanState(provider.id) },
                 )
-                ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    presets.forEachIndexed { index, preset ->
-                        DropdownMenuItem(
-                            text = { Text(presetLabels[index]) },
-                            onClick = {
-                                expanded = false
-                                if (!preset.isCustom) {
-                                    baseUrl = preset.baseUrl
-                                    model = preset.model
-                                }
-                            },
-                        )
-                    }
-                }
             }
 
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it },
-                label = { Text(stringResource(R.string.settings_api_key)) },
-                singleLine = true,
-                visualTransformation = if (keyVisible) VisualTransformation.None
-                else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { keyVisible = !keyVisible }) {
-                        Icon(
-                            imageVector = if (keyVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                            contentDescription = stringResource(
-                                if (keyVisible) R.string.settings_api_key_hide else R.string.settings_api_key_show,
-                            ),
-                        )
-                    }
-                },
+            OutlinedButton(
+                onClick = { vm.addProvider(newProviderName) },
                 modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = baseUrl,
-                onValueChange = { baseUrl = it },
-                label = { Text(stringResource(R.string.settings_base_url)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = model,
-                onValueChange = { model = it },
-                label = { Text(stringResource(R.string.settings_model)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Button(onClick = {
-                    vm.saveApiConfig(baseUrl, apiKey, model)
-                    scope.launch { snackbar.showSnackbar(savedMessage) }
-                }) { Text(stringResource(R.string.settings_save_ai)) }
-
-                Spacer(Modifier.width(Spacing.space2))
-
-                OutlinedButton(
-                    onClick = { vm.testConnection() },
-                    enabled = state.connectionTest !is SettingsViewModel.ConnectionTest.Running,
-                ) {
-                    if (state.connectionTest is SettingsViewModel.ConnectionTest.Running) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(Spacing.space4),
-                            strokeWidth = 2.dp,
-                        )
-                        Spacer(Modifier.width(Spacing.space2))
-                    }
-                    Text(stringResource(R.string.settings_test_connection))
-                }
+                Text(stringResource(R.string.settings_provider_add))
             }
 
-            when (val test = state.connectionTest) {
-                is SettingsViewModel.ConnectionTest.Success -> TestResultText(
-                    text = stringResource(R.string.settings_test_ok),
-                    color = MaterialTheme.colorScheme.primary,
-                )
+            SectionTitle(stringResource(R.string.settings_section_ai_search))
 
-                is SettingsViewModel.ConnectionTest.Failed -> TestResultText(
-                    text = test.detail,
-                    color = MaterialTheme.colorScheme.error,
-                )
+            SearchConfigCard(
+                apiKey = settings.searchApiKey,
+                endpoint = settings.searchEndpoint,
+                testState = state.searchTest,
+                onSave = { key, endpoint ->
+                    vm.saveSearchConfig(key, endpoint)
+                    scope.launch { snackbar.showSnackbar(savedMessage) }
+                },
+                onTest = vm::testSearch,
+            )
 
-                else -> {}
+            SectionTitle(stringResource(R.string.settings_section_timer))
+
+            val ringtoneTitle = remember(settings.timerRingtoneUri) {
+                if (settings.timerRingtoneUri.isBlank()) null
+                else runCatching {
+                    RingtoneManager.getRingtone(context, Uri.parse(settings.timerRingtoneUri))
+                        ?.getTitle(context)
+                }.getOrNull()
+            }
+            SegmentedListItem(
+                onClick = {
+                    val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                        putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
+                        putExtra(
+                            RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                            settings.timerRingtoneUri.takeIf { it.isNotBlank() }?.let(Uri::parse),
+                        )
+                    }
+                    runCatching { ringtoneLauncher.launch(intent) }
+                },
+                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 2),
+                trailingContent = {
+                    Text(ringtoneTitle ?: stringResource(R.string.settings_timer_ringtone_default))
+                },
+            ) {
+                Text(stringResource(R.string.settings_timer_ringtone))
+            }
+            SegmentedListItem(
+                onClick = { vm.setTimerRingtone("") },
+                shapes = ListItemDefaults.segmentedShapes(index = 1, count = 2),
+            ) {
+                Text(stringResource(R.string.settings_timer_ringtone_reset))
             }
 
             SectionTitle(stringResource(R.string.settings_section_reminder))
@@ -329,7 +360,6 @@ fun SettingsScreen(
             }
             SegmentedListItem(
                 onClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     showTimePicker = true
                 },
                 shapes = ListItemDefaults.segmentedShapes(index = 1, count = 2),
@@ -396,6 +426,36 @@ fun SettingsScreen(
                 }
             }
 
+            SectionTitle(stringResource(R.string.settings_section_data))
+
+            // 备份导出/导入走系统文件选择器;「清空对话历史」有确认弹窗,误触可撤回决定
+            SegmentedListItem(
+                onClick = {
+                    val stamp = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
+                    runCatching { exportLauncher.launch("betterlife-backup-$stamp.json") }
+                },
+                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 3),
+                supportingContent = { Text(stringResource(R.string.settings_export_data_sub)) },
+            ) {
+                Text(stringResource(R.string.settings_export_data))
+            }
+            SegmentedListItem(
+                onClick = {
+                    runCatching { importLauncher.launch(arrayOf("application/json")) }
+                },
+                shapes = ListItemDefaults.segmentedShapes(index = 1, count = 3),
+                supportingContent = { Text(stringResource(R.string.settings_import_data_sub)) },
+            ) {
+                Text(stringResource(R.string.settings_import_data))
+            }
+            SegmentedListItem(
+                onClick = { showClearChatConfirm = true },
+                shapes = ListItemDefaults.segmentedShapes(index = 2, count = 3),
+                supportingContent = { Text(stringResource(R.string.settings_clear_chat_sub)) },
+            ) {
+                Text(stringResource(R.string.settings_clear_chat))
+            }
+
             SectionTitle(stringResource(R.string.settings_section_profile))
 
             SegmentedListItem(
@@ -448,9 +508,358 @@ fun SettingsScreen(
             text = { TimePicker(state = timeState) },
         )
     }
+
+    // 导入前必须确认:覆盖式导入不可撤销,文案把「不含 API 密钥」说在前面
+    pendingImportJson?.let { json ->
+        AlertDialog(
+            onDismissRequest = { pendingImportJson = null },
+            title = { Text(stringResource(R.string.settings_import_confirm_title)) },
+            text = { Text(stringResource(R.string.settings_import_confirm_text)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingImportJson = null
+                    vm.importBackup(json)
+                }) { Text(stringResource(R.string.action_import)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingImportJson = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+
+    if (showClearChatConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearChatConfirm = false },
+            title = { Text(stringResource(R.string.settings_clear_chat_confirm_title)) },
+            text = { Text(stringResource(R.string.settings_clear_chat_confirm_text)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showClearChatConfirm = false
+                    vm.clearChatHistory()
+                    scope.launch {
+                        snackbar.showSnackbar(resources.getString(R.string.settings_clear_chat_done))
+                    }
+                }) {
+                    Text(
+                        text = stringResource(R.string.settings_clear_chat_confirm),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearChatConfirm = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+}
+
+/**
+ * 一张供应商卡:名称/Key/地址/模型先进本地表单态(按 id keyed,旋转不丢),
+ * 点「保存」才落盘;测试与扫描都用这张卡自己的配置,互不影响。
+ */
+@Composable
+private fun ProviderCard(
+    provider: AiProvider,
+    isActive: Boolean,
+    testState: SettingsViewModel.ConnectionTest,
+    scanState: SettingsViewModel.ScanState,
+    onSave: (AiProvider) -> Unit,
+    onDelete: () -> Unit,
+    onSetActive: () -> Unit,
+    onSetEnabled: (Boolean) -> Unit,
+    onTest: () -> Unit,
+    onScan: (baseUrl: String, apiKey: String) -> Unit,
+    onScanDismissed: () -> Unit,
+) {
+    var name by rememberSaveable(provider.id) { mutableStateOf(provider.name) }
+    var baseUrl by rememberSaveable(provider.id) { mutableStateOf(provider.baseUrl) }
+    var apiKey by rememberSaveable(provider.id) { mutableStateOf(provider.apiKey) }
+    var model by rememberSaveable(provider.id) { mutableStateOf(provider.model) }
+    var keyVisible by rememberSaveable(provider.id) { mutableStateOf(false) }
+    var showModelPicker by remember { mutableStateOf(false) }
+
+    // 扫描成功才弹选择窗;关掉弹窗时把状态归位,避免重组后反复弹
+    LaunchedEffect(scanState) {
+        if (scanState is SettingsViewModel.ScanState.Success) showModelPicker = true
+    }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(Spacing.space3),
+            verticalArrangement = Arrangement.spacedBy(Spacing.space2),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.settings_provider_name)) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(Spacing.space2))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Switch(checked = provider.enabled, onCheckedChange = onSetEnabled)
+                    Text(
+                        text = stringResource(R.string.settings_provider_enable),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            if (isActive) {
+                Text(
+                    text = stringResource(R.string.settings_provider_active),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                TextButton(onClick = onSetActive) {
+                    Text(stringResource(R.string.settings_provider_set_active))
+                }
+            }
+
+            OutlinedTextField(
+                value = apiKey,
+                onValueChange = { apiKey = it },
+                label = { Text(stringResource(R.string.settings_api_key)) },
+                singleLine = true,
+                visualTransformation = if (keyVisible) VisualTransformation.None
+                else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { keyVisible = !keyVisible }) {
+                        Icon(
+                            imageVector = if (keyVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            contentDescription = stringResource(
+                                if (keyVisible) R.string.settings_api_key_hide else R.string.settings_api_key_show,
+                            ),
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = baseUrl,
+                onValueChange = { baseUrl = it },
+                label = { Text(stringResource(R.string.settings_base_url)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = model,
+                onValueChange = { model = it },
+                label = { Text(stringResource(R.string.settings_model)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Button(onClick = {
+                    onSave(
+                        provider.copy(
+                            name = name.trim(),
+                            baseUrl = baseUrl.trim(),
+                            apiKey = apiKey.trim(),
+                            model = model.trim(),
+                        )
+                    )
+                }) { Text(stringResource(R.string.action_save)) }
+
+                Spacer(Modifier.width(Spacing.space2))
+
+                OutlinedButton(
+                    onClick = onTest,
+                    enabled = testState !is SettingsViewModel.ConnectionTest.Running,
+                ) {
+                    if (testState is SettingsViewModel.ConnectionTest.Running) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(Spacing.space4),
+                            strokeWidth = 2.dp,
+                        )
+                        Spacer(Modifier.width(Spacing.space2))
+                    }
+                    Text(stringResource(R.string.settings_test_connection))
+                }
+
+                Spacer(Modifier.weight(1f))
+
+                TextButton(onClick = onDelete) {
+                    Text(
+                        text = stringResource(R.string.action_delete),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+
+            OutlinedButton(
+                onClick = { onScan(baseUrl.trim(), apiKey.trim()) },
+                enabled = scanState !is SettingsViewModel.ScanState.Loading,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (scanState is SettingsViewModel.ScanState.Loading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(Spacing.space4),
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(Modifier.width(Spacing.space2))
+                }
+                Text(stringResource(R.string.settings_scan_models))
+            }
+
+            when (testState) {
+                is SettingsViewModel.ConnectionTest.Success -> TestResultText(
+                    text = stringResource(R.string.settings_test_ok),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+
+                is SettingsViewModel.ConnectionTest.Failed -> TestResultText(
+                    text = testState.detail,
+                    color = MaterialTheme.colorScheme.error,
+                )
+
+                else -> {}
+            }
+
+            if (scanState is SettingsViewModel.ScanState.Failed) {
+                TestResultText(
+                    text = scanState.detail,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+    }
+
+    val scannedModels = (scanState as? SettingsViewModel.ScanState.Success)?.models
+    if (showModelPicker && scannedModels != null) {
+        AlertDialog(
+            onDismissRequest = {
+                showModelPicker = false
+                onScanDismissed()
+            },
+            title = { Text(stringResource(R.string.settings_scan_models_dialog_title)) },
+            text = {
+                LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                    items(scannedModels) { id ->
+                        Text(
+                            text = id,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    model = id
+                                    showModelPicker = false
+                                    onScanDismissed()
+                                }
+                                .padding(vertical = Spacing.space2),
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showModelPicker = false
+                    onScanDismissed()
+                }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
 }
 
 private const val SOURCES_URL = "https://github.com/eternity4719/HowToLiveBetter"
+
+/**
+ * AI 搜索（博查 web-search）配置卡:key/端点先进本地表单态,点「保存」落盘;
+ * 「测试搜索」真发一次搜索验证 key 与端点可用。
+ */
+@Composable
+private fun SearchConfigCard(
+    apiKey: String,
+    endpoint: String,
+    testState: SettingsViewModel.ConnectionTest,
+    onSave: (String, String) -> Unit,
+    onTest: () -> Unit,
+) {
+    var key by rememberSaveable { mutableStateOf(apiKey) }
+    var ep by rememberSaveable { mutableStateOf(endpoint) }
+    var keyVisible by rememberSaveable { mutableStateOf(false) }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(Spacing.space3),
+            verticalArrangement = Arrangement.spacedBy(Spacing.space2),
+        ) {
+            Text(
+                text = stringResource(R.string.settings_search_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = key,
+                onValueChange = { key = it },
+                label = { Text(stringResource(R.string.settings_api_key)) },
+                singleLine = true,
+                visualTransformation = if (keyVisible) VisualTransformation.None
+                else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { keyVisible = !keyVisible }) {
+                        Icon(
+                            imageVector = if (keyVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            contentDescription = stringResource(
+                                if (keyVisible) R.string.settings_api_key_hide else R.string.settings_api_key_show,
+                            ),
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = ep,
+                onValueChange = { ep = it },
+                label = { Text(stringResource(R.string.settings_search_endpoint)) },
+                placeholder = { Text(stringResource(R.string.settings_search_endpoint_default)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = { onSave(key, ep) }) { Text(stringResource(R.string.action_save)) }
+                Spacer(Modifier.width(Spacing.space2))
+                OutlinedButton(
+                    onClick = onTest,
+                    enabled = testState !is SettingsViewModel.ConnectionTest.Running,
+                ) {
+                    if (testState is SettingsViewModel.ConnectionTest.Running) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(Spacing.space4),
+                            strokeWidth = 2.dp,
+                        )
+                        Spacer(Modifier.width(Spacing.space2))
+                    }
+                    Text(stringResource(R.string.settings_search_test))
+                }
+            }
+            when (testState) {
+                is SettingsViewModel.ConnectionTest.Success -> TestResultText(
+                    text = stringResource(R.string.settings_test_ok),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+
+                is SettingsViewModel.ConnectionTest.Failed -> TestResultText(
+                    text = testState.detail,
+                    color = MaterialTheme.colorScheme.error,
+                )
+
+                else -> {}
+            }
+        }
+    }
+}
 
 /** 提醒开着但通知权限不在时才需要警告行。提成纯函数,判定规则可以脱离 Android 环境测试 */
 internal fun reminderWarningNeeded(reminderEnabled: Boolean, notificationsEnabled: Boolean): Boolean =
@@ -501,7 +910,7 @@ private fun DisclaimerSection() {
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            MotionEntrance(visible = expanded) {
+            MotionEntrance(visible = expanded, expand = true) {
                 Text(
                     text = stringResource(R.string.settings_disclaimer),
                     style = MaterialTheme.typography.bodySmall,

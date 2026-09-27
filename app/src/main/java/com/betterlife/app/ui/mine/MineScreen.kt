@@ -11,7 +11,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.NotInterested
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -25,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -44,6 +51,7 @@ fun MineScreen(
     onOpenChat: () -> Unit,
     onOpenFavorites: () -> Unit,
     onOpenDismissed: () -> Unit,
+    onOpenStats: () -> Unit,
     vm: ProfileViewModel = viewModel(factory = ProfileViewModel.Factory),
 ) {
     val profile by vm.profile.collectAsStateWithLifecycle()
@@ -96,28 +104,39 @@ fun MineScreen(
 
             val entries = listOf(
                 EntryItem(
+                    titleRes = R.string.mine_stats,
+                    subtitleRes = R.string.mine_stats_sub,
+                    icon = Icons.Filled.Insights,
+                    onClick = onOpenStats,
+                ),
+                EntryItem(
                     titleRes = R.string.mine_edit_profile,
                     subtitleRes = null,
+                    icon = Icons.Filled.Edit,
                     onClick = onEditProfile,
                 ),
                 EntryItem(
                     titleRes = R.string.mine_favorites,
                     subtitleRes = R.string.mine_favorites_sub,
+                    icon = Icons.Filled.Favorite,
                     onClick = onOpenFavorites,
                 ),
                 EntryItem(
                     titleRes = R.string.mine_dismissed,
                     subtitleRes = R.string.mine_dismissed_sub,
+                    icon = Icons.Filled.NotInterested,
                     onClick = onOpenDismissed,
                 ),
                 EntryItem(
                     titleRes = R.string.mine_chat,
                     subtitleRes = R.string.mine_chat_sub,
+                    icon = Icons.AutoMirrored.Filled.Chat,
                     onClick = onOpenChat,
                 ),
                 EntryItem(
                     titleRes = R.string.mine_settings,
                     subtitleRes = R.string.mine_settings_sub,
+                    icon = Icons.Filled.Settings,
                     onClick = onOpenSettings,
                 ),
             )
@@ -125,6 +144,7 @@ fun MineScreen(
                 SegmentedListItem(
                     onClick = entry.onClick,
                     shapes = ListItemDefaults.segmentedShapes(index = index, count = entries.size),
+                    leadingContent = { Icon(entry.icon, contentDescription = null) },
                     supportingContent = entry.subtitleRes?.let { res -> { Text(stringResource(res)) } },
                     trailingContent = {
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
@@ -140,6 +160,7 @@ fun MineScreen(
 private data class EntryItem(
     val titleRes: Int,
     val subtitleRes: Int?,
+    val icon: ImageVector,
     val onClick: () -> Unit,
 )
 

@@ -1,6 +1,7 @@
 // 条目库的屏级截图基线。
 //
-// 重点是 ≥600dp 的双栏:左目录、右章内条目。这句话得有一张 900dp 的图来证明 ——
+// 重点是宽屏分档:600–839dp 双栏(目录 | 章内条目)、840–1199dp 双栏(章内条目 | 条目详情)、
+// ≥1200dp 三栏。每个档位都得有一张图来证明 ——
 // 光靠读代码看不出 ListDetailPaneScaffold 到底有没有把详情栏渲染出来。
 package com.betterlife.app.ui.library
 
@@ -75,6 +76,56 @@ private val compactState = twoPaneState.copy(selectedSection = null, sectionEntr
 
 private const val PHONE_WIDTH = 412
 private const val TABLET_WIDTH = 900
+private const val LIST_DETAIL_WIDTH = 840
+private const val THREE_PANE_WIDTH = 1200
+
+@PreviewTest
+@Preview(name = "list-detail-light", widthDp = LIST_DETAIL_WIDTH, heightDp = 700)
+@Preview(
+    name = "list-detail-dark",
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+    widthDp = LIST_DETAIL_WIDTH,
+    heightDp = 700,
+)
+@Composable
+fun LibraryListDetailExpanded() {
+    PreviewScreen {
+        LibraryListDetail(
+            state = twoPaneState,
+            onQueryChange = {},
+            onSearchSubmit = {},
+            onSelectSection = {},
+            onSelectSort = {},
+            onSetFilter = {},
+            onSelectEntry = {},
+            onOpenChat = {},
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "three-pane-light", widthDp = THREE_PANE_WIDTH, heightDp = 800)
+@Preview(
+    name = "three-pane-dark",
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+    widthDp = THREE_PANE_WIDTH,
+    heightDp = 800,
+)
+@Composable
+fun LibraryThreePaneExpanded() {
+    PreviewScreen {
+        LibraryThreePane(
+            state = twoPaneState,
+            onQueryChange = {},
+            onSearchSubmit = {},
+            onSelectSection = {},
+            onSelectSort = {},
+            onSetFilter = {},
+            onSelectEntry = {},
+            onOpenChat = {},
+        )
+    }
+}
 
 @PreviewTest
 @Preview(name = "two-pane-light", widthDp = TABLET_WIDTH, heightDp = 700)
@@ -93,6 +144,7 @@ fun LibraryTwoPaneExpanded() {
             onSearchSubmit = {},
             onSelectSection = {},
             onSelectSort = {},
+            onSetFilter = {},
             onOpenEntry = {},
         )
     }

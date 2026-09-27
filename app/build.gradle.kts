@@ -70,8 +70,10 @@ android {
         // 版本约定：versionName 三段式 —— 大重构迭代第一位、大特性更新迭代第二位、
         // 正式版本迭代第三位；versionCode 即版本号后面的「-n」开发迭代号
         // （0.1.0-1 ↔ versionCode 1），开发中只递增 versionCode。
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -117,6 +119,13 @@ android {
     // 启用 screenshotTest 源集（配合 gradle.properties 的同名开关）
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
 
+    sourceSets {
+        // Room schema JSON 打进 androidTest assets，MigrationTestHelper 据此校验迁移
+        named("androidTest") {
+            assets.srcDir("$projectDir/schemas")
+        }
+    }
+
     packaging {
         resources {
             // 精确排除，不要再用 "META-INF/*" 通配 —— 那会连带干掉 META-INF/services
@@ -139,6 +148,11 @@ android {
         checkReleaseBuilds = true
         warningsAsErrors = false
     }
+}
+
+// Room schema 导出到 app/schemas/，既入库做版本档案，也供 androidTest 的 MigrationTestHelper 使用
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 // APK 产物文件名用英文：BetterLife-<versionName>-<versionCode>.apk
@@ -193,6 +207,8 @@ dependencies {
     implementation(libs.androidx.health.connect)
     // 把打包进来的 baseline profile 真正装上（API < 33 尤其需要）
     implementation(libs.androidx.profileinstaller)
+    // B5 桌面小部件：今日任务一键打卡
+    implementation(libs.androidx.glance.appwidget)
 
     // baseline profile 生成器（只有跑 generateBaselineProfile 时才会用到）
     baselineProfile(project(":baselineprofile"))
@@ -205,6 +221,11 @@ dependencies {
     // 测试
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+
+    // 设备测试：Room 迁移校验（MigrationTestHelper 读 schemas/ 里的 JSON）
+    androidTestImplementation(libs.androidx.room.testing)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
 
     // 截图测试（host 侧渲染 Compose 预览，不需要设备）
     screenshotTestImplementation(libs.compose.ui.tooling)

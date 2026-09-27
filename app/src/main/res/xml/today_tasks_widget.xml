@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- B5「今日任务」小部件：Glance 运行时生成布局，无需 initialLayout；
+     updatePeriodMillis 系统下限就是 30 分钟，任务变化的即时刷新走 WidgetUpdater。 -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="1800000"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/widget_today_tasks_desc"
+    android:previewImage="@mipmap/ic_launcher" />

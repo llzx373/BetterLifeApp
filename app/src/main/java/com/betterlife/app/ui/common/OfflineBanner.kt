@@ -26,7 +26,8 @@ import com.betterlife.app.ui.theme.Spacing
 
 @Composable
 fun OfflineBanner(visible: Boolean, modifier: Modifier = Modifier) {
-    MotionEntrance(visible = visible, modifier = modifier) {
+    // 从顶部展开而不是只淡入:横幅出现时下方 NavHost 是「被推开」而不是瞬移
+    MotionEntrance(visible = visible, modifier = modifier, expand = true) {
         Surface(
             color = MaterialTheme.colorScheme.errorContainer,
             contentColor = MaterialTheme.colorScheme.onErrorContainer,

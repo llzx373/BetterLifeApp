@@ -37,4 +37,83 @@ class TaskReminderTimeTest {
         val trigger = nextTriggerMillis(now, 5, zone)
         assertEquals(millis("2026-03-06", "00:05"), trigger)
     }
+
+    // ---- 指定日期（一次性待办截止日）维度 ----
+
+    @Test
+    fun `截止日就是今天且时间未到则今天触发`() {
+        val now = millis("2026-03-05", "08:00")
+        val trigger = nextTriggerMillis(now, 9 * 60 + 30, zone, LocalDate.parse("2026-03-05"))
+        assertEquals(millis("2026-03-05", "09:30"), trigger)
+    }
+
+    @Test
+    fun `截止日就是今天但时间已过则原样返回过去时刻`() {
+        // 返回过去时刻：work 立即执行，由 worker 自查决定是否跳过
+        val now = millis("2026-03-05", "20:00")
+        val trigger = nextTriggerMillis(now, 9 * 60 + 30, zone, LocalDate.parse("2026-03-05"))
+        assertEquals(millis("2026-03-05", "09:30"), trigger)
+    }
+
+    @Test
+    fun `截止日是明天则明天触发不顺延`() {
+        val now = millis("2026-03-05", "20:00")
+        val trigger = nextTriggerMillis(now, 7 * 60 + 15, zone, LocalDate.parse("2026-03-06"))
+        assertEquals(millis("2026-03-06", "07:15"), trigger)
+    }
+
+    @Test
+    fun `截止日已过则原样返回过去时刻`() {
+        val now = millis("2026-03-05", "20:00")
+        val trigger = nextTriggerMillis(now, 9 * 60, zone, LocalDate.parse("2026-03-01"))
+        assertEquals(millis("2026-03-01", "09:00"), trigger)
+    }
+
+    // ---- 撤销打卡后的补排判断（shouldRescheduleReminder）----
+
+    @Test
+    fun `撤销补排-没设过提醒不补排`() {
+        val now = millis("2026-03-05", "08:00")
+        assertEquals(false, shouldRescheduleReminder(null, now, zone))
+    }
+
+    @Test
+    fun `撤销补排-每日任务目标时间在未来则补排`() {
+        val now = millis("2026-03-05", "08:00")
+        assertEquals(true, shouldRescheduleReminder(9 * 60 + 30, now, zone))
+    }
+
+    @Test
+    fun `撤销补排-每日任务不设日期时总能排到未来`() {
+        // 无日期语义下已过点会顺延到明天，所以恒在未来
+        val now = millis("2026-03-05", "20:00")
+        assertEquals(true, shouldRescheduleReminder(7 * 60, now, zone))
+    }
+
+    @Test
+    fun `撤销补排-一次性待办截止日今天但时间已过不补排`() {
+        val now = millis("2026-03-05", "20:00")
+        assertEquals(
+            false,
+            shouldRescheduleReminder(9 * 60, now, zone, LocalDate.parse("2026-03-05")),
+        )
+    }
+
+    @Test
+    fun `撤销补排-一次性待办截止日已过不补排`() {
+        val now = millis("2026-03-05", "08:00")
+        assertEquals(
+            false,
+            shouldRescheduleReminder(9 * 60, now, zone, LocalDate.parse("2026-03-01")),
+        )
+    }
+
+    @Test
+    fun `撤销补排-一次性待办截止日在未来则补排`() {
+        val now = millis("2026-03-05", "20:00")
+        assertEquals(
+            true,
+            shouldRescheduleReminder(9 * 60, now, zone, LocalDate.parse("2026-03-06")),
+        )
+    }
 }

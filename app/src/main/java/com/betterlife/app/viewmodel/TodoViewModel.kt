@@ -17,21 +17,43 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalDate
 
 class TodoViewModel(
     private val taskManager: TaskManager,
     private val entryRepository: EntryRepository,
 ) : ViewModel() {
 
-    data class TodoItem(val task: TaskEntity, val entry: EntryDto?)
+    data class TodoItem(
+        val task: TaskEntity,
+        val entry: EntryDto?,
+        /** 自定义任务（无条目库条目）的标题，来自 custom_entries */
+        val customTitle: String? = null,
+    ) {
+        val displayTitle: String get() = entry?.title ?: customTitle ?: task.entryId
+    }
+
+    data class WeeklyEntry(
+        val item: TaskManager.WeeklyItem,
+        val entry: EntryDto?,
+        val customTitle: String? = null,
+    ) {
+        val displayTitle: String get() = entry?.title ?: customTitle ?: item.habit.entryId
+    }
+
+    /** 自定义任务的类型，AddTaskDialog 的选择项 */
+    enum class CustomTaskKind { ONCE, DAILY, WEEKLY }
 
     /**
-     * 每日习惯与一次性待办分开给出:两类的语义和交互都不同,
+     * 每日习惯、每周习惯与一次性待办分开给出:三类的语义和交互都不同,
      * 分区在 VM 里算一次,界面不做过滤也不重组重算。
      */
     data class UiState(
         val daily: List<TodoItem> = emptyList(),
+        val weekly: List<WeeklyEntry> = emptyList(),
         val once: List<TodoItem> = emptyList(),
+        /** 用户自选（而非 planner 安排）的每日习惯条目 id，决定行上是否显示「取消每日」 */
+        val userDailyIds: Set<String> = emptySet(),
     ) {
         val dailyDoneCount: Int get() = daily.count { it.task.done }
         val dailyAllDone: Boolean get() = daily.isNotEmpty() && dailyDoneCount == daily.size
@@ -42,20 +64,54 @@ class TodoViewModel(
 
     init {
         viewModelScope.launch {
-            combine(taskManager.todayTasksFlow(), taskManager.todoListFlow()) { daily, once -> daily + once }
-                .collect { tasks ->
-                    val data = withContext(Dispatchers.IO) { entryRepository.entriesData() }
-                    val items = tasks.map { TodoItem(it, data.byId[it.entryId]) }
-                    _uiState.value = UiState(
-                        daily = items.filter { it.task.type == TaskEntity.TYPE_DAILY },
-                        once = items.filter { it.task.type == TaskEntity.TYPE_ONCE },
-                    )
+            combine(
+                taskManager.todayTasksFlow(),
+                taskManager.todoListFlow(),
+                taskManager.weeklyItemsFlow(),
+                taskManager.userDailyIdsFlow(),
+                taskManager.customEntriesFlow(),
+            ) { dailyTasks, onceTasks, weeklyItems, userDaily, customEntries ->
+                val data = withContext(Dispatchers.IO) { entryRepository.entriesData() }
+                val customTitles = customEntries.associate { it.entryId to it.title }
+                val tasks = (dailyTasks + onceTasks).map {
+                    TodoItem(it, data.byId[it.entryId], customTitles[it.entryId])
                 }
+                UiState(
+                    daily = tasks.filter { it.task.type == TaskEntity.TYPE_DAILY },
+                    weekly = weeklyItems.map {
+                        WeeklyEntry(it, data.byId[it.habit.entryId], customTitles[it.habit.entryId])
+                    },
+                    once = tasks.filter { it.task.type == TaskEntity.TYPE_ONCE },
+                    userDailyIds = userDaily.toSet(),
+                )
+            }.collect { _uiState.value = it }
         }
     }
 
     fun addTodo(entryId: String) {
         viewModelScope.launch(Dispatchers.IO) { taskManager.addOneOffTodo(entryId) }
+    }
+
+    /** 新增自定义任务：一次性（可带到期日） / 每日 / 每周（每周用 [timesPerWeek]） */
+    fun addCustom(
+        title: String,
+        kind: CustomTaskKind,
+        timesPerWeek: Int = 3,
+        dueDate: LocalDate? = null,
+    ) {
+        if (title.isBlank()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            when (kind) {
+                CustomTaskKind.ONCE -> taskManager.addCustomOnce(title, dueDate)
+                CustomTaskKind.DAILY -> taskManager.addCustomDaily(title)
+                CustomTaskKind.WEEKLY -> taskManager.addCustomWeekly(title, timesPerWeek)
+            }
+        }
+    }
+
+    /** 设置/清除一次性待办的到期日（null = 清除），已设提醒的会按新日期重排 */
+    fun setOnceDueDate(taskId: Long, dueDate: LocalDate?) {
+        viewModelScope.launch(Dispatchers.IO) { taskManager.setOnceDueDate(taskId, dueDate) }
     }
 
     fun toggle(task: TaskEntity) {
@@ -67,6 +123,41 @@ class TodoViewModel(
 
     fun delete(task: TaskEntity) {
         viewModelScope.launch(Dispatchers.IO) { taskManager.deleteTask(task.taskId) }
+    }
+
+    /** 一次性待办 → 每日习惯 */
+    fun convertToDaily(item: TodoItem) {
+        viewModelScope.launch(Dispatchers.IO) {
+            taskManager.convertToDaily(item.task.entryId, item.task.taskId)
+        }
+    }
+
+    /** 取消用户自选的每日习惯 */
+    fun removeDailyHabit(entryId: String) {
+        viewModelScope.launch(Dispatchers.IO) { taskManager.removeDailyHabit(entryId) }
+    }
+
+    /** 一次性待办 → 每周习惯（一周 [timesPerWeek] 次） */
+    fun convertToWeekly(item: TodoItem, timesPerWeek: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            taskManager.convertToWeekly(item.task.entryId, item.task.taskId, timesPerWeek)
+        }
+    }
+
+    /** 每周习惯今日打卡开关 */
+    fun toggleWeekly(entryId: String) {
+        viewModelScope.launch(Dispatchers.IO) { taskManager.toggleWeeklyToday(entryId) }
+    }
+
+    fun removeWeekly(entryId: String) {
+        viewModelScope.launch(Dispatchers.IO) { taskManager.removeWeeklyHabit(entryId) }
+    }
+
+    /** 撤销移除每周习惯：恢复模板（自定义习惯的标题一并恢复） */
+    fun restoreWeekly(entry: WeeklyEntry) {
+        viewModelScope.launch(Dispatchers.IO) {
+            taskManager.restoreWeeklyHabit(entry.item.habit, entry.customTitle)
+        }
     }
 
     /** 设置/清除单任务提醒时间（一天内分钟数，null = 清除、跟随全局汇总） */

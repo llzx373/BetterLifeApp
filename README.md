@@ -36,7 +36,7 @@
 环境:JDK 17+(本项目在 JDK 21 上验证)、Android SDK(**platform-37 + build-tools 36.0.0**)。`local.properties` 里配置 `sdk.dir`。
 
 ```bash
-./gradlew testDebugUnitTest   # 47 个单元测试
+./gradlew testDebugUnitTest   # 203 个单元测试(36 个测试类)
 ./gradlew assembleDebug       # 产出 app/build/outputs/apk/debug/app-debug.apk
 ./gradlew assembleRelease     # 产出 app/build/outputs/apk/release/app-release.apk(R8 压缩)
 ./gradlew lint                # 静态检查(abortOnError:有错误即构建失败)
@@ -100,7 +100,7 @@ python tools/gen_rules.py                     # 重新生成 tools/relevance_rul
 ```
 
 - `entries.json`:601 条结构化条目,含机器可读的成本标签(钱/时间/毅力/收益/口径)、性价比档(极高/高/一般)、证据等级(A/B/C)
-- `relevance_rules.json`:55 条档案 → 条目的加权/排除规则 + 18 条每日习惯白名单
+- `relevance_rules.json`:55 条档案 → 条目的加权/排除规则 + 17 条每日习惯白名单
 
 ## 技术栈
 

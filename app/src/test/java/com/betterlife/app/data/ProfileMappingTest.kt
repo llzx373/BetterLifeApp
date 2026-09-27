@@ -66,4 +66,14 @@ class ProfileMappingTest {
         val profile = entity.toProfile()
         assertEquals(setOf(Chronic.KIDNEY, Chronic.HEART), profile.chronic)
     }
+
+    @Test
+    fun `无慢病时 chronic 字段产生 none 取值`() {
+        assertEquals(setOf("none"), Profile().fieldValues("chronic"))
+        assertTrue(Profile().matches(mapOf("chronic" to listOf("none"))))
+        assertEquals(
+            setOf("hypertension"),
+            Profile(chronic = setOf(Chronic.HYPERTENSION)).fieldValues("chronic"),
+        )
+    }
 }

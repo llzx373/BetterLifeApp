@@ -14,6 +14,13 @@
     <string name="notification_task_title">任务提醒</string>
     <string name="notification_task_body">别忘了：%1$s</string>
 
+    <!-- B5 桌面小部件（标题复用 today_tasks_title，进度复用 todo_daily_progress） -->
+    <string name="widget_today_tasks_desc">在桌面查看今日任务，点一下即可打卡</string>
+    <string name="widget_all_done">今日任务全部完成，继续保持</string>
+    <string name="widget_no_tasks">还没有今日任务，点这里打开应用</string>
+    <string name="widget_task_checkin_desc">打卡：%1$s</string>
+    <string name="widget_task_undo_desc">撤销打卡：%1$s</string>
+
     <!-- 通用动作 -->
     <string name="action_back">返回</string>
     <string name="action_retry">重试</string>
@@ -94,6 +101,40 @@
     <string name="todo_once_title">一次性待办</string>
     <string name="todo_once_empty">没有一次性待办。看到想做的事,点条目上的「加入待办」。</string>
     <string name="todo_deleted">已删除「%1$s」</string>
+    <string name="todo_convert_daily">转为每日习惯</string>
+    <string name="todo_convert_weekly">转为每周习惯</string>
+    <string name="todo_remove_daily">取消每日习惯</string>
+    <string name="todo_weekly_title">每周习惯</string>
+    <string name="todo_weekly_empty">没有每周习惯。把一次性待办转为每周,就能按「一周几次」来安排。</string>
+    <string name="todo_weekly_progress">本周 %1$d/%2$d 次</string>
+    <string name="todo_weekly_reached">本周已达标</string>
+    <string name="todo_weekly_times_dialog_title">一周做几次</string>
+    <string name="todo_weekly_times_option">每周 %1$d 次</string>
+    <string name="todo_weekly_removed">已移除每周习惯「%1$s」</string>
+    <string name="todo_add_task_desc">新增任务</string>
+    <string name="todo_add_dialog_title">新任务</string>
+    <string name="todo_add_name_label">做什么</string>
+    <string name="todo_add_kind_once">一次性</string>
+    <string name="todo_add_kind_daily">每天</string>
+    <string name="todo_add_kind_weekly">每周</string>
+
+    <!-- AI 问答:多供应商与搜索来源 -->
+    <string name="chat_provider_no_key">这张供应商卡还没有配置 API Key</string>
+    <string name="chat_source_kb">知识库</string>
+    <string name="chat_source_web">互联网</string>
+    <string name="chat_providers_desc">选择回答的供应商</string>
+    <string name="chat_providers_dialog_title">选择回答的供应商</string>
+    <string name="chat_providers_dialog_hint">可以多选,几个供应商会同时回答。全不选 = 只用「当前使用」的那张。</string>
+    <string name="chat_web_not_configured">互联网回答需要先配置 AI 搜索的 API Key</string>
+    <string name="chat_sources_label">来源</string>
+    <string name="chat_sources_more">等 %1$d 条来源</string>
+
+    <!-- AI 搜索设置 -->
+    <string name="settings_section_ai_search">AI 搜索</string>
+    <string name="settings_search_hint">聊天页切到「互联网」时,先用这个搜索服务查资料再回答。</string>
+    <string name="settings_search_endpoint">搜索端点</string>
+    <string name="settings_search_endpoint_default">留空用默认:https://api.bochaai.com/v1/web-search</string>
+    <string name="settings_search_test">测试搜索</string>
 
     <!-- 单任务提醒时间 -->
     <string name="task_reminder_set_desc">设置提醒时间</string>
@@ -129,6 +170,9 @@
     <string name="library_no_match">没有匹配的条目</string>
     <string name="library_recent_searches">最近搜索</string>
     <string name="library_pick_chapter">从左边的目录挑一章</string>
+    <string name="library_pick_entry">从中间的列表挑一条</string>
+    <string name="library_pick_entry_left">从左边的列表挑一条</string>
+    <string name="library_choose_chapter">切换章节</string>
     <string name="library_chapter_overline">第 %1$d 章</string>
     <string name="library_entry_count">%1$d 条</string>
     <string name="library_sort_ratio">性价比</string>
@@ -281,8 +325,6 @@
 
     <!-- 设置页 -->
     <string name="settings_section_ai">AI 问答</string>
-    <string name="settings_provider">服务商</string>
-    <string name="settings_custom">自定义</string>
     <string name="settings_api_key">API Key</string>
     <string name="settings_api_key_show">显示密钥</string>
     <string name="settings_api_key_hide">隐藏密钥</string>
@@ -291,7 +333,20 @@
     <string name="settings_base_url">Base URL</string>
     <string name="settings_model">模型</string>
     <string name="settings_saved">已保存</string>
-    <string name="settings_save_ai">保存 AI 设置</string>
+    <string name="settings_provider_name">名称</string>
+    <string name="settings_provider_active">当前使用</string>
+    <string name="settings_provider_set_active">设为当前</string>
+    <string name="settings_provider_enable">启用</string>
+    <string name="settings_provider_add">新增供应商</string>
+    <string name="settings_provider_default_name">自定义供应商</string>
+    <string name="settings_provider_deleted">已删除供应商</string>
+    <string name="settings_scan_models">扫描模型</string>
+    <string name="settings_scan_models_dialog_title">选择模型</string>
+    <string name="action_save">保存</string>
+    <string name="settings_section_timer">番茄钟</string>
+    <string name="settings_timer_ringtone">计时结束提示音</string>
+    <string name="settings_timer_ringtone_default">系统默认</string>
+    <string name="settings_timer_ringtone_reset">恢复默认</string>
     <string name="settings_section_reminder">每日提醒</string>
     <string name="settings_reminder_enable">开启提醒</string>
     <string name="settings_reminder_time">提醒时间</string>
@@ -314,4 +369,108 @@
     <string name="settings_about_source_url">github.com/eternity4719/HowToLiveBetter</string>
     <string name="settings_disclaimer_title">免责声明</string>
     <string name="settings_disclaimer">内容版权归原项目所有,请遵循其许可证使用。本应用仅做整理与呈现,不构成医疗、法律或投资意见;涉及健康与安全的决定,请咨询专业人士。</string>
+
+    <!-- 数据统计页 -->
+    <string name="mine_stats">数据统计</string>
+    <string name="mine_stats_sub">回顾打卡、连续天数与完成趋势</string>
+    <string name="stats_title">数据统计</string>
+    <string name="stats_empty">这里还空空的。从今天的第一次打卡开始,你的回顾会慢慢积累在这里。</string>
+    <string name="stats_section_achievements">回顾</string>
+    <string name="stats_achievements_empty">里程碑会在这里安静地出现</string>
+    <string name="stats_new_badge">新</string>
+    <string name="ach_streak_7_title">连续 7 天</string>
+    <string name="ach_streak_7_desc">有一个习惯连续完成了 7 天</string>
+    <string name="ach_streak_30_title">连续 30 天</string>
+    <string name="ach_streak_30_desc">有一个习惯连续完成了 30 天</string>
+    <string name="ach_streak_100_title">连续 100 天</string>
+    <string name="ach_streak_100_desc">有一个习惯连续完成了 100 天</string>
+    <string name="ach_total_10_title">累计 10 次</string>
+    <string name="ach_total_10_desc">已经累计完成 10 次打卡</string>
+    <string name="ach_total_50_title">累计 50 次</string>
+    <string name="ach_total_50_desc">已经累计完成 50 次打卡</string>
+    <string name="ach_total_100_title">累计 100 次</string>
+    <string name="ach_total_100_desc">已经累计完成 100 次打卡</string>
+    <string name="ach_total_500_title">累计 500 次</string>
+    <string name="ach_total_500_desc">已经累计完成 500 次打卡</string>
+    <string name="ach_total_1000_title">累计 1000 次</string>
+    <string name="ach_total_1000_desc">已经累计完成 1000 次打卡</string>
+    <string name="ach_perfect_week_title">完整的一周</string>
+    <string name="ach_perfect_week_desc">有一周的每日任务全部完成了</string>
+    <string name="stats_section_streak">连续天数</string>
+    <string name="stats_streak_best">最长连续 %1$d 天</string>
+    <string name="stats_streak_current">当前 %1$d 天</string>
+    <string name="stats_streak_empty">还没有连续打卡中的习惯</string>
+    <string name="stats_section_trend">完成率趋势</string>
+    <string name="stats_trend_desc">近 8 周完成率</string>
+    <string name="stats_trend_no_data">无数据</string>
+    <string name="stats_section_period">周期报告</string>
+    <string name="stats_period_this_week">本周</string>
+    <string name="stats_period_last_week">上周</string>
+    <string name="stats_period_this_month">本月</string>
+    <string name="stats_period_last_month">上月</string>
+    <string name="stats_period_total_done">完成 %1$d 次</string>
+    <string name="stats_period_rate">每日任务完成率 %1$d%%</string>
+    <string name="stats_period_no_daily">这段时间还没有每日任务记录</string>
+    <string name="stats_period_notes">随手记</string>
+    <string name="stats_period_no_notes">这段时间没有留下随手记</string>
+    <string name="stats_ai_interpret">AI 解读</string>
+    <string name="stats_ai_interpreting">正在回顾…</string>
+    <string name="stats_ai_no_key">配置 AI 供应商后,可以让它解读这段时间的打卡</string>
+    <string name="stats_ai_error">解读没有成功,可以重试</string>
+
+    <!-- 设置页:数据(备份导出/导入、清空对话历史) -->
+    <string name="settings_section_data">数据</string>
+    <string name="settings_export_data">导出数据</string>
+    <string name="settings_export_data_sub">备份到本地 JSON 文件,不含 API 密钥与对话历史</string>
+    <string name="settings_import_data">导入数据</string>
+    <string name="settings_import_data_sub">从备份文件恢复,会覆盖当前本地数据</string>
+    <string name="settings_import_confirm_title">导入备份?</string>
+    <string name="settings_import_confirm_text">导入会覆盖当前全部本地数据,且备份中不含 API 密钥。</string>
+    <string name="action_import">导入</string>
+    <string name="settings_export_ok">已导出</string>
+    <string name="settings_export_failed">导出没有成功</string>
+    <string name="settings_import_ok">已导入 %1$d 条数据</string>
+    <string name="settings_import_failed">导入没有成功:%1$s</string>
+    <string name="settings_clear_chat">清空对话历史</string>
+    <string name="settings_clear_chat_sub">删除本机上的全部 AI 对话记录</string>
+    <string name="settings_clear_chat_confirm_title">清空对话历史?</string>
+    <string name="settings_clear_chat_confirm_text">本机上的全部对话记录会被删除,无法恢复。</string>
+    <string name="settings_clear_chat_confirm">清空</string>
+    <string name="settings_clear_chat_done">对话历史已清空</string>
+
+    <!-- 待办页:一次性待办到期日 -->
+    <string name="todo_due_date_label">%1$d月%2$d日到期</string>
+    <string name="todo_due_overdue_label">%1$d月%2$d日已过期</string>
+    <string name="todo_due_date_edit_desc">修改到期日</string>
+    <string name="todo_due_date_dialog_title">选择到期日</string>
+    <string name="todo_due_date_clear">清除到期日</string>
+    <string name="todo_add_due_none">选择到期日(可选)</string>
+    <string name="todo_add_due_set">到期日:%1$d月%2$d日</string>
+
+    <!-- 今日页:C2 打卡备注 / B1 自动核销 / B3 请假与补卡 / C1 我做过了 -->
+    <string name="today_checkin_note_title">打卡</string>
+    <string name="today_checkin_note_placeholder">一句话记录,可留空</string>
+    <string name="today_checkin_note_skip">跳过</string>
+    <string name="today_auto_done_label">Health Connect 已自动核销</string>
+    <string name="today_action_leave">请假一天</string>
+    <string name="today_leave_confirm">保住连续天数,今天不计完成也不中断</string>
+    <string name="today_leave_state">已请假</string>
+    <string name="today_leave_cancel">取消请假</string>
+    <string name="today_action_backfill">补昨天的卡</string>
+    <string name="today_backfill_confirm">把昨天标记为已完成?</string>
+    <string name="today_backfill_success">已补上昨天的卡</string>
+    <string name="today_backfill_had">昨天已经有记录了</string>
+    <string name="today_done_before_menu">我做过了</string>
+    <string name="today_done_before">已记下,这条以后不再推荐了</string>
+    <!-- 条目笔记 / 库筛选 / 分享卡片 -->
+    <string name="detail_note_section">笔记</string>
+    <string name="detail_note_write">写笔记</string>
+    <string name="detail_note_edit">编辑笔记</string>
+    <string name="detail_note_hint">记点什么…</string>
+    <string name="filter_ratio">性价比</string>
+    <string name="filter_grade">证据</string>
+    <string name="filter_lens">口径</string>
+    <string name="filter_chip_active">%1$s·%2$d</string>
+    <string name="filter_empty">没有符合当前筛选的条目</string>
+    <string name="share_card_source_label">出处</string>
 </resources>

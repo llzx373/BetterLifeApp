@@ -6,20 +6,25 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.betterlife.app.BetterLifeApp
+import com.betterlife.app.data.SettingsGateway
 import com.betterlife.app.tasks.TimerSession
 import com.betterlife.app.tasks.TimerTaskGateway
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class TimerViewModel(
     private val taskId: Long,
     private val gateway: TimerTaskGateway,
+    settings: SettingsGateway,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
 
@@ -46,6 +51,11 @@ class TimerViewModel(
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    /** 计时结束提示音 URI，空串 = 系统默认通知音 */
+    val ringtoneUri: StateFlow<String> = settings.settingsFlow
+        .map { it.timerRingtoneUri }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
     private var session: TimerSession? = null
     private var tickJob: Job? = null
@@ -107,7 +117,7 @@ class TimerViewModel(
         fun factory(taskId: Long): ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as BetterLifeApp
-                TimerViewModel(taskId, app.container.taskManager)
+                TimerViewModel(taskId, app.container.taskManager, app.container.settingsStore)
             }
         }
     }

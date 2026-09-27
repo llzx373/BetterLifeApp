@@ -5,6 +5,10 @@
 // 只渲染 Available / Unauthorized 两态；Loading 与 Unavailable 由调用方决定不渲染。
 package com.betterlife.app.ui.today
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,7 +33,10 @@ import androidx.compose.ui.semantics.semantics
 import com.betterlife.app.R
 import com.betterlife.app.data.health.StepsSource
 import com.betterlife.app.data.health.StepsState
+import com.betterlife.app.ui.theme.LocalMotionLevel
+import com.betterlife.app.ui.theme.MotionLevel
 import com.betterlife.app.ui.theme.Spacing
+import com.betterlife.app.ui.theme.motionEffectsSpec
 
 @Composable
 internal fun StepsCard(
@@ -82,10 +89,27 @@ private fun StepsCountRow(state: StepsState.Available) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             // 等宽数字：步数跳动时卡片不横移
-            Text(
-                text = state.steps.toString(),
-                style = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum"),
-            )
+            if (LocalMotionLevel.current == MotionLevel.OFF) {
+                Text(
+                    text = state.steps.toString(),
+                    style = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum"),
+                )
+            } else {
+                // transitionSpec 不是 Composable 上下文,spec 必须先取出来
+                val effects = motionEffectsSpec<Float>()
+                AnimatedContent(
+                    targetState = state.steps,
+                    transitionSpec = {
+                        fadeIn(animationSpec = effects) togetherWith fadeOut(animationSpec = effects)
+                    },
+                    label = "stepCount",
+                ) { steps ->
+                    Text(
+                        text = steps.toString(),
+                        style = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum"),
+                    )
+                }
+            }
         }
         Text(
             text = sourceLabel,

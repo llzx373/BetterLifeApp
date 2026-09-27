@@ -7,11 +7,18 @@ package com.betterlife.app.ui.timer
 
 import android.content.Context
 import android.media.RingtoneManager
+import android.net.Uri
 import android.os.VibrationEffect
 import android.os.Vibrator
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -59,7 +66,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
 import com.betterlife.app.tasks.formatRemainingMillis
+import com.betterlife.app.ui.common.MotionEntrance
+import com.betterlife.app.ui.theme.LocalMotionLevel
+import com.betterlife.app.ui.theme.MotionLevel
 import com.betterlife.app.ui.theme.Spacing
+import com.betterlife.app.ui.theme.motionEffectsSpec
 import com.betterlife.app.viewmodel.TimerViewModel
 
 private val RingSize = 240.dp
@@ -77,11 +88,12 @@ fun TimerScreen(
     vm: TimerViewModel = viewModel(factory = TimerViewModel.factory(taskId)),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
+    val ringtoneUri by vm.ringtoneUri.collectAsStateWithLifecycle()
 
     // 提示音与振动只挂在真实入口：截图预览渲染的是 TimerContent，不会响
     val context = LocalContext.current
     LaunchedEffect(state) {
-        if (state is TimerViewModel.UiState.Finished) playFinishFeedback(context)
+        if (state is TimerViewModel.UiState.Finished) playFinishFeedback(context, ringtoneUri)
     }
 
     TimerContent(
@@ -122,32 +134,72 @@ internal fun TimerContent(
             )
         },
     ) { padding ->
-        when (state) {
-            TimerViewModel.UiState.Loading -> Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center,
-            ) { CircularProgressIndicator() }
-
-            is TimerViewModel.UiState.Setup -> SetupContent(
-                title = state.title,
-                onStart = onStart,
-                modifier = Modifier.fillMaxSize().padding(padding),
-            )
-
-            is TimerViewModel.UiState.Running -> RunningContent(
-                state = state,
-                onTogglePause = onTogglePause,
-                onGiveUp = onGiveUp,
-                onBack = onBack,
-                modifier = Modifier.fillMaxSize().padding(padding),
-            )
-
-            is TimerViewModel.UiState.Finished -> FinishedContent(
-                title = state.title,
-                onBack = onBack,
-                modifier = Modifier.fillMaxSize().padding(padding),
-            )
+        // 关闭档不套 AnimatedContent:静态帧否则可能抓到相位切换的中间态
+        if (LocalMotionLevel.current == MotionLevel.OFF) {
+            TimerStateContent(state, padding, onBack, onStart, onTogglePause, onGiveUp)
+            return@Scaffold
         }
+        // transitionSpec 不是 Composable 上下文,spec 必须先取出来
+        val effects = motionEffectsSpec<Float>()
+        AnimatedContent(
+            targetState = state,
+            transitionSpec = {
+                // 只淡入淡出,不位移:计时屏数字跳动已经够热闹
+                fadeIn(animationSpec = effects) togetherWith fadeOut(animationSpec = effects)
+            },
+            // 每秒刷新的倒计时不算相位切换,只有相位变了才播切换动画
+            contentKey = { it.phase },
+            label = "timerState",
+        ) { target ->
+            TimerStateContent(target, padding, onBack, onStart, onTogglePause, onGiveUp)
+        }
+    }
+}
+
+/** 相位:同一相位内的数据刷新(每秒倒计时)不该触发 AnimatedContent,切换动画按相位而不是 state 判 */
+private val TimerViewModel.UiState.phase: Int
+    get() = when (this) {
+        TimerViewModel.UiState.Loading -> 0
+        is TimerViewModel.UiState.Setup -> 1
+        is TimerViewModel.UiState.Running -> 2
+        is TimerViewModel.UiState.Finished -> 3
+    }
+
+/** 三态内容:Setup → Running → Finished。抽出来是为了关闭档能绕过 AnimatedContent 直接渲染 */
+@Composable
+private fun TimerStateContent(
+    state: TimerViewModel.UiState,
+    padding: PaddingValues,
+    onBack: () -> Unit,
+    onStart: (Long) -> Unit,
+    onTogglePause: () -> Unit,
+    onGiveUp: () -> Unit,
+) {
+    when (state) {
+        TimerViewModel.UiState.Loading -> Box(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentAlignment = Alignment.Center,
+        ) { CircularProgressIndicator() }
+
+        is TimerViewModel.UiState.Setup -> SetupContent(
+            title = state.title,
+            onStart = onStart,
+            modifier = Modifier.fillMaxSize().padding(padding),
+        )
+
+        is TimerViewModel.UiState.Running -> RunningContent(
+            state = state,
+            onTogglePause = onTogglePause,
+            onGiveUp = onGiveUp,
+            onBack = onBack,
+            modifier = Modifier.fillMaxSize().padding(padding),
+        )
+
+        is TimerViewModel.UiState.Finished -> FinishedContent(
+            title = state.title,
+            onBack = onBack,
+            modifier = Modifier.fillMaxSize().padding(padding),
+        )
     }
 }
 
@@ -266,45 +318,52 @@ private fun RunningContent(
 /** 完成态：一句话 + 返回。打卡已在进这态之前由 ViewModel 完成 */
 @Composable
 private fun FinishedContent(title: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.padding(Spacing.space6),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(
-            imageVector = Icons.Filled.CheckCircle,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(FinishIconSize),
-        )
-        Spacer(Modifier.height(Spacing.space4))
-        Text(stringResource(R.string.timer_finished), style = MaterialTheme.typography.headlineSmall)
-        Spacer(Modifier.height(Spacing.space2))
-        Text(
-            text = stringResource(R.string.timer_finished_done),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (title.isNotBlank()) {
+    // 完成态是全屏情绪最高点:MutableTransitionState 重载才能首帧就播;
+    // 关闭档由 MotionEntrance 内部直接静态输出
+    val visible = remember { MutableTransitionState(false).apply { targetState = true } }
+    MotionEntrance(visibleState = visible, modifier = modifier, scaleFrom = 0.96f) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(Spacing.space6),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(FinishIconSize),
+            )
+            Spacer(Modifier.height(Spacing.space4))
+            Text(stringResource(R.string.timer_finished), style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(Spacing.space2))
             Text(
-                text = title,
+                text = stringResource(R.string.timer_finished_done),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
             )
+            if (title.isNotBlank()) {
+                Spacer(Modifier.height(Spacing.space2))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            Spacer(Modifier.height(Spacing.space6))
+            Button(onClick = onBack) { Text(stringResource(R.string.action_back)) }
         }
-        Spacer(Modifier.height(Spacing.space6))
-        Button(onClick = onBack) { Text(stringResource(R.string.action_back)) }
     }
 }
 
-private fun playFinishFeedback(context: Context) {
+private fun playFinishFeedback(context: Context, ringtoneUri: String) {
     runCatching {
-        RingtoneManager.getRingtone(
-            context,
-            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
-        )?.play()
+        val uri = if (ringtoneUri.isBlank()) {
+            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        } else {
+            Uri.parse(ringtoneUri)
+        }
+        RingtoneManager.getRingtone(context, uri)?.play()
     }
     runCatching {
         context.getSystemService(Vibrator::class.java)

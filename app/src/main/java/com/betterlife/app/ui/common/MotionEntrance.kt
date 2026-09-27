@@ -8,13 +8,17 @@ package com.betterlife.app.ui.common
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.betterlife.app.ui.theme.LocalMotionLevel
 import com.betterlife.app.ui.theme.MotionLevel
@@ -26,7 +30,14 @@ import com.betterlife.app.ui.theme.motionSpatialSpec
  * 减弱档下 `motionSpatialSpec()` 是瞬时的,所以自动退化成「只有淡入」。
  */
 @Composable
-private fun enterTransition(scaleFrom: Float?, slideFromBottom: Boolean): EnterTransition = when {
+private fun enterTransition(
+    scaleFrom: Float?,
+    slideFromBottom: Boolean,
+    expand: Boolean,
+): EnterTransition = when {
+    expand -> fadeIn(animationSpec = motionEffectsSpec()) +
+        expandVertically(animationSpec = motionSpatialSpec(), expandFrom = Alignment.Top)
+
     slideFromBottom -> fadeIn(animationSpec = motionEffectsSpec()) +
         slideInVertically(animationSpec = motionSpatialSpec()) { height -> height / 2 }
 
@@ -37,11 +48,21 @@ private fun enterTransition(scaleFrom: Float?, slideFromBottom: Boolean): EnterT
 }
 
 @Composable
+private fun exitTransition(expand: Boolean): ExitTransition =
+    if (expand) {
+        fadeOut(animationSpec = motionEffectsSpec()) +
+            shrinkVertically(animationSpec = motionSpatialSpec())
+    } else {
+        fadeOut(animationSpec = motionEffectsSpec())
+    }
+
+@Composable
 internal fun MotionEntrance(
     visible: Boolean,
     modifier: Modifier = Modifier,
     scaleFrom: Float? = null,
     slideFromBottom: Boolean = false,
+    expand: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     if (LocalMotionLevel.current == MotionLevel.OFF) {
@@ -51,8 +72,8 @@ internal fun MotionEntrance(
     AnimatedVisibility(
         visible = visible,
         modifier = modifier,
-        enter = enterTransition(scaleFrom, slideFromBottom),
-        exit = fadeOut(animationSpec = motionEffectsSpec()),
+        enter = enterTransition(scaleFrom, slideFromBottom, expand),
+        exit = exitTransition(expand),
     ) {
         content()
     }
@@ -68,6 +89,7 @@ internal fun MotionEntrance(
     modifier: Modifier = Modifier,
     scaleFrom: Float? = null,
     slideFromBottom: Boolean = false,
+    expand: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     if (LocalMotionLevel.current == MotionLevel.OFF) {
@@ -77,8 +99,8 @@ internal fun MotionEntrance(
     AnimatedVisibility(
         visibleState = visibleState,
         modifier = modifier,
-        enter = enterTransition(scaleFrom, slideFromBottom),
-        exit = fadeOut(animationSpec = motionEffectsSpec()),
+        enter = enterTransition(scaleFrom, slideFromBottom, expand),
+        exit = exitTransition(expand),
     ) {
         content()
     }

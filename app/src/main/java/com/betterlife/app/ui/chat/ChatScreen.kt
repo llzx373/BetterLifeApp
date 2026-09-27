@@ -6,6 +6,7 @@ package com.betterlife.app.ui.chat
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.keyframes
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,8 +27,13 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,12 +56,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
+import com.betterlife.app.ai.AiSource
 import com.betterlife.app.ai.ChatMessage
+import com.betterlife.app.data.resolveActiveProvider
 import com.betterlife.app.ui.common.predictiveBackTransition
 import com.betterlife.app.ui.theme.LocalMotionLevel
 import com.betterlife.app.ui.theme.MotionLevel
@@ -73,6 +82,9 @@ private val SuggestionRes = listOf(
     R.string.chat_suggestion_3,
 )
 
+/** 知识库来源最多直接列出的条数,超出的折叠成「等 N 条来源」 */
+private const val KB_SOURCES_SHOWN = 3
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ChatScreen(
@@ -85,18 +97,34 @@ fun ChatScreen(
     val state by vm.uiState.collectAsStateWithLifecycle()
     val settingsState by settingsVm.uiState.collectAsStateWithLifecycle()
     var input by rememberSaveable { mutableStateOf("") }
+    var showProviderDialog by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
-    val noApiKey = settingsState.loaded && settingsState.settings.apiKey.isBlank()
+    val noApiKey = settingsState.loaded && resolveActiveProvider(
+        settingsState.settings.aiProviders,
+        settingsState.settings.activeProviderId,
+    )?.apiKey.isNullOrBlank()
 
     // 条目详情页跳进来时自动解读一次;重复触发(旋转重建)由 VM 里的已解读集合挡住
     LaunchedEffect(entryId) {
         if (entryId != null) vm.explainEntry(entryId)
     }
 
-    // 新消息到达时滚到底部
+    // 新消息到达时滚到底部。animateScrollToItem 不看全局档位,所以这里手动分流:
+    // 标准档滚动动画,减弱/关闭档瞬移;首次进带历史的会话一律瞬移,不做长距离滚动
+    val motionLevel = LocalMotionLevel.current
+    var didInitialScroll by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(state.messages.size) {
-        if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.size - 1)
+        if (state.messages.isEmpty()) return@LaunchedEffect
+        val last = state.messages.size - 1
+        if (!didInitialScroll) {
+            listState.scrollToItem(last)
+            didInitialScroll = true
+        } else if (motionLevel == MotionLevel.STANDARD) {
+            listState.animateScrollToItem(last)
+        } else {
+            listState.scrollToItem(last)
+        }
     }
 
     Scaffold(
@@ -123,6 +151,12 @@ fun ChatScreen(
             if (noApiKey) {
                 NoKeyBanner(onOpenSettings = onOpenSettings)
             }
+            if (state.webSearch && !state.searchConfigured) {
+                Banner(
+                    textRes = R.string.chat_web_not_configured,
+                    onOpenSettings = onOpenSettings,
+                )
+            }
 
             LazyColumn(
                 state = listState,
@@ -136,12 +170,7 @@ fun ChatScreen(
                     }
                 }
                 items(state.messages.size, key = { it }) { i ->
-                    val msg = state.messages[i]
-                    Bubble(
-                        text = msg.content.ifBlank { stringResource(R.string.chat_error_generic) },
-                        isUser = msg.role == ChatMessage.ROLE_USER,
-                        isError = msg.isError,
-                    )
+                    Bubble(msg = state.messages[i])
                 }
                 if (state.asking) {
                     item(key = "asking") { ThinkingRow(entryCount = state.entryCount) }
@@ -152,6 +181,26 @@ fun ChatScreen(
                 modifier = Modifier.fillMaxWidth().padding(Spacing.space3),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // 来源切换：知识库 / 互联网
+                IconButton(onClick = vm::toggleWebSearch) {
+                    Icon(
+                        imageVector = if (state.webSearch) Icons.Filled.Public else Icons.Filled.MenuBook,
+                        contentDescription = stringResource(
+                            if (state.webSearch) R.string.chat_source_web else R.string.chat_source_kb,
+                        ),
+                        tint = if (state.webSearch) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                // 并行供应商选择
+                IconButton(onClick = { showProviderDialog = true }) {
+                    Icon(
+                        Icons.Filled.Groups,
+                        contentDescription = stringResource(R.string.chat_providers_desc),
+                        tint = if (state.selectedProviderIds.size > 1) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 OutlinedTextField(
                     value = input,
                     onValueChange = { input = it },
@@ -174,6 +223,63 @@ fun ChatScreen(
             }
         }
     }
+
+    if (showProviderDialog) {
+        ProviderDialog(
+            providers = state.enabledProviders.map { it.id to it.name },
+            initialSelected = state.selectedProviderIds,
+            onConfirm = { ids ->
+                showProviderDialog = false
+                vm.setChatProviders(ids)
+            },
+            onDismiss = { showProviderDialog = false },
+        )
+    }
+}
+
+/** 并行回答的供应商多选:全不选 = 只用「当前使用」的那张 */
+@Composable
+private fun ProviderDialog(
+    providers: List<Pair<String, String>>,
+    initialSelected: Set<String>,
+    onConfirm: (Set<String>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var checked by remember { mutableStateOf(initialSelected) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.chat_providers_dialog_title)) },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(checked) }) {
+                Text(stringResource(R.string.action_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+        text = {
+            Column {
+                Text(
+                    text = stringResource(R.string.chat_providers_dialog_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                providers.forEach { (id, name) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                checked = if (id in checked) checked - id else checked + id
+                            },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(checked = id in checked, onCheckedChange = null)
+                        Text(name, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        },
+    )
 }
 
 /** 安全底线是常量,不是模型回答:固定在顶部,不随对话滚走 */
@@ -200,6 +306,11 @@ private fun SafetyNotice() {
 
 @Composable
 private fun NoKeyBanner(onOpenSettings: () -> Unit) {
+    Banner(textRes = R.string.chat_no_key_banner, onOpenSettings = onOpenSettings)
+}
+
+@Composable
+private fun Banner(textRes: Int, onOpenSettings: () -> Unit) {
     Surface(
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -210,7 +321,7 @@ private fun NoKeyBanner(onOpenSettings: () -> Unit) {
             modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space1),
         ) {
             Text(
-                stringResource(R.string.chat_no_key_banner),
+                stringResource(textRes),
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.weight(1f),
             )
@@ -265,7 +376,9 @@ private const val BUBBLE_POP_MILLIS = 250
 
 /** 气泡:用户侧大圆角右对齐,助手侧小圆角左对齐,方向感不靠颜色也能看出来 */
 @Composable
-private fun Bubble(text: String, isUser: Boolean, isError: Boolean) {
+private fun Bubble(msg: ChatViewModel.ChatUiMessage) {
+    val isUser = msg.role == ChatMessage.ROLE_USER
+    val isError = msg.isError
     val container = when {
         isError -> MaterialTheme.colorScheme.errorContainer
         isUser -> MaterialTheme.colorScheme.primary
@@ -278,56 +391,123 @@ private fun Bubble(text: String, isUser: Boolean, isError: Boolean) {
     }
     val shape = if (isUser) MaterialTheme.shapes.large else MaterialTheme.shapes.extraSmall
 
-    // 入场三拍。关闭/减弱档停在终态不动。
+    // 入场三拍。关闭档停在终态;减弱档只留 100ms 淡入,不做缩放。
     // 已知取舍:LazyColumn 的 item 被回收后再滚回来会重播一次;只播「新消息」需要
     // 把消息 id 与已播集合提到 VM,不等这笔复杂度。
     val level = LocalMotionLevel.current
     // 协程里不是 Composable 上下文,spec 必须先取出来
     val effects = motionEffectsSpec<Float>()
-    val scale = remember { Animatable(1f) }
-    val alpha = remember { Animatable(1f) }
+    // 初始值直接按档位给:先在终态绘制一帧、LaunchedEffect 里再 snapTo 回起点会闪跳
+    val scale = remember { Animatable(if (level == MotionLevel.STANDARD) BUBBLE_POP_FROM else 1f) }
+    val alpha = remember { Animatable(if (level == MotionLevel.OFF) 1f else 0f) }
     LaunchedEffect(level) {
-        if (level != MotionLevel.STANDARD) {
-            scale.snapTo(1f)
-            alpha.snapTo(1f)
-            return@LaunchedEffect
+        when (level) {
+            MotionLevel.STANDARD -> {
+                // snapTo 保留:运行中切档位要先归位再播
+                scale.snapTo(BUBBLE_POP_FROM)
+                alpha.snapTo(0f)
+                launch { alpha.animateTo(1f, animationSpec = effects) }
+                scale.animateTo(
+                    targetValue = 1f,
+                    animationSpec = keyframes {
+                        durationMillis = BUBBLE_POP_MILLIS
+                        BUBBLE_POP_PEAK at BUBBLE_POP_MILLIS / 2
+                        1f at BUBBLE_POP_MILLIS
+                    },
+                )
+            }
+            MotionLevel.REDUCED -> {
+                scale.snapTo(1f)
+                alpha.snapTo(0f)
+                alpha.animateTo(1f, animationSpec = effects)
+            }
+            MotionLevel.OFF -> {
+                scale.snapTo(1f)
+                alpha.snapTo(1f)
+            }
         }
-        scale.snapTo(BUBBLE_POP_FROM)
-        alpha.snapTo(0f)
-        launch { alpha.animateTo(1f, animationSpec = effects) }
-        scale.animateTo(
-            targetValue = 1f,
-            animationSpec = keyframes {
-                durationMillis = BUBBLE_POP_MILLIS
-                BUBBLE_POP_PEAK at BUBBLE_POP_MILLIS / 2
-                1f at BUBBLE_POP_MILLIS
-            },
-        )
     }
 
+    val text = msg.contentRes?.let { stringResource(it) }
+        ?: msg.content.ifBlank { stringResource(R.string.chat_error_generic) }
+
     Box(modifier = Modifier.fillMaxWidth()) {
-        Surface(
-            color = container,
-            contentColor = content,
-            shape = shape,
+        Column(
             modifier = Modifier
                 .align(if (isUser) Alignment.CenterEnd else Alignment.CenterStart)
-                .widthIn(max = BubbleMaxWidth)
-                .graphicsLayer {
+                .widthIn(max = BubbleMaxWidth),
+        ) {
+            Surface(
+                color = container,
+                contentColor = content,
+                shape = shape,
+                modifier = Modifier.graphicsLayer {
                     scaleX = scale.value
                     scaleY = scale.value
                     this.alpha = alpha.value
                 },
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = Spacing.space3, vertical = Spacing.space2),
-                verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (isError) {
-                    Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(Spacing.space4))
-                    Spacer(Modifier.width(Spacing.space2))
+                Column(
+                    modifier = Modifier.padding(horizontal = Spacing.space3, vertical = Spacing.space2),
+                ) {
+                    // 多供应商并行时标注这张气泡是谁答的
+                    msg.providerName?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = content.copy(alpha = 0.7f),
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (isError) {
+                            Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(Spacing.space4))
+                            Spacer(Modifier.width(Spacing.space2))
+                        }
+                        Text(text = text, style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
-                Text(text = text, style = MaterialTheme.typography.bodyMedium)
+            }
+            if (!isUser && !isError && msg.sources.isNotEmpty()) {
+                SourcesRow(sources = msg.sources)
+            }
+        }
+    }
+}
+
+/** 答案来源:知识库列「第X节第Y条」(超出折叠),互联网列可点的链接标题 */
+@Composable
+private fun SourcesRow(sources: List<AiSource>) {
+    val uriHandler = LocalUriHandler.current
+    Column(modifier = Modifier.padding(top = Spacing.space1, start = Spacing.space2)) {
+        Text(
+            text = stringResource(R.string.chat_sources_label),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        val web = sources.any { it.url != null }
+        if (web) {
+            sources.forEachIndexed { index, s ->
+                Text(
+                    text = "${index + 1}. ${s.label}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { s.url?.let(uriHandler::openUri) },
+                )
+            }
+        } else {
+            sources.take(KB_SOURCES_SHOWN).forEach { s ->
+                Text(
+                    text = s.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (sources.size > KB_SOURCES_SHOWN) {
+                Text(
+                    text = stringResource(R.string.chat_sources_more, sources.size),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

@@ -23,6 +23,7 @@ import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.MainActivity
 import com.betterlife.app.R
 import com.betterlife.app.data.db.TaskEntity
+import com.betterlife.app.widget.WidgetUpdater
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -80,14 +81,16 @@ class ReminderScheduler(private val context: Context) {
 
     /**
      * 给单条任务排到点精准触发的一次性 work（按 taskId 命名，重排即 REPLACE）。
-     * [minutesOfDay] 是一天内的分钟数；已过点则顺延到明天（见 [nextTriggerMillis]）。
+     * [minutesOfDay] 是一天内的分钟数；[date] 非空（一次性待办的截止日）时定在该日期触发，
+     * 否则已过点顺延到明天（见 [nextTriggerMillis]）。
      */
-    fun scheduleTaskReminder(taskId: Long, minutesOfDay: Int) {
+    fun scheduleTaskReminder(taskId: Long, minutesOfDay: Int, date: LocalDate? = null) {
         ensureChannel(context)
         val now = System.currentTimeMillis()
-        val triggerAt = nextTriggerMillis(now, minutesOfDay, ZoneId.systemDefault())
+        val triggerAt = nextTriggerMillis(now, minutesOfDay, ZoneId.systemDefault(), date)
+        // 截止日的目标时刻可能已经过去，负延迟按 0 处理，work 立即执行、由 worker 自查
         val request = OneTimeWorkRequestBuilder<TaskReminderWorker>()
-            .setInitialDelay(triggerAt - now, TimeUnit.MILLISECONDS)
+            .setInitialDelay((triggerAt - now).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
             .setInputData(workDataOf(TaskReminderWorker.KEY_TASK_ID to taskId))
             .build()
         WorkManager.getInstance(context)
@@ -110,6 +113,11 @@ class DailyReminderWorker(
         if (profile != null) {
             container.taskManager.ensureTodayTasks(profile)
         }
+        // B1：先用 Health Connect 数据自动核销达标的每日任务，再统计未完成数发通知；
+        // 尽力而为——HC 不可用/没权限/出异常都安静跳过
+        runCatching { container.taskManager.autoCompleteByHealth() }
+        // B5：新一天任务已生成 / 自动核销已落库，同步刷新桌面小部件
+        WidgetUpdater.refresh(applicationContext)
         notifyUndone(container.taskManager.todayUndoneCount())
         return Result.success()
     }
@@ -153,12 +161,19 @@ class TaskReminderWorker(
         val container = (applicationContext as BetterLifeApp).container
         val task = container.taskManager.getTask(taskId) ?: return Result.success()
         if (task.done || task.notified) return Result.success()
+        val todayStr = LocalDate.now().toString()
         // DAILY 任务只在自己的日期当天提醒：昨天任务的遗留 work 今天触发时直接跳过，
         // 次日的新任务会在创建时（ensureTodayTasks）继承提醒时间并排自己的 work。
-        if (task.type == TaskEntity.TYPE_DAILY && task.date != LocalDate.now().toString()) {
+        if (task.type == TaskEntity.TYPE_DAILY && task.date != todayStr) {
             return Result.success()
         }
-        val title = container.entryRepository.entriesData().byId[task.entryId]?.title ?: task.entryId
+        // ONCE 带截止日：到期当天及之后才提醒；没到截止日的遗留 work（比如改了时间但日期还没到）直接跳过。
+        // ONCE 不带截止日维持原行为：排到点（今天/明天）就提醒。
+        if (task.type == TaskEntity.TYPE_ONCE && task.dueDate != null && task.dueDate > todayStr) {
+            return Result.success()
+        }
+        // taskTitle 内部会先查条目库再回退 custom_entries，自定义任务显示用户输入的标题
+        val title = container.taskManager.taskTitle(taskId) ?: task.entryId
         notifyTask(task.taskId, title)
         container.taskManager.markNotified(task.taskId)
         return Result.success()

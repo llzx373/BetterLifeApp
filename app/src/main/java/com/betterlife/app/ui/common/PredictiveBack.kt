@@ -15,6 +15,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import com.betterlife.app.ui.theme.LocalMotionLevel
+import com.betterlife.app.ui.theme.MotionLevel
 
 /** 手势走到底时整体缩到 92%,和系统「退到上一层」的方向感一致 */
 private const val MAX_SCALE_SHRINK = 0.08f
@@ -43,6 +45,9 @@ internal fun Modifier.predictiveBackTransition(onBack: () -> Unit): Modifier {
             progress = 0f
         }
     }
+
+    // 三档降级覆盖到这里:减弱/关闭档不驱动位移与缩放,只保留返回行为本身
+    if (LocalMotionLevel.current != MotionLevel.STANDARD) return this
 
     return this.then(
         Modifier.graphicsLayer {

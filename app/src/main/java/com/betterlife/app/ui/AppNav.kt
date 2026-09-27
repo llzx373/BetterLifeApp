@@ -6,9 +6,16 @@
 // 路由散在多个文件里手写,重构时必错。
 package com.betterlife.app.ui
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Done
@@ -29,8 +36,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
@@ -52,6 +61,11 @@ import com.betterlife.app.ui.library.SectionScreen
 import com.betterlife.app.ui.mine.MineScreen
 import com.betterlife.app.ui.onboarding.OnboardingScreen
 import com.betterlife.app.ui.settings.SettingsScreen
+import com.betterlife.app.ui.stats.StatsScreen
+import com.betterlife.app.ui.theme.LocalMotionLevel
+import com.betterlife.app.ui.theme.MotionLevel
+import com.betterlife.app.ui.theme.motionEffectsSpec
+import com.betterlife.app.ui.theme.motionSpatialSpec
 import com.betterlife.app.ui.timer.TimerScreen
 import com.betterlife.app.ui.today.TodayScreen
 import com.betterlife.app.ui.todo.TodoScreen
@@ -93,6 +107,9 @@ data object FavoritesRoute
 data object DismissedRoute
 
 @Serializable
+data object StatsRoute
+
+@Serializable
 data class TimerRoute(val taskId: Long)
 
 @Serializable
@@ -124,17 +141,23 @@ internal val tabs = listOf(
 fun AppNav(vm: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)) {
     val state by vm.uiState.collectAsStateWithLifecycle()
 
-    // DataStore 还没读出来时不要先渲染 today 再跳走,那会闪一下
-    if (!state.loaded) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+    // DataStore 还没读出来时不要先渲染 today 再跳走,那会闪一下。
+    // loading → 主界面走 Crossfade:OFF 档 spec 是 snap,瞬时切换没有中间帧。
+    Crossfade(
+        targetState = state.loaded,
+        animationSpec = motionEffectsSpec(),
+        label = "appLoading",
+    ) { loaded ->
+        if (!loaded) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else {
+            AppScaffold(
+                startDestination = if (state.settings.onboardingDone) TodayRoute else OnboardingRoute,
+            )
         }
-        return
     }
-
-    AppScaffold(
-        startDestination = if (state.settings.onboardingDone) TodayRoute else OnboardingRoute,
-    )
 }
 
 @Composable
@@ -178,11 +201,36 @@ private fun AppScaffold(startDestination: Any) {
         },
     ) {
         Column(Modifier.fillMaxSize()) {
-            OfflineBanner(visible = !online)
+            // 横幅在状态栏之下、NavHost 之上;不可见时 MotionEntrance 不组合内容,不占位
+            OfflineBanner(visible = !online, modifier = Modifier.statusBarsPadding())
+            // 转场 spec 必须先在 Composable 作用域取出来 —— NavHost 的转场 lambda 不是
+            // Composable 上下文。OFF 档给 None:连 snap() 都可能留一帧 alpha=0 的中间态
+            val motionOff = LocalMotionLevel.current == MotionLevel.OFF
+            val navFade = motionEffectsSpec<Float>()
+            val navSlide = motionSpatialSpec<IntOffset>()
             NavHost(
                 navController = navController,
                 startDestination = startDestination,
                 modifier = Modifier.weight(1f),
+                enterTransition = {
+                    when {
+                        motionOff -> EnterTransition.None
+                        // tab 之间切换只淡入;推进二级页时新页从右侧滑入,给出方向感
+                        initialState.destination.isTabDestination() &&
+                            targetState.destination.isTabDestination() -> fadeIn(animationSpec = navFade)
+                        else -> fadeIn(animationSpec = navFade) +
+                            slideInHorizontally(animationSpec = navSlide) { it / 4 }
+                    }
+                },
+                exitTransition = {
+                    if (motionOff) ExitTransition.None else fadeOut(animationSpec = navFade)
+                },
+                popEnterTransition = {
+                    if (motionOff) EnterTransition.None else fadeIn(animationSpec = navFade)
+                },
+                popExitTransition = {
+                    if (motionOff) ExitTransition.None else fadeOut(animationSpec = navFade)
+                },
             ) {
             composable<TodayRoute> {
                 TodayScreen(
@@ -203,6 +251,7 @@ private fun AppScaffold(startDestination: Any) {
                 LibraryScreen(
                     onOpenSection = { n -> navController.navigate(SectionRoute(n)) },
                     onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
+                    onOpenChat = { id -> navController.navigate(ChatRoute(id)) },
                 )
             }
             composable<SectionRoute> { entry ->
@@ -226,6 +275,13 @@ private fun AppScaffold(startDestination: Any) {
                     onOpenChat = { navController.navigate(ChatRoute()) },
                     onOpenFavorites = { navController.navigate(FavoritesRoute) },
                     onOpenDismissed = { navController.navigate(DismissedRoute) },
+                    onOpenStats = { navController.navigate(StatsRoute) },
+                )
+            }
+            composable<StatsRoute> {
+                StatsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenSettings = { navController.navigate(SettingsRoute) },
                 )
             }
             composable<FavoritesRoute> {
@@ -278,3 +334,7 @@ private fun NavOptionsBuilder.tabOptions() {
     launchSingleTop = true
     restoreState = true
 }
+
+/** 目的地是否属于四个 tab 之一(含其栈内层级),用于区分 tab 切换与二级页推进 */
+private fun NavDestination?.isTabDestination(): Boolean =
+    this?.hierarchy?.any { dest -> tabs.any { tab -> dest.hasRoute(tab.routeClass) } } == true

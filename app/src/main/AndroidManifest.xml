@@ -10,6 +10,9 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- 今日步数：Health Connect 读步数；传感器降级路径需要 ACTIVITY_RECOGNITION（运行时权限） -->
     <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <!-- B1 自动核销：读运动 session（今日运动分钟数）与睡眠 session（昨晚睡眠时长） -->
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
     <application
@@ -53,5 +56,29 @@
                 <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
             </intent-filter>
         </activity>
+
+        <!-- 分享卡片图片(EntryDetailScreen 生成的 PNG)通过 FileProvider 授予临时读权限 -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- B5「今日任务」桌面小部件 -->
+        <receiver
+            android:name=".widget.TodayTasksWidgetReceiver"
+            android:exported="false"
+            android:label="@string/today_tasks_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/today_tasks_widget" />
+        </receiver>
     </application>
 </manifest>

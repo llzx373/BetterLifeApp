@@ -1,12 +1,16 @@
 package com.betterlife.app.ai
 
+import com.betterlife.app.data.AiProvider
 import com.betterlife.app.data.AppSettings
 import com.betterlife.app.data.EntryDto
 import com.betterlife.app.data.Profile
+import com.betterlife.app.data.RulesFile
 import com.betterlife.app.data.SettingsGateway
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -23,6 +27,12 @@ class AiAdvisorFallbackTest {
         override suspend fun current(): AppSettings = AppSettings()
     }
 
+    /** 不会真触网的搜索器：fallback 测试里 ask 不走互联网分支，它只是摆设 */
+    private class FakeWebSearcher : WebSearcher {
+        override suspend fun search(query: String, count: Int): Result<List<WebSearchItem>> =
+            Result.success(emptyList())
+    }
+
     private val entry = EntryDto(
         id = "02-01",
         sec = 2,
@@ -34,7 +44,7 @@ class AiAdvisorFallbackTest {
 
     private fun newAdvisor(): AiAdvisor {
         val settings = FakeSettingsGateway()
-        return AiAdvisor(LlmClient(settings), EntryRetriever(), settings)
+        return AiAdvisor(LlmClient(settings), EntryRetriever(), settings, FakeWebSearcher())
     }
 
     @Test
@@ -53,5 +63,18 @@ class AiAdvisorFallbackTest {
 
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+    }
+
+    @Test
+    fun `无Key时askStream直接发降级Done不触网`() = runTest {
+        val noKeyProvider = AiProvider(id = "a", name = "A", baseUrl = "https://x", apiKey = "", model = "m")
+        val events = newAdvisor()
+            .askStream(Profile(), "怎么戒烟", listOf(entry), RulesFile(), noKeyProvider, useWeb = false)
+            .toList()
+
+        assertEquals(1, events.size)
+        val done = events.single() as AiStreamEvent.Done
+        assertTrue(done.fullText.contains("还没有配置 API Key"))
+        assertTrue(done.fullText.contains(entry.title))
     }
 }

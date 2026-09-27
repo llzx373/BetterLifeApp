@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -59,6 +60,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -102,6 +104,7 @@ import com.betterlife.app.data.health.HealthConnectRepository
 import com.betterlife.app.data.health.StepsSource
 import com.betterlife.app.data.health.StepsState
 import com.betterlife.app.recommend.ScoredEntry
+import com.betterlife.app.tasks.TaskManager
 import com.betterlife.app.ui.common.CostMeter
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.GradeBadge
@@ -148,13 +151,17 @@ fun TodayScreen(
     val libraryState by libraryVm.uiState.collectAsStateWithLifecycle()
     val stepsState by stepsVm.uiState.collectAsStateWithLifecycle()
 
-    // 「不再推荐」的结果反馈走这个宿主:撤销即把 DISMISSED 状态清掉
+    // 「不再推荐」/「我做过了」/「补卡」的结果反馈走这个宿主:撤销类动作即回滚对应状态
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val dismissedMessage = stringResource(R.string.today_dismissed)
+    val doneBeforeMessage = stringResource(R.string.today_done_before)
+    val backfillSuccessMessage = stringResource(R.string.today_backfill_success)
+    val backfillHadMessage = stringResource(R.string.today_backfill_had)
     val undoLabel = stringResource(R.string.action_undo)
 
-    // 步数数据源按门面给的 source 发起对应的授权流程;授权结果回来都统一 refresh 重判
+    // 步数数据源按门面给的 source 发起对应的授权流程;授权结果回来都统一 refresh 重判。
+    // HC 一次申请自动核销要用的全部读权限(步数+运动+睡眠),缺的类型对应规则安静地不命中
     val healthPermissionLauncher = rememberLauncherForActivityResult(
         PermissionController.createRequestPermissionResultContract(),
     ) { stepsVm.refresh() }
@@ -164,15 +171,16 @@ fun TodayScreen(
     val onAuthorizeSteps = {
         when ((stepsState as? StepsState.Unauthorized)?.source ?: StepsSource.SENSOR) {
             StepsSource.HEALTH_CONNECT ->
-                healthPermissionLauncher.launch(setOf(HealthConnectRepository.READ_STEPS_PERMISSION))
+                healthPermissionLauncher.launch(HealthConnectRepository.AUTO_COMPLETE_PERMISSIONS)
             StepsSource.SENSOR ->
                 sensorPermissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
         }
     }
 
-    // Health Connect 路径没有实时流，回前台时重读一次快照
-    LifecycleResumeEffect(stepsVm) {
+    // Health Connect 路径没有实时流，回前台时重读一次快照；顺手跑一次 B1 自动核销（无权限时 no-op）
+    LifecycleResumeEffect(stepsVm, todayVm) {
         stepsVm.refresh()
+        todayVm.autoCompleteByHealth()
         onPauseOrDispose { }
     }
 
@@ -204,29 +212,52 @@ fun TodayScreen(
                 modifier = Modifier.fillMaxSize().padding(padding),
             )
 
-            is TodayViewModel.UiState.Ready -> TodayContent(
-                state = state,
-                libraryState = libraryState,
-                stepsState = stepsState,
-                now = LocalDateTime.now(),
-                onToggle = todayVm::toggleTask,
-                onSwap = todayVm::swapTask,
-                onDrop = todayVm::dropTask,
-                onOpenEntry = onOpenEntry,
-                onAddTodo = libraryVm::addToTodo,
-                onDismissEntry = { entryId ->
-                    libraryVm.dismissEntry(entryId)
-                    scope.launch {
-                        val result = snackbar.showSnackbar(dismissedMessage, actionLabel = undoLabel)
-                        if (result == SnackbarResult.ActionPerformed) libraryVm.restoreEntry(entryId)
-                    }
-                },
-                onAuthorizeSteps = onAuthorizeSteps,
-                onStartTimer = onStartTimer,
-                onOpenLibrary = onOpenLibrary,
-                onEditProfile = onEditProfile,
-                contentPadding = padding,
-            )
+            is TodayViewModel.UiState.Ready -> {
+                // 骨架屏有入场,Ready 裸切过来就是硬切;只淡入,不带位移/缩放
+                val readyVisible = remember { MutableTransitionState(false).apply { targetState = true } }
+                MotionEntrance(visibleState = readyVisible) {
+                    TodayContent(
+                        state = state,
+                        libraryState = libraryState,
+                        stepsState = stepsState,
+                        now = LocalDateTime.now(),
+                        onCheckIn = todayVm::checkIn,
+                        onUndo = todayVm::undoCheckIn,
+                        onSwap = todayVm::swapTask,
+                        onDrop = todayVm::dropTask,
+                        onTakeLeave = { task -> todayVm.takeLeaveToday(task.entryId) },
+                        onCancelLeave = { task -> todayVm.cancelLeaveToday(task.entryId) },
+                        onBackfill = { task ->
+                            todayVm.backfillYesterday(task.entryId) { filled ->
+                                scope.launch {
+                                    snackbar.showSnackbar(if (filled) backfillSuccessMessage else backfillHadMessage)
+                                }
+                            }
+                        },
+                        onOpenEntry = onOpenEntry,
+                        onAddTodo = libraryVm::addToTodo,
+                        onDismissEntry = { entryId ->
+                            libraryVm.dismissEntry(entryId)
+                            scope.launch {
+                                val result = snackbar.showSnackbar(dismissedMessage, actionLabel = undoLabel)
+                                if (result == SnackbarResult.ActionPerformed) libraryVm.restoreEntry(entryId)
+                            }
+                        },
+                        onMarkDoneBefore = { entryId ->
+                            libraryVm.markDoneBefore(entryId)
+                            scope.launch {
+                                val result = snackbar.showSnackbar(doneBeforeMessage, actionLabel = undoLabel)
+                                if (result == SnackbarResult.ActionPerformed) libraryVm.unmarkDoneBefore(entryId)
+                            }
+                        },
+                        onAuthorizeSteps = onAuthorizeSteps,
+                        onStartTimer = onStartTimer,
+                        onOpenLibrary = onOpenLibrary,
+                        onEditProfile = onEditProfile,
+                        contentPadding = padding,
+                    )
+                }
+            }
         }
     }
 }
@@ -238,28 +269,44 @@ internal fun TodayContent(
     libraryState: LibraryViewModel.UiState,
     stepsState: StepsState,
     now: LocalDateTime,
-    onToggle: (TaskEntity) -> Unit,
+    onCheckIn: (TaskEntity, String?) -> Unit,
+    onUndo: (TaskEntity) -> Unit,
     onSwap: (TaskEntity) -> Unit,
     onDrop: (TaskEntity) -> Unit,
+    onTakeLeave: (TaskEntity) -> Unit,
+    onCancelLeave: (TaskEntity) -> Unit,
+    onBackfill: (TaskEntity) -> Unit,
     onOpenEntry: (String) -> Unit,
     onAddTodo: (String) -> Unit,
     onDismissEntry: (String) -> Unit,
+    onMarkDoneBefore: (String) -> Unit,
     onAuthorizeSteps: () -> Unit,
     onStartTimer: (Long) -> Unit,
     onOpenLibrary: () -> Unit,
     onEditProfile: () -> Unit,
     contentPadding: PaddingValues,
 ) {
-    // 打卡后让卡片先停在原位 300ms:形变和位移动画同时发生会互相打架
+    // 打卡/撤销后让卡片先停在原位 300ms:形变和位移动画同时发生会互相打架。
+    // pinnedDone 记下动作瞬间的分组:Room 状态还没回来的间隙里,卡片也不许先动
     var settlingId by remember { mutableStateOf<Long?>(null) }
+    var settlingPinnedDone by remember { mutableStateOf(false) }
     LaunchedEffect(settlingId) {
         val id = settlingId ?: return@LaunchedEffect
         delay(REORDER_DELAY_MS)
         if (settlingId == id) settlingId = null
     }
-    val tasks = remember(state.items, settlingId) {
+    // 打卡备注 / 请假 / 补卡的确认弹窗:一次只会有一个
+    var noteDialogTask by remember { mutableStateOf<TaskEntity?>(null) }
+    var leaveDialogTask by remember { mutableStateOf<TaskEntity?>(null) }
+    var backfillDialogTask by remember { mutableStateOf<TaskEntity?>(null) }
+    // settlingId 期间把任务钉在动作前的分组:打卡的留在未完成组,撤销的留在已完成组,
+    // 等 300ms 沉降延迟结束、勾选形变做完,再统一重排
+    val tasks = remember(state.items, settlingId, settlingPinnedDone) {
         state.items.sortedWith(
-            compareBy({ it.task.done && it.task.taskId != settlingId }, { it.task.taskId }),
+            compareBy(
+                { if (it.task.taskId == settlingId) settlingPinnedDone else it.task.done },
+                { it.task.taskId },
+            ),
         )
     }
     val streak = remember(state.items) { state.items.maxOfOrNull { it.streak } ?: 0 }
@@ -328,12 +375,18 @@ internal fun TodayContent(
             else -> items(tasks, key = { it.task.taskId }) { item ->
                 DailyTaskCard(
                     item = item,
-                    onToggle = {
-                        if (!item.task.done) settlingId = item.task.taskId
-                        onToggle(item.task)
+                    onRequestCheckIn = { noteDialogTask = item.task },
+                    onUndo = {
+                        // 撤销同样走沉降延迟:卡片先在已完成组停 300ms,等勾的形变做完再升回去
+                        settlingId = item.task.taskId
+                        settlingPinnedDone = item.task.done
+                        onUndo(item.task)
                     },
                     onSwap = { onSwap(item.task) },
                     onDrop = { onDrop(item.task) },
+                    onRequestLeave = { leaveDialogTask = item.task },
+                    onCancelLeave = { onCancelLeave(item.task) },
+                    onRequestBackfill = { backfillDialogTask = item.task },
                     onStartTimer = { onStartTimer(item.task.taskId) },
                     onOpenEntry = { item.entry?.let { onOpenEntry(it.id) } },
                     modifier = Modifier
@@ -387,6 +440,7 @@ internal fun TodayContent(
                             onClick = { onOpenEntry(scored.entry.id) },
                             onAddTodo = { onAddTodo(scored.entry.id) },
                             onDismiss = { onDismissEntry(scored.entry.id) },
+                            onMarkDoneBefore = { onMarkDoneBefore(scored.entry.id) },
                         )
                     }
                 }
@@ -395,6 +449,94 @@ internal fun TodayContent(
 
         item(key = "bottom-spacer") { Spacer(Modifier.height(Spacing.space12)) }
     }
+
+    // 打卡备注(C2):可留空,跳过 = 不带备注直接打卡;点外部取消 = 不打卡
+    noteDialogTask?.let { task ->
+        CheckInNoteDialog(
+            onConfirm = { note ->
+                settlingId = task.taskId
+                settlingPinnedDone = task.done
+                onCheckIn(task, note)
+                noteDialogTask = null
+            },
+            onDismiss = { noteDialogTask = null },
+        )
+    }
+
+    // 请假(B3):确认后当天不打卡也不断签,语义保持安静
+    leaveDialogTask?.let { task ->
+        ConfirmDialog(
+            title = stringResource(R.string.today_action_leave),
+            message = stringResource(R.string.today_leave_confirm),
+            onConfirm = {
+                onTakeLeave(task)
+                leaveDialogTask = null
+            },
+            onDismiss = { leaveDialogTask = null },
+        )
+    }
+
+    // 补昨天的卡(B3):只认昨天这一天,结果反馈由调用方 snackbar 给出
+    backfillDialogTask?.let { task ->
+        ConfirmDialog(
+            title = stringResource(R.string.today_action_backfill),
+            message = stringResource(R.string.today_backfill_confirm),
+            onConfirm = {
+                onBackfill(task)
+                backfillDialogTask = null
+            },
+            onDismiss = { backfillDialogTask = null },
+        )
+    }
+}
+
+/** C2 打卡备注弹窗:单行、可留空;打卡与跳过都会完成打卡,区别只在带不带备注 */
+@Composable
+private fun CheckInNoteDialog(onConfirm: (String?) -> Unit, onDismiss: () -> Unit) {
+    var note by rememberSaveable { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.today_checkin_note_title)) },
+        text = {
+            OutlinedTextField(
+                value = note,
+                onValueChange = { note = it },
+                singleLine = true,
+                placeholder = { Text(stringResource(R.string.today_checkin_note_placeholder)) },
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(note.ifBlank { null }) }) {
+                Text(stringResource(R.string.today_task_check))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { onConfirm(null) }) {
+                Text(stringResource(R.string.today_checkin_note_skip))
+            }
+        },
+    )
+}
+
+/** 确定/取消 的轻确认弹窗(请假、补卡共用),按钮文案走全局 action_confirm/action_cancel */
+@Composable
+private fun ConfirmDialog(
+    title: String,
+    message: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(message) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.action_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
 }
 
 /** 问候语只由小时决定。提成纯函数 + 由外部传入时刻,是为了让截图预览能固定住时间 ——
@@ -447,14 +589,24 @@ private fun StreakPill(days: Int) {
 @Composable
 private fun DailyTaskCard(
     item: TodayViewModel.TaskItem,
-    onToggle: () -> Unit,
+    onRequestCheckIn: () -> Unit,
+    onUndo: () -> Unit,
     onSwap: () -> Unit,
     onDrop: () -> Unit,
+    onRequestLeave: () -> Unit,
+    onCancelLeave: () -> Unit,
+    onRequestBackfill: () -> Unit,
     onStartTimer: () -> Unit,
     onOpenEntry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val done = item.task.done
+    // 三拍庆祝一张卡只播一次:卡片划出屏再划回、或打开页面时已完成,勾都停在终态;
+    // 撤销后重置,下次打卡还能再播
+    var celebrated by rememberSaveable(item.task.taskId) { mutableStateOf(false) }
+    LaunchedEffect(done) { if (!done) celebrated = false }
+    // 请假只对未完成态有意义:已完成(或完成后请假)的卡维持正常完成态
+    val onLeave = item.onLeaveToday && !done
     // 平板/桌面指针悬停时抬一档容器层级,给个「指到了」的反馈;触控下 hoverable 无开销
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
@@ -472,12 +624,21 @@ private fun DailyTaskCard(
     ) {
         Column(Modifier.padding(Spacing.space4)) {
             Text(
-                text = item.entry?.title ?: item.task.entryId,
+                text = item.displayTitle,
                 style = MaterialTheme.typography.titleSmall,
                 color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                 textDecoration = if (done) TextDecoration.LineThrough else TextDecoration.Underline,
                 modifier = Modifier.clickable(onClick = onOpenEntry),
             )
+            // B1:Health Connect 自动核销的卡标出来源,小而弱,不抢完成态的安静
+            if (done && item.doneBy == TaskManager.DONE_BY_AUTO_HC) {
+                Spacer(Modifier.height(Spacing.space1))
+                Text(
+                    text = stringResource(R.string.today_auto_done_label),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             item.entry?.human?.takeIf { it.isNotBlank() }?.let {
                 Spacer(Modifier.height(Spacing.space1))
                 Text(
@@ -488,12 +649,58 @@ private fun DailyTaskCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            // C2:完成备注只显示手动打卡的随手记;自动核销的备注是达标证据,已由来源标签表达
+            if (done && item.doneBy != TaskManager.DONE_BY_AUTO_HC) {
+                item.task.note?.takeIf { it.isNotBlank() }?.let {
+                    Spacer(Modifier.height(Spacing.space1))
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             item.task.remindAtMinutes?.let {
                 Spacer(Modifier.height(Spacing.space2))
                 ReminderTimeLabel(it)
             }
             Spacer(Modifier.height(Spacing.space3))
-            TaskAction(done = done, onToggle = onToggle, onSwap = onSwap, onDrop = onDrop, onStartTimer = onStartTimer)
+            if (onLeave) {
+                LeaveAction(onCancelLeave = onCancelLeave)
+            } else {
+                TaskAction(
+                    done = done,
+                    isDailyHabit = item.isDailyHabit,
+                    playPop = done && !celebrated,
+                    onPopPlayed = { celebrated = true },
+                    onCheckIn = onRequestCheckIn,
+                    onUndo = onUndo,
+                    onSwap = onSwap,
+                    onDrop = onDrop,
+                    onRequestLeave = onRequestLeave,
+                    onRequestBackfill = onRequestBackfill,
+                    onStartTimer = onStartTimer,
+                )
+            }
+        }
+    }
+}
+
+/** B3 请假态:一行安静的「已请假」+ 取消入口,替代打卡按钮;不庆祝也不警告 */
+@Composable
+private fun LeaveAction(onCancelLeave: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.today_leave_state),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.weight(1f))
+        TextButton(onClick = onCancelLeave) {
+            Text(stringResource(R.string.today_leave_cancel))
         }
     }
 }
@@ -507,14 +714,23 @@ private const val CHECK_POP_MILLIS = 250
 @Composable
 private fun TaskAction(
     done: Boolean,
-    onToggle: () -> Unit,
+    isDailyHabit: Boolean,
+    playPop: Boolean,
+    onPopPlayed: () -> Unit,
+    onCheckIn: () -> Unit,
+    onUndo: () -> Unit,
     onSwap: () -> Unit,
     onDrop: () -> Unit,
+    onRequestLeave: () -> Unit,
+    onRequestBackfill: () -> Unit,
     onStartTimer: () -> Unit,
 ) {
     // 关闭档不套 AnimatedContent:静态帧否则可能抓到按钮切换的中间态
     if (LocalMotionLevel.current == MotionLevel.OFF) {
-        TaskActionContent(done, onToggle, onSwap, onDrop, onStartTimer)
+        TaskActionContent(
+            done, isDailyHabit, playPop, onPopPlayed, onCheckIn, onUndo, onSwap, onDrop,
+            onRequestLeave, onRequestBackfill, onStartTimer,
+        )
         return
     }
     // transitionSpec 不是 Composable 上下文,spec 必须先取出来
@@ -530,16 +746,25 @@ private fun TaskAction(
         },
         label = "taskAction",
     ) { isDone ->
-        TaskActionContent(isDone, onToggle, onSwap, onDrop, onStartTimer)
+        TaskActionContent(
+            isDone, isDailyHabit, playPop, onPopPlayed, onCheckIn, onUndo, onSwap, onDrop,
+            onRequestLeave, onRequestBackfill, onStartTimer,
+        )
     }
 }
 
 @Composable
 private fun TaskActionContent(
     done: Boolean,
-    onToggle: () -> Unit,
+    isDailyHabit: Boolean,
+    playPop: Boolean,
+    onPopPlayed: () -> Unit,
+    onCheckIn: () -> Unit,
+    onUndo: () -> Unit,
     onSwap: () -> Unit,
     onDrop: () -> Unit,
+    onRequestLeave: () -> Unit,
+    onRequestBackfill: () -> Unit,
     onStartTimer: () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
@@ -550,9 +775,9 @@ private fun TaskActionContent(
         if (done) {
             FilledTonalButton(onClick = {
                 haptics.performHapticFeedback(HapticFeedbackType.ToggleOff)
-                onToggle()
+                onUndo()
             }) {
-                CheckPopIcon()
+                CheckPopIcon(playPop = playPop, onPopPlayed = onPopPlayed)
                 Spacer(Modifier.width(Spacing.space1))
                 Text(stringResource(R.string.today_task_undo))
             }
@@ -561,7 +786,7 @@ private fun TaskActionContent(
                 leadingButton = {
                     SplitButtonDefaults.LeadingButton(onClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
-                        onToggle()
+                        onCheckIn()
                     }) {
                         Text(stringResource(R.string.today_task_check))
                     }
@@ -593,6 +818,23 @@ private fun TaskActionContent(
                                     onDrop()
                                 },
                             )
+                            // 请假/补卡只对用户自选的每日习惯开放(planner 补位的任务没有连签要保)
+                            if (isDailyHabit) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.today_action_leave)) },
+                                    onClick = {
+                                        menuOpen = false
+                                        onRequestLeave()
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.today_action_backfill)) },
+                                    onClick = {
+                                        menuOpen = false
+                                        onRequestBackfill()
+                                    },
+                                )
+                            }
                         }
                     }
                 },
@@ -614,14 +856,17 @@ private fun TaskActionContent(
  * 打卡勾:一次三拍形变。这是全 App 最高频的动作,值得一次明确的反馈。
  *
  * 触觉只是**加强**,形变才是主反馈 —— 不能把触觉当唯一反馈(§6.3)。
- * 关闭与减弱档直接停在终态,不动。
+ * 关闭与减弱档、以及已庆祝过的卡(playPop=false)直接停在终态,不动。
  */
 @Composable
-private fun CheckPopIcon() {
+private fun CheckPopIcon(playPop: Boolean, onPopPlayed: () -> Unit) {
     val level = LocalMotionLevel.current
-    val scale = remember { Animatable(1f) }
-    LaunchedEffect(level) {
-        if (level != MotionLevel.STANDARD) {
+    // 初始值按播放意图取,避免首帧先画终态再 snapTo 回起点的闪跳
+    val scale = remember {
+        Animatable(if (level == MotionLevel.STANDARD && playPop) CHECK_POP_FROM else 1f)
+    }
+    LaunchedEffect(level, playPop) {
+        if (level != MotionLevel.STANDARD || !playPop) {
             scale.snapTo(1f)
             return@LaunchedEffect
         }
@@ -634,6 +879,7 @@ private fun CheckPopIcon() {
                 1f at CHECK_POP_MILLIS
             },
         )
+        onPopPlayed()
     }
     Icon(
         Icons.Filled.Check,
@@ -705,6 +951,7 @@ private fun RecommendedRow(
     onClick: () -> Unit,
     onAddTodo: () -> Unit,
     onDismiss: () -> Unit,
+    onMarkDoneBefore: () -> Unit,
 ) {
     val entry: EntryDto = scored.entry
     // 与 DailyTaskCard 同一套 hover 先例:指针悬停抬到 surfaceContainerHighest
@@ -765,6 +1012,13 @@ private fun RecommendedRow(
             Text(entry.title, style = MaterialTheme.typography.titleSmall)
         }
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.today_done_before_menu)) },
+                onClick = {
+                    menuOpen = false
+                    onMarkDoneBefore()
+                },
+            )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.today_dismiss_menu)) },
                 onClick = {

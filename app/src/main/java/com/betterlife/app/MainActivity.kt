@@ -42,4 +42,10 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        // 进程跨夜存活时把「今天」推进到真实日期，任务查询随之切到新的一天
+        (application as BetterLifeApp).container.taskManager.refreshToday()
+    }
 }

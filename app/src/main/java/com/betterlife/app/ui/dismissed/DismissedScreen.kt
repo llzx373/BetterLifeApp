@@ -125,7 +125,8 @@ internal fun DismissedContent(
                             Text(stringResource(R.string.dismissed_action_restore))
                         }
                     },
-                    modifier = Modifier.clickable { onOpenEntry(entry.id) },
+                    // 恢复后行淡出并让位,而不是瞬间消失(§6.2)
+                    modifier = Modifier.animateItem().clickable { onOpenEntry(entry.id) },
                 ) {
                     Text(entry.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }

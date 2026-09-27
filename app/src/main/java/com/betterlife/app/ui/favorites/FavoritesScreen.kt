@@ -113,9 +113,22 @@ fun FavoritesScreen(
                             )
                         }
                     },
-                    modifier = Modifier.clickable { onOpenEntry(entry.id) },
+                    // 取消收藏后行淡出并让位,而不是瞬间消失(§6.2)
+                    modifier = Modifier.animateItem().clickable { onOpenEntry(entry.id) },
                 ) {
-                    Text(entry.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Column {
+                        Text(entry.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        // 详情页里写的笔记在这里露一两行,想改还是进详情改
+                        state.notes[entry.id]?.takeIf { it.isNotBlank() }?.let { note ->
+                            Text(
+                                note,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
                 }
             }
         }

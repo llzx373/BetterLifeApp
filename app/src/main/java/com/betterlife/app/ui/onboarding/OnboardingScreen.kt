@@ -53,6 +53,8 @@ import com.betterlife.app.data.Occupation
 import com.betterlife.app.data.Profile
 import com.betterlife.app.data.Smoking
 import com.betterlife.app.data.SugaryDrinks
+import com.betterlife.app.ui.theme.LocalMotionLevel
+import com.betterlife.app.ui.theme.MotionLevel
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.viewmodel.ProfileViewModel
 import kotlinx.coroutines.launch
@@ -75,6 +77,15 @@ fun OnboardingScreen(
     val pagerState = rememberPagerState(pageCount = { STEP_COUNT })
     val scope = rememberCoroutineScope()
     val page = pagerState.currentPage
+
+    // animateScrollToPage 不看全局档位:标准档播滚动动画,减弱/关闭档瞬移
+    val motionLevel = LocalMotionLevel.current
+    val goToPage: (Int) -> Unit = { target ->
+        scope.launch {
+            if (motionLevel == MotionLevel.STANDARD) pagerState.animateScrollToPage(target)
+            else pagerState.scrollToPage(target)
+        }
+    }
 
     LaunchedEffect(saveState) {
         if (saveState is ProfileViewModel.SaveState.Success) onFinished()
@@ -136,16 +147,12 @@ fun OnboardingScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (page > 0) {
-                    TextButton(onClick = {
-                        scope.launch { pagerState.animateScrollToPage(page - 1) }
-                    }) { Text(stringResource(R.string.onboarding_prev)) }
+                    TextButton(onClick = { goToPage(page - 1) }) { Text(stringResource(R.string.onboarding_prev)) }
                 }
                 Spacer(Modifier.weight(1f))
 
                 if (page < STEP_COUNT - 1) {
-                    TextButton(onClick = {
-                        scope.launch { pagerState.animateScrollToPage(STEP_COUNT - 1) }
-                    }) {
+                    TextButton(onClick = { goToPage(STEP_COUNT - 1) }) {
                         Text(
                             stringResource(
                                 if (page == 0) R.string.onboarding_jump else R.string.onboarding_skip,
@@ -153,9 +160,7 @@ fun OnboardingScreen(
                         )
                     }
                     Spacer(Modifier.width(Spacing.space2))
-                    Button(onClick = {
-                        scope.launch { pagerState.animateScrollToPage(page + 1) }
-                    }) { Text(stringResource(R.string.onboarding_next)) }
+                    Button(onClick = { goToPage(page + 1) }) { Text(stringResource(R.string.onboarding_next)) }
                 } else {
                     Column(modifier = Modifier.weight(1f)) {
                         if (saveState is ProfileViewModel.SaveState.Failed) {

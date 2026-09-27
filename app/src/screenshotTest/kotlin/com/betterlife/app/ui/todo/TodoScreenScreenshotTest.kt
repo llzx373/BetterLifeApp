@@ -9,6 +9,8 @@ import androidx.compose.runtime.Composable
 import com.android.tools.screenshot.PreviewTest
 import com.betterlife.app.data.EntryKeys
 import com.betterlife.app.data.db.TaskEntity
+import com.betterlife.app.data.db.WeeklyHabitEntity
+import com.betterlife.app.tasks.TaskManager
 import com.betterlife.app.ui.FourFoldScreenPreview
 import com.betterlife.app.ui.PreviewScreen
 import com.betterlife.app.ui.fakeEntry
@@ -55,6 +57,13 @@ private val changeInsurance = fakeEntry(
     grade = "B",
 )
 
+private val playBadminton = fakeEntry(
+    id = "11-07",
+    sec = 11,
+    title = "打一场羽毛球",
+    lens = EntryKeys.LENS_MORTALITY,
+)
+
 @PreviewTest
 @FourFoldScreenPreview
 @Composable
@@ -85,13 +94,35 @@ fun TodoBothSections() {
                         changeInsurance,
                     ),
                 ),
+                weekly = listOf(
+                    TodoViewModel.WeeklyEntry(
+                        TaskManager.WeeklyItem(
+                            habit = WeeklyHabitEntity(
+                                entryId = playBadminton.id,
+                                timesPerWeek = 3,
+                                createdAt = 0L,
+                            ),
+                            doneCount = 1,
+                            checkedToday = true,
+                        ),
+                        playBadminton,
+                    ),
+                ),
+                userDailyIds = setOf(walkAfterDinner.id),
             ),
             contentPadding = PaddingValues(Spacing.space4),
             onToggle = {},
             onOpenEntry = {},
             onDelete = {},
             onSetReminder = { _, _ -> },
+            onSetDueDate = { _, _ -> },
             onStartTimer = {},
+            onConvertToDaily = {},
+            onConvertToWeekly = { _, _ -> },
+            onRemoveDailyHabit = {},
+            onToggleWeekly = {},
+            onRemoveWeekly = {},
+            onAddCustom = { _, _, _, _ -> },
         )
     }
 }

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 分享卡片:FileProvider 只暴露 cache/share 目录 -->
+<paths>
+    <cache-path name="share" path="share/" />
+</paths>

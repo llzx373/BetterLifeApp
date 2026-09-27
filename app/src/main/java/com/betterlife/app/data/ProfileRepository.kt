@@ -45,6 +45,7 @@ data class Profile(
     /**
      * 规则 when 条件的字段取值集合：
      * 单选字段 = 单元素集合；布尔字段 = "true"/"false"；多选字段 = 全部选中值。
+     * chronic 为空（无慢病）时产生 "none"，让 when {"chronic": ["none"]} 的规则可命中。
      */
     fun fieldValues(field: String): Set<String> = when (field) {
         "ageRange" -> setOf(ageRange.key)
@@ -56,7 +57,7 @@ data class Profile(
         "sugaryDrinks" -> setOf(sugaryDrinks.key)
         "exercise" -> setOf(exercise.key)
         "sleepShort" -> setOf(sleepShort.toString())
-        "chronic" -> chronic.mapTo(mutableSetOf()) { it.key }
+        "chronic" -> if (chronic.isEmpty()) setOf("none") else chronic.mapTo(mutableSetOf()) { it.key }
         "occupation" -> setOf(occupation.key)
         "financialStress" -> setOf(financialStress.toString())
         "housing" -> setOf(housing.key)

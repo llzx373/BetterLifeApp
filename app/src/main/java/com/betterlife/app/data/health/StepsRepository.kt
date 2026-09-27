@@ -34,6 +34,27 @@ interface HealthConnectSteps {
     suspend fun readTodaySteps(): Long
 }
 
+/**
+ * 自动核销用的全量健康数据窄接口：步数/运动/睡眠三类读取 + 各自的权限检查。
+ * 与 [HealthConnectSteps] 并列（今日步数门面只需要后者），HealthConnectRepository 同时实现两者；
+ * 测试照惯例喂 fake。
+ */
+interface HealthConnectMetrics {
+    suspend fun status(): HealthConnectStatus
+    suspend fun hasStepsPermission(): Boolean
+    suspend fun hasExercisePermission(): Boolean
+    suspend fun hasSleepPermission(): Boolean
+
+    /** 当天 0 点（设备本地时区）到现在的步数合计 */
+    suspend fun readTodaySteps(): Long
+
+    /** 当天 0 点到现在 ExerciseSession 的时长合计（分钟） */
+    suspend fun readTodayExerciseMinutes(): Long
+
+    /** 昨晚窗口（昨天 18:00 到今天 12:00）内 SleepSession 的时长合计（小时） */
+    suspend fun readLastNightSleepHours(): Double
+}
+
 interface SensorSteps {
     /** 设备有没有计步传感器（部分模拟器没有） */
     val available: Boolean

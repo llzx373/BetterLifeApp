@@ -14,12 +14,18 @@ import com.betterlife.app.data.EntryRepository
 import com.betterlife.app.data.ProfileRepository
 import com.betterlife.app.data.SectionDto
 import com.betterlife.app.data.SettingsStore
+import com.betterlife.app.data.db.EntryNoteDao
+import com.betterlife.app.data.db.EntryNoteEntity
 import com.betterlife.app.data.db.EntryStateDao
 import com.betterlife.app.data.db.EntryStateEntity
+import com.betterlife.app.recommend.EntryFilter
 import com.betterlife.app.recommend.RecommendationEngine
 import com.betterlife.app.recommend.ScoredEntry
+import com.betterlife.app.recommend.applyFilter
+import com.betterlife.app.recommend.matchesFilter
 import com.betterlife.app.tasks.TaskManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +36,7 @@ class LibraryViewModel(
     private val entryRepository: EntryRepository,
     private val profileRepository: ProfileRepository,
     private val entryStateDao: EntryStateDao,
+    private val entryNoteDao: EntryNoteDao,
     private val taskManager: TaskManager,
     private val recommendationEngine: RecommendationEngine,
     private val retriever: EntryRetriever,
@@ -41,8 +48,12 @@ class LibraryViewModel(
         /** 每章的主导口径,用来给目录着色 */
         val sectionLens: Map<Int, String> = emptyMap(),
         val selectedSection: Int? = null,
+        /** 宽屏(≥840dp 的列表|详情双栏、≥1200dp 的三栏)里详情栏展示的条目;窄屏详情走整屏路由,不用这个状态 */
+        val selectedEntryId: String? = null,
         val sectionEntries: List<EntryDto> = emptyList(),
         val sort: EntrySort = EntrySort.RATIO,
+        /** 章内列表与搜索结果共用的筛选条件;推荐不受影响 */
+        val filter: EntryFilter = EntryFilter(),
         val recommended: LinkedHashMap<String, List<ScoredEntry>> = LinkedHashMap(),
         val query: String = "",
         val searchResults: List<RetrievedEntry> = emptyList(),
@@ -52,6 +63,9 @@ class LibraryViewModel(
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    /** 搜索结果的未筛选基线;setFilter 从它重算,清空筛选才能恢复被滤掉的条目 */
+    private var searchBaseline: List<RetrievedEntry> = emptyList()
 
     /** 已收藏的条目 id,详情页据此显示收藏态 */
     private val _favorites = MutableStateFlow<Set<String>>(emptySet())
@@ -99,9 +113,59 @@ class LibraryViewModel(
             val data = entryRepository.entriesData()
             _uiState.value = _uiState.value.copy(
                 selectedSection = n,
-                sectionEntries = sortedSectionEntries(data, n, _uiState.value.sort),
+                // 换章后右栏若还留着旧章的详情就串味了,一并清掉
+                selectedEntryId = null,
+                sectionEntries = sortedSectionEntries(data, n, _uiState.value.sort)
+                    .applyFilter(_uiState.value.filter),
             )
         }
+    }
+
+    /** 筛选条件切换:章内列表与搜索结果都跟着收缩;推荐不变 */
+    fun setFilter(filter: EntryFilter) {
+        _uiState.value = _uiState.value.copy(
+            filter = filter,
+            searchResults = searchBaseline.filter { it.entry.matchesFilter(filter) },
+        )
+        val section = _uiState.value.selectedSection ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val data = entryRepository.entriesData()
+            _uiState.value = _uiState.value.copy(
+                sectionEntries = sortedSectionEntries(data, section, _uiState.value.sort).applyFilter(filter),
+            )
+        }
+    }
+
+    fun toggleRatioFilter(value: String) = setFilter(_uiState.value.filter.toggleRatio(value))
+
+    fun toggleGradeFilter(value: String) = setFilter(_uiState.value.filter.toggleGrade(value))
+
+    fun toggleLensFilter(value: String) = setFilter(_uiState.value.filter.toggleLens(value))
+
+    fun clearFilter() = setFilter(EntryFilter())
+
+    /** 某条目的用户笔记流;详情页据此显示/编辑 */
+    fun noteFlow(entryId: String): Flow<EntryNoteEntity?> = entryNoteDao.noteFlow(entryId)
+
+    /** 保存笔记;空白文本等价于删除 */
+    fun saveNote(entryId: String, text: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val trimmed = text.trim()
+            if (trimmed.isEmpty()) {
+                entryNoteDao.delete(entryId)
+            } else {
+                entryNoteDao.upsert(EntryNoteEntity(entryId, trimmed, System.currentTimeMillis()))
+            }
+        }
+    }
+
+    fun deleteNote(entryId: String) {
+        viewModelScope.launch(Dispatchers.IO) { entryNoteDao.delete(entryId) }
+    }
+
+    /** 三栏布局里点条目:右栏就地展示详情,不跳路由 */
+    fun selectEntry(entryId: String?) {
+        _uiState.value = _uiState.value.copy(selectedEntryId = entryId)
     }
 
     /** 章内排序切换:按性价比 / 按证据等级 / 按原书顺序 */
@@ -116,8 +180,14 @@ class LibraryViewModel(
         _uiState.value = _uiState.value.copy(query = query)
         viewModelScope.launch(Dispatchers.IO) {
             val data = entryRepository.entriesData()
-            val results = if (query.isBlank()) emptyList()
-            else retriever.search(query, data.entries, topK = 20)
+            val results = if (query.isBlank()) {
+                searchBaseline = emptyList()
+                emptyList()
+            } else {
+                val baseline = retriever.search(query, data.entries, topK = 20)
+                searchBaseline = baseline
+                baseline.filter { it.entry.matchesFilter(_uiState.value.filter) }
+            }
             _uiState.value = _uiState.value.copy(searchResults = results)
         }
     }
@@ -140,14 +210,27 @@ class LibraryViewModel(
         }
     }
 
-    /** 不再推荐:标记 DISMISSED 后推荐列表随数据流自动收缩 */
+    /** 不再推荐:标记 DISMISSED 后推荐列表随数据流自动收缩;三栏右栏若正展示这条,清掉选中 */
     fun dismissEntry(entryId: String) {
+        if (_uiState.value.selectedEntryId == entryId) {
+            _uiState.value = _uiState.value.copy(selectedEntryId = null)
+        }
         viewModelScope.launch(Dispatchers.IO) { taskManager.setDismissed(entryId, true) }
     }
 
     /** 撤销「不再推荐」,清除 DISMISSED 状态 */
     fun restoreEntry(entryId: String) {
         viewModelScope.launch(Dispatchers.IO) { taskManager.setDismissed(entryId, false) }
+    }
+
+    /** 我做过了:写 DONE 状态,推荐列表随数据流自动收缩(不产生任务行) */
+    fun markDoneBefore(entryId: String) {
+        viewModelScope.launch(Dispatchers.IO) { taskManager.markDoneBefore(entryId) }
+    }
+
+    /** 撤销「我做过了」,只清 DONE 状态 */
+    fun unmarkDoneBefore(entryId: String) {
+        viewModelScope.launch(Dispatchers.IO) { taskManager.unmarkDoneBefore(entryId) }
     }
 
     companion object {
@@ -157,7 +240,8 @@ class LibraryViewModel(
                 val c = app.container
                 LibraryViewModel(
                     c.entryRepository, c.profileRepository, c.database.entryStateDao(),
-                    c.taskManager, c.recommendationEngine, c.entryRetriever, c.settingsStore,
+                    c.database.entryNoteDao(), c.taskManager, c.recommendationEngine,
+                    c.entryRetriever, c.settingsStore,
                 )
             }
         }
