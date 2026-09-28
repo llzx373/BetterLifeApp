@@ -29,3 +29,43 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         )
     }
 }
+
+/**
+ * v6 → v7：新增内容库三表（条目内容从 assets 迁入 Room，见 ContentEntities.kt）。
+ * 纯建表，不动存量用户表；SS-NN → 稳定 key 的 entryId 改写由 ContentBootstrap 在首启时做。
+ */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS content_sections" +
+                " (`key` TEXT NOT NULL, n INTEGER NOT NULL, title TEXT NOT NULL," +
+                " intro TEXT NOT NULL, entryCount INTEGER NOT NULL, PRIMARY KEY(`key`))"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS content_entries" +
+                " (`key` TEXT NOT NULL, secKey TEXT NOT NULL, sec INTEGER NOT NULL," +
+                " n INTEGER NOT NULL, title TEXT NOT NULL, cost TEXT NOT NULL DEFAULT ''," +
+                " human TEXT NOT NULL DEFAULT '', gain TEXT NOT NULL DEFAULT ''," +
+                " grade TEXT NOT NULL DEFAULT '', src TEXT NOT NULL DEFAULT ''," +
+                " note TEXT NOT NULL DEFAULT '', money TEXT NOT NULL DEFAULT ''," +
+                " time TEXT NOT NULL DEFAULT '', will TEXT NOT NULL DEFAULT ''," +
+                " level TEXT NOT NULL DEFAULT '', lens TEXT NOT NULL DEFAULT ''," +
+                " dispute INTEGER NOT NULL DEFAULT 0, todo INTEGER NOT NULL DEFAULT 0," +
+                " cs INTEGER NOT NULL DEFAULT 0, ratio TEXT NOT NULL DEFAULT ''," +
+                " hay TEXT NOT NULL DEFAULT '', hash TEXT NOT NULL DEFAULT ''," +
+                " removed INTEGER NOT NULL DEFAULT 0, updatedAt INTEGER NOT NULL," +
+                " PRIMARY KEY(`key`))"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_content_entries_secKey ON content_entries (secKey)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_content_entries_removed ON content_entries (removed)"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS content_meta" +
+                " (id INTEGER NOT NULL, contentVersion TEXT NOT NULL," +
+                " upstreamCommit TEXT NOT NULL, updatedAt INTEGER NOT NULL, PRIMARY KEY(id))"
+        )
+    }
+}

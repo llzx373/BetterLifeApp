@@ -73,6 +73,12 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
 
         // 已一次性高亮过的成就里程碑 key,逗号分隔;无顺序要求
         val CELEBRATED_MILESTONES = stringPreferencesKey("celebrated_milestones")
+
+        // 条目 id 已从 SS-NN 改写成稳定 key 的一次性标记（ContentBootstrap 用）
+        val CONTENT_ID_MIGRATED = booleanPreferencesKey("content_id_migrated")
+
+        // 每日习惯是否已首次播种过示例的一次性标记（TaskManager.ensureTodayTasks 用）
+        val DAILY_HABITS_SEEDED = booleanPreferencesKey("daily_habits_seeded")
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -222,6 +228,29 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
     }
 
     /**
+     * 条目 id 迁移标记：五张用户表的 entryId 是否已从 SS-NN 改写成稳定 key。
+     * 与 searchHistory 同理不进 AppSettings —— 它是首启迁移的局部状态，只需读一次。
+     */
+    suspend fun isContentIdMigrated(): Boolean =
+        context.dataStore.data.first()[Keys.CONTENT_ID_MIGRATED] ?: false
+
+    suspend fun setContentIdMigrated() {
+        context.dataStore.edit { it[Keys.CONTENT_ID_MIGRATED] = true }
+    }
+
+    /**
+     * 每日习惯首次播种标记：用户还没有任何 STATE_DAILY 时是否已播种过示例。
+     * 与 contentIdMigrated 同理不进 AppSettings —— 它是一次性播种的局部状态，只需读一次。
+     * 无论实际挑到几条都只播一次：用户主动删光习惯后不应再被塞回来。
+     */
+    suspend fun isDailyHabitsSeeded(): Boolean =
+        context.dataStore.data.first()[Keys.DAILY_HABITS_SEEDED] ?: false
+
+    suspend fun setDailyHabitsSeeded() {
+        context.dataStore.edit { it[Keys.DAILY_HABITS_SEEDED] = true }
+    }
+
+    /**
      * 否则播种 Kimi/DeepSeek 两张预设卡;首次写供应商时迁移结果随之落盘
      */
     private fun readProviders(p: Preferences): List<AiProvider> {
@@ -254,7 +283,7 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
         raw?.let { runCatching { json.decodeFromString<List<AiProvider>>(it) }.getOrNull() }
 
     companion object {
-        const val DEFAULT_THEME_MODE = "brand_green"
+        const val DEFAULT_THEME_MODE = "brand_blue_purple"
 
         /** 默认「标准」。降级是给需要的用户的选项,不该是所有人的默认 */
         const val DEFAULT_MOTION_LEVEL = "standard"

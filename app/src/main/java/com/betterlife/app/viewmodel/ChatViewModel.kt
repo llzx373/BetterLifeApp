@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class ChatViewModel(
     private val aiAdvisor: AiAdvisor,
     private val profileRepository: ProfileRepo,
-    private val entriesData: () -> EntriesData,
+    private val entriesData: suspend () -> EntriesData,
     private val settingsStore: ChatSettingsGateway,
     private val chatMessageDao: ChatMessageDao,
 ) : ViewModel() {

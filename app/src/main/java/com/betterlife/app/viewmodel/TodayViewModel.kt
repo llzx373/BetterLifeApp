@@ -9,7 +9,6 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.data.EntryDto
 import com.betterlife.app.data.EntryRepository
-import com.betterlife.app.data.Profile
 import com.betterlife.app.data.ProfileRepository
 import com.betterlife.app.data.db.TaskEntity
 import com.betterlife.app.tasks.TaskManager
@@ -81,10 +80,6 @@ class TodayViewModel(
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    /** 换一条要用到完整档案，随数据流缓存下来 */
-    @Volatile
-    private var profile: Profile? = null
-
     private var observeJob: Job? = null
 
     init {
@@ -102,7 +97,6 @@ class TodayViewModel(
         observeJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 profileRepository.profileFlow.collectLatest { p ->
-                    profile = p
                     if (p == null) {
                         _uiState.value = UiState.Empty
                         return@collectLatest
@@ -217,15 +211,6 @@ class TodayViewModel(
                 true
             }
             withContext(Dispatchers.Main) { onResult(filled) }
-        }
-    }
-
-    /** 换一条：当前这条不再推荐，补一条新的顶上 */
-    fun swapTask(task: TaskEntity) {
-        val p = profile ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            taskManager.replaceTodayTask(p, task)
-            refreshWidgets()
         }
     }
 

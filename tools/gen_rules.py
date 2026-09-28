@@ -15,6 +15,8 @@ universal = (
     + ["22-01", "22-03", "22-04", "22-06", "22-09"]
 )
 
+# 每日习惯种子池:用户还没有任何自选每日习惯时,从这里按档案挑 3 条示例播种
+# (全是「今天做一次、明天还要做」的习惯);播种后增删全由用户决定,种子池不再参与每天安排
 daily = ["02-07", "02-10", "02-11", "02-13", "02-14", "02-18", "02-19", "02-20",
          "02-23", "02-25", "02-28", "02-31", "02-32", "03-02", "03-04", "03-08",
          "22-09"]
@@ -178,7 +180,7 @@ rules = [
      "reason": "目标=放松:第22节娱乐场所安全和减压方法"},
 ]
 
-doc = {"version": 1, "dailyEntryIds": daily, "rules": rules}
+doc = {"version": 3, "seedEntryIds": daily, "rules": rules}
 
 entries = json.load(open(r"app/src/main/assets/entries.json", encoding="utf-8"))
 valid_ids = {e["id"] for e in entries["entries"]}
@@ -196,12 +198,29 @@ for idx, r in enumerate(rules):
     for s in r.get("boostSections", []):
         if s not in valid_secs:
             bad.append((f"rule{idx}.sections", s))
-check(daily, "daily")
+check(daily, "seedEntryIds")
 if bad:
     print("BAD IDS:", bad)
-else:
-    print("all ids ok")
+    raise SystemExit(1)
+print("all ids ok")
+
+# 上面规则按位置序号 SS-NN 编写(人工维护方便);输出时全部换算成稳定 key,
+# 上游插入条目导致条号顺延时不影响 App 端匹配。节号同理换成 section key。
+id_to_key = {e["id"]: e["key"] for e in entries["entries"]}
+sec_to_key = {s["n"]: s["key"] for s in entries["sections"]}
+
+def to_keys(ids):
+    return [id_to_key[i] for i in ids]
+
+for r in doc["rules"]:
+    if "boostEntryIds" in r:
+        r["boostEntryIds"] = to_keys(r["boostEntryIds"])
+    if "excludeEntryIds" in r:
+        r["excludeEntryIds"] = to_keys(r["excludeEntryIds"])
+    if "boostSections" in r:
+        r["boostSections"] = [sec_to_key[s] for s in r["boostSections"]]
+doc["seedEntryIds"] = to_keys(doc["seedEntryIds"])
 
 with open(r"tools/relevance_rules.json", "w", encoding="utf-8") as f:
     json.dump(doc, f, ensure_ascii=False, indent=2)
-print("rules:", len(rules), "daily:", len(daily), "universal pool:", len(universal))
+print("rules:", len(rules), "seed pool:", len(daily), "universal pool:", len(universal))

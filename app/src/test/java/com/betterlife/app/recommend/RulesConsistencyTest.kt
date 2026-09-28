@@ -94,22 +94,30 @@ class RulesConsistencyTest {
 
     @Test
     fun `真实规则下无慢病用户被剔除 02-12 而高血压用户保留`() {
+        // 规则已改用稳定 key：从真实 entries.json 取 "02-12" 对应的 key 再参与断言
+        val file = json.decodeFromString(EntriesFile.serializer(), assetFile("entries.json").readText())
+        val legacy = file.entries.first { it.id == "02-12" }
         val entries = listOf(
-            EntryDto(id = "02-12", sec = 2, n = 12, title = "t", lens = "死亡率", ratio = "高", grade = "A"),
+            EntryDto(
+                id = legacy.key, sec = legacy.sec, n = legacy.n, title = "t",
+                key = legacy.key, secKey = legacy.secKey,
+                lens = "死亡率", ratio = "高", grade = "A",
+            ),
         )
         val rules = loadRules()
         val engine = RecommendationEngine()
         val healthy = engine.recommend(Profile(), entries, rules, emptySet())
-        assertTrue("无慢病用户不应看到 02-12", healthy.values.flatten().none { it.entry.id == "02-12" })
+        assertTrue("无慢病用户不应看到 02-12", healthy.values.flatten().none { it.entry.id == legacy.key })
         val hypertension = engine.recommend(Profile(chronic = setOf(Chronic.HYPERTENSION)), entries, rules, emptySet())
-        assertTrue("高血压用户应保留 02-12", hypertension.values.flatten().any { it.entry.id == "02-12" })
+        assertTrue("高血压用户应保留 02-12", hypertension.values.flatten().any { it.entry.id == legacy.key })
     }
 
     @Test
-    fun `每日白名单不含 todo 条目`() {
+    fun `每日种子池不含 todo 条目`() {
         val entries = json.decodeFromString(EntriesFile.serializer(), assetFile("entries.json").readText())
-        val todoIds = entries.entries.filter { it.todo }.mapTo(mutableSetOf()) { it.id }
-        val bad = loadRules().dailyEntryIds.filter { it in todoIds }
-        assertTrue("dailyEntryIds 含 todo 条目，永远不会被规划: $bad", bad.isEmpty())
+        // 种子池与 todo 集合都用稳定 key 比较（assets 里 EntryDto.id 仍是 SS-NN，见 EntryDto.id 约定）
+        val todoKeys = entries.entries.filter { it.todo }.mapTo(mutableSetOf()) { it.key }
+        val bad = loadRules().seedEntryIds.filter { it in todoKeys }
+        assertTrue("seedEntryIds 含 todo 条目，永远不会被挑中: $bad", bad.isEmpty())
     }
 }

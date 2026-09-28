@@ -73,6 +73,32 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun migrate6To7() {
+        helper.createDatabase(TEST_DB, 6).apply {
+            execSQL(
+                "INSERT INTO tasks (entryId, type) VALUES ('02-01', 'DAILY')"
+            )
+            close()
+        }
+
+        // 纯建表迁移：老行原样保留，重点校验三张新表结构与 Room 期望一致
+        val db = helper.runMigrationsAndValidate(TEST_DB, 7, true, MIGRATION_6_7)
+
+        db.query("SELECT entryId FROM tasks").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("02-01", c.getString(0))
+        }
+        for (table in listOf("content_sections", "content_entries", "content_meta")) {
+            db.query(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+                arrayOf(table),
+            ).use { c ->
+                assertTrue("missing table: $table", c.moveToFirst())
+            }
+        }
+    }
+
     private companion object {
         const val TEST_DB = "migration-test"
     }

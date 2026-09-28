@@ -60,30 +60,26 @@
 
 ### 3.1 色彩
 
-**品牌绿保留,但取消"动态取色默认开"。**
+**固定品牌色 + 多主题切换,取消"动态取色默认开"。**
 
-决策:设置页提供**三选一**(不是开关),默认"品牌绿"。
+决策:设置页「主题」区是**分段列表选择**(不是开关),枚举顺序即展示顺序,默认"蓝紫"(2026-09-28 起,此前默认青绿):
 
 ```
-主题:  ○ 品牌绿 (默认)   ○ 跟随系统壁纸 (Material You)   ○ 深色优先
+主题:  ○ 蓝紫(默认)  ○ 青绿  ○ 暖橙  ○ 青  ○ 跟随系统壁纸(Material You)  ○ 深色优先
 ```
 
 理由:D5。健康类 App 的品牌识别依赖固定色;Material You 是加分项,不该是默认。动态取色仍然保留,在 Android 12+ 作为选项提供,并且:**选 Material You 时,口径色(§3.2)不跟随壁纸**,否则四个语义色会被壁纸洗掉,失去区分度。
 
-品牌色不改(#2E7D32 系),但补齐完整的 tonal palette(13 阶),现在的 `Color.kt` 是手工挑的十几对,缺 `surfaceContainer*` 系列 —— 那正是 M3 表达性组件(工具栏、分段列表)要用的色槽。
+四个品牌色共用同一套中性/表面/error token(它们本就接近中性),差异只在 primary/secondary/tertiary 三个家族 —— `Color.kt` 里每品牌一个 `BrandPalette`(primary/secondary/tertiary 三条六阶 Ramp),由 `brandLightColors/brandDarkColors` 装配成明/暗两套 scheme:
 
-**需要补的色槽**(当前 `Theme.kt` 完全没有):
+| 品牌 | seed | light primary | dark primary |
+|---|---|---|---|
+| 蓝紫(默认) | #5A58D6 | #4F4DCB | #C2C1FF |
+| 青绿 | #2E7D32 | #2E7D32 | #95D494 |
+| 暖橙 | #C2410C | #AC3400 | #FFB59D |
+| 青 | #0F766E | #006A63 | #80D5CB |
 
-```
-surfaceContainerLowest / surfaceContainerLow / surfaceContainer
-surfaceContainerHigh / surfaceContainerHighest
-surfaceDim / surfaceBright
-inverseSurface / inverseOnSurface / inversePrimary
-surfaceTint
-outlineVariant
-```
-
-> 注意:`MaterialExpressiveTheme` 的新组件大量依赖 `surfaceContainer*`。缺这些色槽时,组件会落到默认的灰紫,和品牌绿打架。
+新品牌的 tonal 由 seed 按 M3 派生(material-color-utilities:secondary 同 hue 低彩 16、tertiary hue+60 彩 24),六阶文字对全部 ≥ WCAG AA 4.5:1;青绿沿用历史手工调色值,原样保留。palette 是完整的 13 阶,含 `surfaceContainer*` / `surfaceDim` / `surfaceBright` / `inverse*` / `outlineVariant` / `scrim` —— M3 表达性组件(工具栏、分段列表、FloatingToolbar)要用的色槽。
 
 ### 3.2 口径色(Lens Colors)—— 本项目的自定义语义色
 
@@ -598,7 +594,7 @@ sealed interface TodayUiState {
 
 1. **9 处 `ListItem(headlineContent = …)` 弃用警告未迁移** —— 迁移到新重载就是 P2 的"表达性 ListItem",现在迁移会改变视觉,与 P0"不改任何一屏视觉"冲突,故保留。
 2. **依赖可升版本**:material3 alpha29、okhttp 5.5.0、kotlinx-serialization 1.11.0、core-ktx 1.19.1、navigation 2.10.2、datastore 1.2.1、work 2.12.0。当前组合是"已验证通过"的一致集合,升级应作为独立可回滚的一步,不要混在 P1 里。
-3. **正式签名密钥库尚未创建**,release 目前回退到 debug 签名(见 README「发布构建与签名」)。
+3. **正式签名密钥库尚未创建**,release 目前回退到 debug 签名(见 docs/BUILD.md「发布构建与签名」)。
 4. **未加 androidTest 依赖**,留给 P3 的截图测试。
 5. **未显式设置 `android:enableOnBackInvokedCallback`**,留给 P3 一并验证预测性返回。
 6. 通知此前**没有 `contentIntent`**(点了没反应),P0 已补上 `PendingIntent`(带 `FLAG_IMMUTABLE`)。
@@ -830,7 +826,7 @@ AnimatedVisibility(visibleState = visible, enter = fadeIn() + scaleIn(initialSca
 
 release 目前回退 debug 签名,产物不能对外分发。这一步**不是代码问题**:需要你先定密钥库放哪、密码怎么保管、谁持有。
 
-在决定之前不动它 —— 签名密钥一旦丢失不可恢复,而且它不该以任何形式进仓库(`.gitignore` 已排除 `keystore.properties` 与 `*.jks`)。生成命令与 `keystore.properties` 的字段见 README「发布构建与签名」。
+在决定之前不动它 —— 签名密钥一旦丢失不可恢复,而且它不该以任何形式进仓库(`.gitignore` 已排除 `keystore.properties` 与 `*.jks`)。生成命令与 `keystore.properties` 的字段见 docs/BUILD.md「发布构建与签名」。
 
 #### P3-A4 · 依赖升级(2026-09-24 已完成)
 
@@ -1199,7 +1195,7 @@ release 目前回退 debug 签名,产物不能对外分发。这一步**不是�
 发布前必须全绿:
 
 - [ ] `./gradlew assembleRelease` 产出已签名包,`targetSdk ≥ 36`
-- [ ] 深色模式冷启动无白屏;主题三选一即时生效
+- [ ] 深色模式冷启动无白屏;主题切换即时生效
 - [x] 全项目无硬编码中文字面量(`UiNoChineseLiteralTest` 卡住,违规即构建失败)
 - [ ] 无硬编码 `dp` 间距字面量(间距走 token)(界面级 P1 已做;**组件内部几何**刻意保留字面量,见 P1 执行记录)
 - [x] 四个口径色在氘代色盲模拟下可区分,且每处都有配图标(`LensColorAccessibilityTest` 卡住对比度与 ΔE;见 B7)

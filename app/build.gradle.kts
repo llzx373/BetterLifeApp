@@ -70,8 +70,8 @@ android {
         // 版本约定：versionName 三段式 —— 大重构迭代第一位、大特性更新迭代第二位、
         // 正式版本迭代第三位；versionCode 即版本号后面的「-n」开发迭代号
         // （0.1.0-1 ↔ versionCode 1），开发中只递增 versionCode。
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -100,7 +100,7 @@ android {
             } else {
                 logger.warn(
                     "未配置正式签名（环境变量、.env 与 keystore.properties 均缺失）：release 构建回退到 debug 签名。" +
-                        "正式发布前请配置签名（见 README 的「发布构建」一节）。"
+                        "正式发布前请配置签名（见 docs/BUILD.md 的「发布构建与签名」一节）。"
                 )
                 signingConfigs.getByName("debug")
             }

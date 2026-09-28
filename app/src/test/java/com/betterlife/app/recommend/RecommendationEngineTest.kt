@@ -22,13 +22,13 @@ class RecommendationEngineTest {
         todo: Boolean = false,
     ) = EntryDto(
         id = id, sec = sec, n = id.substringAfter('-').toInt(), title = "t$id",
-        lens = lens, ratio = ratio, grade = grade, cs = cs, todo = todo,
+        secKey = "s$sec", lens = lens, ratio = ratio, grade = grade, cs = cs, todo = todo,
     )
 
     private fun rule(
         cond: Map<String, List<String>> = emptyMap(),
         boost: List<String> = emptyList(),
-        boostSecs: List<Int> = emptyList(),
+        boostSecs: List<String> = emptyList(),
         exclude: List<String> = emptyList(),
         weight: Int = 10,
     ) = RuleDto(cond, boost, boostSecs, exclude, weight, "reason")
@@ -47,7 +47,7 @@ class RecommendationEngineTest {
     private val rules = RulesFile(
         rules = listOf(
             rule(cond = mapOf("smoking" to listOf("yes")), boost = listOf("01-01"), weight = 100),
-            rule(boostSecs = listOf(2), weight = 10),
+            rule(boostSecs = listOf("s2"), weight = 10),
             rule(cond = mapOf("smoking" to listOf("yes")), exclude = listOf("01-02"), weight = 5),
         )
     )

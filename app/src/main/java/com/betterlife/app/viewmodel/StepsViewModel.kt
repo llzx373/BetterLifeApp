@@ -31,10 +31,11 @@ class StepsViewModel(
     /**
      * 重新判定状态并订阅步数流。权限授予/拒绝之后、页面 resume 时调用：
      * 门面每次收集都会重新查 SDK 状态与权限，重新收集就是刷新。
+     * 已有结果时保留旧值（stale-while-revalidate），等流的新排放再替换——
+     * 重置回 Loading 会让步数卡先消失再插入，回到首页时布局会闪一下。
      */
     fun refresh() {
         collectJob?.cancel()
-        _uiState.value = StepsState.Loading
         collectJob = viewModelScope.launch(Dispatchers.IO) {
             stepsRepository.stepsFlow().collect { _uiState.value = it }
         }

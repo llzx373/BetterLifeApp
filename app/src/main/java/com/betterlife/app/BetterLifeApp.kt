@@ -12,14 +12,17 @@ import com.betterlife.app.data.NetworkMonitor
 import com.betterlife.app.data.ProfileRepository
 import com.betterlife.app.data.SettingsStore
 import com.betterlife.app.data.backup.BackupManager
+import com.betterlife.app.data.content.ContentBootstrap
+import com.betterlife.app.data.content.ContentSyncRepository
 import com.betterlife.app.data.db.AppDatabase
 import com.betterlife.app.data.db.ChatMessageDao
 import com.betterlife.app.data.health.HealthConnectRepository
 import com.betterlife.app.data.health.HealthRulesRepository
 import com.betterlife.app.data.health.SensorStepsRepository
 import com.betterlife.app.data.health.StepsRepository
-import com.betterlife.app.recommend.DailyTaskPlanner
+import com.betterlife.app.recommend.DailySeedPicker
 import com.betterlife.app.recommend.RecommendationEngine
+import com.betterlife.app.tasks.ContentSyncWorker
 import com.betterlife.app.tasks.ReminderScheduler
 import com.betterlife.app.tasks.TaskManager
 
@@ -31,20 +34,32 @@ class BetterLifeApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        // 内容库周期同步（每天一次、联网才跑）；KEEP 语义，重复注册不会重置已排队的任务
+        ContentSyncWorker.enqueuePeriodic(this)
     }
 }
 
 /** 手动依赖注入容器（单例） */
 class AppContainer(private val context: Context) {
 
-    val entryRepository: EntryRepository by lazy { EntryRepository(context) }
-
     val database: AppDatabase by lazy { AppDatabase.build(context) }
+
+    val settingsStore: SettingsStore by lazy { SettingsStore(context) }
+
+    /** 内容库首启播种 + 旧 entryId（SS-NN）迁移；依赖 database 与 settingsStore，不成环 */
+    val contentBootstrap: ContentBootstrap by lazy { ContentBootstrap(context, database, settingsStore) }
+
+    val entryRepository: EntryRepository by lazy {
+        EntryRepository(contentBootstrap, database.contentDao(), context)
+    }
+
+    /** 内容库运行时同步（GitHub Releases content-latest）；Worker 与设置页「检查更新」共用 */
+    val contentSyncRepository: ContentSyncRepository by lazy {
+        ContentSyncRepository(database, entryRepository, contentBootstrap, context)
+    }
 
     /** 聊天记录表入口，ChatViewModel 持久化用 */
     val chatMessageDao: ChatMessageDao by lazy { database.chatMessageDao() }
-
-    val settingsStore: SettingsStore by lazy { SettingsStore(context) }
 
     val networkMonitor: NetworkMonitor by lazy { NetworkMonitor(context) }
 
@@ -52,7 +67,7 @@ class AppContainer(private val context: Context) {
 
     val recommendationEngine: RecommendationEngine by lazy { RecommendationEngine() }
 
-    val dailyTaskPlanner: DailyTaskPlanner by lazy { DailyTaskPlanner(maxDaily = 3) }
+    val dailySeedPicker: DailySeedPicker by lazy { DailySeedPicker() }
 
     val taskManager: TaskManager by lazy {
         TaskManager(
@@ -62,8 +77,9 @@ class AppContainer(private val context: Context) {
             weeklyHabitDao = database.weeklyHabitDao(),
             streakLeaveDao = database.streakLeaveDao(),
             customEntryDao = database.customEntryDao(),
-            planner = dailyTaskPlanner,
+            seedPicker = dailySeedPicker,
             entryRepository = entryRepository,
+            settingsStore = settingsStore,
             reminderScheduler = reminderScheduler,
             healthConnect = healthConnectRepository,
             healthRulesRepository = healthRulesRepository,
@@ -73,7 +89,7 @@ class AppContainer(private val context: Context) {
     val reminderScheduler: ReminderScheduler by lazy { ReminderScheduler(context) }
 
     /** 本地 JSON 备份导出/导入（不含 chat_messages 与 DataStore 敏感配置） */
-    val backupManager: BackupManager by lazy { BackupManager(database, reminderScheduler) }
+    val backupManager: BackupManager by lazy { BackupManager(database, reminderScheduler, context) }
 
     /** Health Connect 读取仓库：步数门面与 B1 自动核销共用一个实例 */
     val healthConnectRepository: HealthConnectRepository by lazy { HealthConnectRepository(context) }

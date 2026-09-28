@@ -13,6 +13,7 @@ import com.betterlife.app.data.AiProvider
 import com.betterlife.app.data.AppSettings
 import com.betterlife.app.data.SettingsStore
 import com.betterlife.app.data.backup.BackupManager
+import com.betterlife.app.data.content.ContentSyncRepository
 import com.betterlife.app.data.db.ChatMessageDao
 import com.betterlife.app.tasks.ReminderScheduler
 import com.betterlife.app.ui.theme.MotionLevel
@@ -31,6 +32,7 @@ class SettingsViewModel(
     private val webSearcher: WebSearcher,
     private val backupManager: BackupManager,
     private val chatMessageDao: ChatMessageDao,
+    private val contentSyncRepository: ContentSyncRepository,
 ) : ViewModel() {
 
     /** 某张卡的连接自检结果，交给界面翻成文案 */
@@ -73,6 +75,10 @@ class SettingsViewModel(
         val searchTest: ConnectionTest = ConnectionTest.Idle,
         /** 数据区导出/导入动作的状态 */
         val dataAction: DataAction = DataAction.Idle,
+        /** 内容库当前版本（content_meta；空 = 还没读到） */
+        val contentVersion: String = "",
+        /** 上次内容同步时间（epoch millis；0 = 还没读到） */
+        val contentSyncedAt: Long = 0L,
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -83,6 +89,13 @@ class SettingsViewModel(
             settingsStore.settingsFlow.collect { s ->
                 _uiState.value = _uiState.value.copy(settings = s, loaded = true)
             }
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val meta = contentSyncRepository.currentMeta() ?: return@launch
+            _uiState.value = _uiState.value.copy(
+                contentVersion = meta.contentVersion,
+                contentSyncedAt = meta.updatedAt,
+            )
         }
     }
 
@@ -277,7 +290,7 @@ class SettingsViewModel(
                 val c = app.container
                 SettingsViewModel(
                     c.settingsStore, c.reminderScheduler, c.llmClient, c.webSearcher,
-                    c.backupManager, c.chatMessageDao,
+                    c.backupManager, c.chatMessageDao, c.contentSyncRepository,
                 )
             }
         }

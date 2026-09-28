@@ -33,7 +33,8 @@ class DismissedViewModel(
             taskManager.dismissedIdsFlow().collect { ids ->
                 val byId = entryRepository.entriesData().byId
                 _uiState.value = UiState(
-                    entries = ids.mapNotNull { byId[it] }.sortedBy { it.id },
+                    entries = ids.mapNotNull { byId[it] }
+                        .sortedWith(compareBy({ it.sec }, { it.n })),
                     loaded = true,
                 )
             }

@@ -41,7 +41,8 @@ class FavoritesViewModel(
             ) { ids, notes -> ids to notes }.collect { (ids, notes) ->
                 val byId = entryRepository.entriesData().byId
                 _uiState.value = UiState(
-                    entries = ids.mapNotNull { byId[it] }.sortedBy { it.id },
+                    entries = ids.mapNotNull { byId[it] }
+                        .sortedWith(compareBy({ it.sec }, { it.n })),
                     notes = notes.associate { it.entryId to it.text },
                     loaded = true,
                 )

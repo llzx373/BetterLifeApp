@@ -211,6 +211,18 @@ fun EntryDetailContent(
                     ),
                     verticalArrangement = Arrangement.spacedBy(Spacing.space4),
                 ) {
+                    // 下架条目:内容快照照常展示,顶部先给一条来源状态说明
+                    // (secondaryContainer:参照 OfflineBanner 的配色约定,「可读但有保留」的提示态)
+                    if (e.removed) {
+                        item {
+                            NoticeRow(
+                                textRes = R.string.entry_removed_banner,
+                                container = MaterialTheme.colorScheme.secondaryContainer,
+                                content = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                        }
+                    }
+
                     item { HeroSection(e) }
 
                     if (e.dispute || e.todo) {

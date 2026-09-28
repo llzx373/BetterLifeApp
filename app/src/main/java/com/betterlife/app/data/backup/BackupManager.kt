@@ -1,6 +1,9 @@
 package com.betterlife.app.data.backup
 
+import android.content.Context
 import androidx.room.withTransaction
+import com.betterlife.app.data.content.BundledContent
+import com.betterlife.app.data.content.LegacyEntryId
 import com.betterlife.app.data.db.AppDatabase
 import com.betterlife.app.data.db.TaskEntity
 import com.betterlife.app.tasks.ReminderScheduler
@@ -10,11 +13,18 @@ import java.time.LocalDate
  * 本地 JSON 备份的导出/导入。
  * 只覆盖 7 张持久表（见 [BackupPayload]）：chat_messages 不备份，
  * DataStore 里的 API key 等敏感配置不出设备。
+ *
+ * 旧版备份里的条目 id 是位置序号 "SS-NN"，导入时按捆绑 entries.json 的
+ * id→key 映射改写成稳定 key（映射不上的原样保留，如 "custom:" 前缀行）。
  */
 class BackupManager(
     private val database: AppDatabase,
     private val reminderScheduler: ReminderScheduler,
+    private val context: Context,
 ) {
+
+    /** SS-NN → 稳定 key 映射，首次导入时才解析 assets，随实例缓存 */
+    private val legacyIdToKey: Map<String, String> by lazy { BundledContent.legacyIdToKey(context) }
 
     /** 导出全部持久表为 JSON 字符串；单事务读取保证一致性快照，写入文件/分享由调用方负责 */
     suspend fun exportJson(): String {
@@ -39,7 +49,7 @@ class BackupManager(
      * taskId 原样保留插入（Room 显式主键插入），单任务提醒的 work 名与通知 id 保持稳定。
      */
     suspend fun importJson(json: String): Result<Int> {
-        val payload = BackupCodec.decode(json).getOrElse { return Result.failure(it) }
+        val payload = BackupCodec.decode(json).getOrElse { return Result.failure(it) }.remapEntryIds()
         return runCatching {
             val count = database.withTransaction {
                 database.profileDao().deleteAll()
@@ -66,6 +76,22 @@ class BackupManager(
             rescheduleRemindersAfterImport()
             count
         }
+    }
+
+    /**
+     * 旧版（SS-NN）条目 id → 稳定 key 改写。只动匹配 `SS-NN` 形态的 entryId，
+     * 已是 key 或 "custom:" 前缀的行原样保留；映射不上（上游已删的条目）也保留原值。
+     * customEntries 的 id 恒为 "custom:<UUID>"，不在改写范围内。
+     */
+    private fun BackupPayload.remapEntryIds(): BackupPayload {
+        fun remap(id: String): String = LegacyEntryId.remap(id, legacyIdToKey)
+        return copy(
+            tasks = tasks.map { it.copy(entryId = remap(it.entryId)) },
+            entryStates = entryStates.map { it.copy(entryId = remap(it.entryId)) },
+            weeklyHabits = weeklyHabits.map { it.copy(entryId = remap(it.entryId)) },
+            entryNotes = entryNotes.map { it.copy(entryId = remap(it.entryId)) },
+            streakLeaves = streakLeaves.map { it.copy(entryId = remap(it.entryId)) },
+        )
     }
 
     /**

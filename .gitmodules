@@ -1,0 +1,3 @@
+[submodule "upstream/HowToLiveBetter"]
+	url = https://github.com/eternity4719/HowToLiveBetter.git
+	path = upstream/HowToLiveBetter

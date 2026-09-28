@@ -52,7 +52,7 @@ class TodoViewModel(
         val daily: List<TodoItem> = emptyList(),
         val weekly: List<WeeklyEntry> = emptyList(),
         val once: List<TodoItem> = emptyList(),
-        /** 用户自选（而非 planner 安排）的每日习惯条目 id，决定行上是否显示「取消每日」 */
+        /** 用户自选的每日习惯条目 id，决定行上是否显示「取消每日」 */
         val userDailyIds: Set<String> = emptySet(),
     ) {
         val dailyDoneCount: Int get() = daily.count { it.task.done }

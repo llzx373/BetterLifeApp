@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   # 单元测试 + 静态检查 + release 包。release 在没有 keystore.properties 时
-  # 回退 debug 签名（见 README「发布构建与签名」），所以这里能在任何机器上跑通。
+  # 回退 debug 签名（见 docs/BUILD.md「发布构建与签名」），所以这里能在任何机器上跑通。
   build:
     runs-on: ubuntu-latest
     steps:

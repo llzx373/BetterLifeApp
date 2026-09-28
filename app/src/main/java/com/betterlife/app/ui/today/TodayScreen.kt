@@ -223,7 +223,6 @@ fun TodayScreen(
                         now = LocalDateTime.now(),
                         onCheckIn = todayVm::checkIn,
                         onUndo = todayVm::undoCheckIn,
-                        onSwap = todayVm::swapTask,
                         onDrop = todayVm::dropTask,
                         onTakeLeave = { task -> todayVm.takeLeaveToday(task.entryId) },
                         onCancelLeave = { task -> todayVm.cancelLeaveToday(task.entryId) },
@@ -271,7 +270,6 @@ internal fun TodayContent(
     now: LocalDateTime,
     onCheckIn: (TaskEntity, String?) -> Unit,
     onUndo: (TaskEntity) -> Unit,
-    onSwap: (TaskEntity) -> Unit,
     onDrop: (TaskEntity) -> Unit,
     onTakeLeave: (TaskEntity) -> Unit,
     onCancelLeave: (TaskEntity) -> Unit,
@@ -354,12 +352,13 @@ internal fun TodayContent(
             )
         }
 
+        // 每日任务是纯用户自选:走到这里说明用户把习惯删光了,引导去条目库重新挑
         when {
             tasks.isEmpty() -> item(key = "tasks-empty") {
                 EmptyCard(
                     text = stringResource(R.string.today_tasks_empty),
-                    actionText = stringResource(R.string.today_action_fill_profile),
-                    onAction = onEditProfile,
+                    actionText = stringResource(R.string.today_action_go_library),
+                    onAction = onOpenLibrary,
                     modifier = Modifier.padding(horizontal = Spacing.space4),
                 )
             }
@@ -382,7 +381,6 @@ internal fun TodayContent(
                         settlingPinnedDone = item.task.done
                         onUndo(item.task)
                     },
-                    onSwap = { onSwap(item.task) },
                     onDrop = { onDrop(item.task) },
                     onRequestLeave = { leaveDialogTask = item.task },
                     onCancelLeave = { onCancelLeave(item.task) },
@@ -591,7 +589,6 @@ private fun DailyTaskCard(
     item: TodayViewModel.TaskItem,
     onRequestCheckIn: () -> Unit,
     onUndo: () -> Unit,
-    onSwap: () -> Unit,
     onDrop: () -> Unit,
     onRequestLeave: () -> Unit,
     onCancelLeave: () -> Unit,
@@ -675,7 +672,6 @@ private fun DailyTaskCard(
                     onPopPlayed = { celebrated = true },
                     onCheckIn = onRequestCheckIn,
                     onUndo = onUndo,
-                    onSwap = onSwap,
                     onDrop = onDrop,
                     onRequestLeave = onRequestLeave,
                     onRequestBackfill = onRequestBackfill,
@@ -719,7 +715,6 @@ private fun TaskAction(
     onPopPlayed: () -> Unit,
     onCheckIn: () -> Unit,
     onUndo: () -> Unit,
-    onSwap: () -> Unit,
     onDrop: () -> Unit,
     onRequestLeave: () -> Unit,
     onRequestBackfill: () -> Unit,
@@ -728,7 +723,7 @@ private fun TaskAction(
     // 关闭档不套 AnimatedContent:静态帧否则可能抓到按钮切换的中间态
     if (LocalMotionLevel.current == MotionLevel.OFF) {
         TaskActionContent(
-            done, isDailyHabit, playPop, onPopPlayed, onCheckIn, onUndo, onSwap, onDrop,
+            done, isDailyHabit, playPop, onPopPlayed, onCheckIn, onUndo, onDrop,
             onRequestLeave, onRequestBackfill, onStartTimer,
         )
         return
@@ -747,7 +742,7 @@ private fun TaskAction(
         label = "taskAction",
     ) { isDone ->
         TaskActionContent(
-            isDone, isDailyHabit, playPop, onPopPlayed, onCheckIn, onUndo, onSwap, onDrop,
+            isDone, isDailyHabit, playPop, onPopPlayed, onCheckIn, onUndo, onDrop,
             onRequestLeave, onRequestBackfill, onStartTimer,
         )
     }
@@ -761,7 +756,6 @@ private fun TaskActionContent(
     onPopPlayed: () -> Unit,
     onCheckIn: () -> Unit,
     onUndo: () -> Unit,
-    onSwap: () -> Unit,
     onDrop: () -> Unit,
     onRequestLeave: () -> Unit,
     onRequestBackfill: () -> Unit,
@@ -805,20 +799,14 @@ private fun TaskActionContent(
                         }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.today_action_swap)) },
-                                onClick = {
-                                    menuOpen = false
-                                    onSwap()
-                                },
-                            )
-                            DropdownMenuItem(
                                 text = { Text(stringResource(R.string.today_action_drop)) },
                                 onClick = {
                                     menuOpen = false
                                     onDrop()
                                 },
                             )
-                            // 请假/补卡只对用户自选的每日习惯开放(planner 补位的任务没有连签要保)
+                            // 请假/补卡只对用户自选的每日习惯开放:任务行生成后习惯被取消时
+                            // isDailyHabit 为 false(连签已断,没有要保的)
                             if (isDailyHabit) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.today_action_leave)) },

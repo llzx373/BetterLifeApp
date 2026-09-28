@@ -67,8 +67,8 @@
     <!-- 今日页 -->
     <string name="today_tasks_title">今日任务</string>
     <string name="today_tasks_progress">已完成 %1$d 项,共 %2$d 项</string>
-    <string name="today_tasks_empty">还没有今日任务。先完善档案,或去条目库逛逛。</string>
-    <string name="today_action_fill_profile">完善档案</string>
+    <string name="today_tasks_empty">还没有每日习惯,去条目库挑几条放进每天。</string>
+    <string name="today_action_go_library">去条目库逛逛</string>
     <string name="today_recommend_title">为你推荐</string>
     <string name="today_all_entries">全部条目</string>
     <string name="today_recommend_empty">填一份档案,推荐会更准;也可以先随便看看。</string>
@@ -84,7 +84,6 @@
     <string name="today_task_check">打卡</string>
     <string name="today_task_undo">撤销</string>
     <string name="today_task_menu">更多操作</string>
-    <string name="today_action_swap">换一条</string>
     <string name="today_action_drop">今天不做</string>
     <string name="today_add_todo_desc">加入待办</string>
     <string name="today_dismiss_menu">不再推荐这条</string>
@@ -208,6 +207,7 @@
     <string name="detail_cost_time">时间 %1$s</string>
     <string name="detail_cost_will">毅力 %1$s</string>
     <string name="detail_dispute_notice">这条建议存在争议,请结合自己的情况判断。</string>
+    <string name="entry_removed_banner">该条目已在上游下架,内容保留供参考</string>
     <string name="detail_todo_notice">这条内容还未核实,谨慎参考。</string>
 
     <!-- AI 问答 -->
@@ -358,7 +358,10 @@
     <string name="motion_standard">标准</string>
     <string name="motion_reduced">减弱</string>
     <string name="motion_off">关闭</string>
-    <string name="theme_brand">品牌绿（默认）</string>
+    <string name="theme_brand_blue_purple">蓝紫（默认）</string>
+    <string name="theme_brand_green">青绿</string>
+    <string name="theme_brand_orange">暖橙</string>
+    <string name="theme_brand_teal">青</string>
     <string name="theme_material_you">跟随系统壁纸</string>
     <string name="theme_dark">深色优先</string>
     <string name="settings_section_profile">档案</string>
@@ -437,6 +440,10 @@
     <string name="settings_clear_chat_confirm_text">本机上的全部对话记录会被删除,无法恢复。</string>
     <string name="settings_clear_chat_confirm">清空</string>
     <string name="settings_clear_chat_done">对话历史已清空</string>
+    <string name="settings_content_update">检查内容更新</string>
+    <string name="settings_content_update_sub">当前版本 %1$s · 上次同步 %2$s</string>
+    <string name="settings_content_update_none">尚未同步</string>
+    <string name="settings_content_update_started">已开始检查内容更新</string>
 
     <!-- 待办页:一次性待办到期日 -->
     <string name="todo_due_date_label">%1$d月%2$d日到期</string>

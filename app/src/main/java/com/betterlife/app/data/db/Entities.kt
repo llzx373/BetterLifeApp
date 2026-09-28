@@ -124,7 +124,7 @@ data class EntryStateEntity(
         const val STATE_DONE = "DONE"
         const val STATE_DISMISSED = "DISMISSED"
         const val STATE_FAVORITE = "FAVORITE"
-        /** 用户自选的每日习惯：ensureTodayTasks 会把它并入当天 DAILY 任务（优先于 planner 配额） */
+        /** 用户自选的每日习惯：ensureTodayTasks 每天把它落成当天的 DAILY 任务行 */
         const val STATE_DAILY = "DAILY"
     }
 }

@@ -184,7 +184,8 @@ class LibraryViewModel(
                 searchBaseline = emptyList()
                 emptyList()
             } else {
-                val baseline = retriever.search(query, data.entries, topK = 20)
+                // 搜索语料同样剔除下架条目（与 bySection 的浏览过滤一致）
+                val baseline = retriever.search(query, data.entries.filter { !it.removed }, topK = 20)
                 searchBaseline = baseline
                 baseline.filter { it.entry.matchesFilter(_uiState.value.filter) }
             }
@@ -278,7 +279,7 @@ internal fun sortEntries(entries: List<EntryDto>, sort: EntrySort): List<EntryDt
     EntrySort.GRADE -> entries.sortedWith(
         compareBy<EntryDto> { gradeRank(it.grade) }.thenComparing(RecommendationEngine.ENTRY_COMPARATOR),
     )
-    EntrySort.ORDER -> entries.sortedBy { it.id }
+    EntrySort.ORDER -> entries.sortedWith(compareBy({ it.sec }, { it.n }))
 }
 
 /** 某一章按当前排序方式取条目：首屏填充与切换章节都走它，保证两处结果一致 */

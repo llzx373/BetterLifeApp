@@ -33,7 +33,7 @@ class RecommendationEngine {
         private val RATIO_ORDER = mapOf("极高" to 0, "高" to 1, "一般" to 2)
         private val GRADE_ORDER = mapOf("A" to 0, "B" to 1, "C" to 2)
 
-        /** 组内排序比较器，DailyTaskPlanner 也复用 */
+        /** 组内排序比较器，DailySeedPicker 也复用 */
         val ENTRY_COMPARATOR: Comparator<EntryDto> =
             compareBy({ RATIO_ORDER[it.ratio] ?: 3 }, { GRADE_ORDER[it.grade] ?: 3 }, { it.cs }, { it.id })
 
@@ -52,7 +52,7 @@ class RecommendationEngine {
 
         val scored = ArrayList<ScoredEntry>(entries.size)
         for (entry in entries) {
-            if (entry.todo) continue
+            if (entry.todo || entry.removed) continue
             if (entry.id in excludedIds) continue
 
             var excludedByRule = false
@@ -63,7 +63,7 @@ class RecommendationEngine {
                     excludedByRule = true
                     break
                 }
-                val boosted = entry.id in rule.boostEntryIds || entry.sec in rule.boostSections
+                val boosted = entry.id in rule.boostEntryIds || entry.secKey in rule.boostSections
                 if (boosted) {
                     score += rule.weight
                     if (rule.reason.isNotBlank()) reasons += rule.reason

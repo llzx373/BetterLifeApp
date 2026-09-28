@@ -1,4 +1,4 @@
-// 设置页:AI 供应商卡片(启用/禁用/测试/扫描模型)、番茄钟铃声、每日提醒、主题、档案入口、关于与免责
+// 设置页:AI 供应商卡片(启用/禁用/测试/扫描模型)、番茄钟铃声、每日提醒、主题、档案入口、数据(备份/内容更新)、关于与免责
 //
 // 分组用表达性分段 ListItem 连成一组,不再靠 HorizontalDivider 划线;
 // 输入框走 rememberSaveable,旋转设备不丢已经敲进去的内容。
@@ -88,6 +88,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
 import com.betterlife.app.data.AiProvider
+import com.betterlife.app.tasks.ContentSyncWorker
 import com.betterlife.app.ui.common.MotionEntrance
 import com.betterlife.app.ui.theme.MotionLevel
 import com.betterlife.app.ui.theme.Spacing
@@ -434,7 +435,7 @@ fun SettingsScreen(
                     val stamp = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
                     runCatching { exportLauncher.launch("betterlife-backup-$stamp.json") }
                 },
-                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 3),
+                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 4),
                 supportingContent = { Text(stringResource(R.string.settings_export_data_sub)) },
             ) {
                 Text(stringResource(R.string.settings_export_data))
@@ -443,14 +444,41 @@ fun SettingsScreen(
                 onClick = {
                     runCatching { importLauncher.launch(arrayOf("application/json")) }
                 },
-                shapes = ListItemDefaults.segmentedShapes(index = 1, count = 3),
+                shapes = ListItemDefaults.segmentedShapes(index = 1, count = 4),
                 supportingContent = { Text(stringResource(R.string.settings_import_data_sub)) },
             ) {
                 Text(stringResource(R.string.settings_import_data))
             }
+            // 内容更新:入队一次性同步 work 后立即反馈,结果不阻塞界面(失败由 WorkManager 退避重试)
+            val contentSyncedLabel = remember(state.contentSyncedAt) {
+                if (state.contentSyncedAt <= 0L) null
+                else java.time.LocalDateTime.ofInstant(
+                    java.time.Instant.ofEpochMilli(state.contentSyncedAt),
+                    java.time.ZoneId.systemDefault(),
+                ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+            }
+            val contentCheckStartedMessage = stringResource(R.string.settings_content_update_started)
+            SegmentedListItem(
+                onClick = {
+                    ContentSyncWorker.enqueueOnce(context)
+                    scope.launch { snackbar.showSnackbar(contentCheckStartedMessage) }
+                },
+                shapes = ListItemDefaults.segmentedShapes(index = 2, count = 4),
+                supportingContent = {
+                    Text(
+                        stringResource(
+                            R.string.settings_content_update_sub,
+                            state.contentVersion.ifBlank { stringResource(R.string.settings_content_update_none) },
+                            contentSyncedLabel ?: stringResource(R.string.settings_content_update_none),
+                        )
+                    )
+                },
+            ) {
+                Text(stringResource(R.string.settings_content_update))
+            }
             SegmentedListItem(
                 onClick = { showClearChatConfirm = true },
-                shapes = ListItemDefaults.segmentedShapes(index = 2, count = 3),
+                shapes = ListItemDefaults.segmentedShapes(index = 3, count = 4),
                 supportingContent = { Text(stringResource(R.string.settings_clear_chat_sub)) },
             ) {
                 Text(stringResource(R.string.settings_clear_chat))
@@ -925,7 +953,10 @@ private fun DisclaimerSection() {
 @Composable
 private fun themeModeLabel(mode: ThemeMode): String = stringResource(
     when (mode) {
-        ThemeMode.BRAND_GREEN -> R.string.theme_brand
+        ThemeMode.BRAND_BLUE_PURPLE -> R.string.theme_brand_blue_purple
+        ThemeMode.BRAND_GREEN -> R.string.theme_brand_green
+        ThemeMode.BRAND_ORANGE -> R.string.theme_brand_orange
+        ThemeMode.BRAND_TEAL -> R.string.theme_brand_teal
         ThemeMode.MATERIAL_YOU -> R.string.theme_material_you
         ThemeMode.DARK -> R.string.theme_dark
     },

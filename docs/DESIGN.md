@@ -20,9 +20,11 @@
 ```
 data/        内容与持久层
   EntryModels.kt        entries.json / relevance_rules.json 的 DTO
-  EntryRepository.kt    assets → 内存索引(byId/bySection/sections/dailyEntryIds)
-  db/                   Room v6(8 表):profile、tasks、entry_states、weekly_habits、
-                        custom_entries、entry_notes、streak_leaves、chat_messages
+  EntryRepository.kt    Room 内容表 → 内存索引(byId/bySection/sections/seedEntryIds);invalidate() 供同步后失效
+  content/              ContentBootstrap(首装播种 + SS-NN→key 迁移)、ContentSyncRepository(增量/全量同步)
+  db/                   Room v7(11 表):profile、tasks、entry_states、weekly_habits、
+                        custom_entries、entry_notes、streak_leaves、chat_messages、
+                        content_sections、content_entries、content_meta
   SettingsStore.kt      DataStore:API 配置、提醒时间、onboardingDone、搜索历史、已庆祝里程碑
   NetworkMonitor.kt     连通性监听(壳层离线横幅的数据源)
   ProfileRepository.kt  Profile 领域模型 ↔ ProfileEntity;Profile.matches() 规则匹配
@@ -30,7 +32,7 @@ data/        内容与持久层
   backup/               本地 JSON 导出/导入(BackupManager + BackupCodec)
 recommend/   纯 Kotlin,不依赖 Android,全部可单测
   RecommendationEngine.kt  规则打分 + 按口径分组排序
-  DailyTaskPlanner.kt      每日任务挑选(确定性轮换)
+  DailySeedPicker.kt       每日习惯首次播种的示例挑选(种子池 ∩ 档案命中)
   EntryFilter.kt           条目库筛选(性价比档/证据等级/口径)
 tasks/
   TaskManager.kt           任务读写、打卡、streak、加待办、HC 自动核销
@@ -51,30 +53,39 @@ ui/          Compose 页面:onboarding / today / todo / library / chat / setting
 
 ## 3. 内容管线(tools/)
 
-- `build_content.py`:解析源仓库 `book/*.md`,输出 `app/src/main/assets/entries.json`。解析正则复刻自源仓库 index.html,**源书格式变了先改这里**,改完跑脚本看自检输出(601 条、六栏完整率、档位分布)。
-- `gen_rules.py` → `tools/relevance_rules.json` → 手动拷贝到 `app/src/main/assets/`。脚本自带 id 存在性校验。
+- 上游书库以 **git submodule** 挂在 `upstream/HowToLiveBetter`(GitHub: `eternity4719/HowToLiveBetter`),clone 本仓库用 `git clone --recursive` 或事后 `git submodule update --init`。
+- `build_content.py`:解析 submodule 的 `book/*.md`,输出 `app/src/main/assets/entries.json`。解析正则复刻自源仓库 index.html,**源书格式变了先改这里**,改完跑脚本看自检输出(601 条、六栏完整率、档位分布、key 冲突检查)。`--version` 传上游 commit short hash 作为 contentVersion。
+- `build_content_pack.py`:把 entries.json 打成发布包(manifest.json + entries.json.gz 全量 + patch.json 增量),供人工发布到 GitHub Release(发布步骤见 [BUILD.md](BUILD.md)「内容管线」,刻意不走 CI:整体改标题的继承关系需要人工核对)。
+- `gen_rules.py` → `tools/relevance_rules.json` → 手动拷贝到 `app/src/main/assets/`。规则按 SS-NN 人工编写,**输出时自动换算成稳定 key**;脚本自带 id 存在性校验。
 
-entries.json 单条字段:`id`(节号-条号)、`sec/n/title`、`cost/human/gain/grade/src/note`、`money/time/will/level/lens`、`cs/ratio/dispute/todo`、`hay`(检索用小写拼接)。
+**稳定 key(2026-09-28 起)**:条目主键是 `key = sha1(节标题+条目标题)[:12]`,不是位置序号 `SS-NN`。上游插入条目会让条号顺延,但标题按上游约定只加字不换词,所以 key 稳定。`SS-NN` 仍保留在 entries.json 的 `id` 字段,仅供老用户首启迁移(五张用户表的 entryId 由 ContentBootstrap 改写)与旧备份导入改写(BackupManager,备份 format 仍 6 不 bump——格式没变只是 id 语义变了)使用。节同理有 `key`。标题「增减几个字」有两层相似度兼容:**构建期** `build_content.py --prev-entries`(发布前先把上一版 entries.json 留底)按标题相似度继承旧 key(SequenceMatcher,阈值 0.8、候选唯一,节先继承、条目再先精确后模糊,节改名导致的整节连锁断裂由条目的精确匹配兜住);**运行时** ContentSyncRepository 对下架且有用户数据的 key 在同节在架条目里做 bigram Jaccard 保守重挂(阈值 0.85 + 分差 0.05,见 TitleSimilarity)。两层都没接住的 → 旧 key 消失、新 key 出现,用户数据脱钩但保留;在 `app/src/main/assets/key_aliases.json` 登记 旧key→新key 别名,同步时会把用户数据挂回新条目。构建与打包脚本都对「同节内消失+新增」打警告提醒登记别名,由发布人人工判断是否登记。
+
+**运行时内容同步**:内容落 Room(`content_sections/content_entries/content_meta`)。首装/升级时 ContentBootstrap 把捆绑 entries.json 播种进库;`ContentSyncWorker`(WorkManager 24h + 联网约束,Application.onCreate 注册)从滚动 Release `content-latest` 拉 manifest 比对版本,基线匹配走 patch.json 增量、否则 entries.json.gz 全量;应用后在事务内对照 manifest 做全量 hash 校验,失败回滚等下轮。下架条目标 `removed`(行永不删):浏览/推荐/每日规划剔除,详情页展示快照 + 下架横幅,用户数据不受影响。设置页「检查内容更新」可手动触发。
+
+entries.json 单条字段:`key/secKey/hash`(稳定标识与内容哈希)、`id`(节号-条号,仅迁移用)、`sec/n/title`、`cost/human/gain/grade/src/note`、`money/time/will/level/lens`、`cs/ratio/dispute/todo`、`hay`(检索用小写拼接)、`removed`。
 
 ## 4. 推荐引擎语义(relevance_rules.json)
 
 ```json
 {"when": {"smoking": ["yes"], "chronic": ["kidney"]},
- "boostEntryIds": [...], "boostSections": [2], "excludeEntryIds": [...],
+ "boostEntryIds": [...], "boostSections": ["<节key>"], "excludeEntryIds": [...],
  "weight": 100, "reason": "..."}
 ```
 
+- 条目与节的引用都是**稳定 key**(见 §3);gen_rules.py 里按 SS-NN/节号编写,输出时自动换算
 - `when` 全部字段匹配才生效(档案值 ∈ 数组);`{}` = 所有人;**布尔一律写字符串 `"true"/"false"`**(写成 JSON 布尔会在反序列化时崩溃,已踩过)
-- 打分:命中规则的 weight 累加(boostEntryIds 直接加;boostSections 加给该节每条);命中规则的 excludeEntryIds **无条件剔除**;todo=true 剔除
+- 打分:命中规则的 weight 累加(boostEntryIds 直接加;boostSections 加给该节每条);命中规则的 excludeEntryIds **无条件剔除**;todo=true 与 removed(上游下架)剔除
 - 排序:按 lens 分组(固定序 死亡率→金钱→时间→自由),组内 score desc → ratio → grade → cs asc,每组 topN(默认 5)
 
 **改规则的方法论**:加分规则回答「这条建议为谁而写」,排除规则回答「备注里写了谁不能用」。新加档案字段时,先在 `Profile.fieldValues()` 注册,再补规则,最后加引擎单测。
 
 ### 每日任务
 
-`dailyEntryIds` 白名单(17 条,全是「今天做一次、明天还要做」的习惯)∩ 档案命中条目中,剔除 todo/exclude 后,按 ratio/grade/cs 稳定排序,用 `floorMod(日期hash, 条数)` 做起点轮换,取前 3 条。同一天结果必然可复现。
+每日任务是**纯用户自选**机制:`entry_states` 的 `STATE_DAILY` 集合即每日习惯清单,每天由 `TaskManager.ensureTodayTasks` 落成当天的任务行(幂等,靠 `countDailyByDate > 0` 判重)。自选习惯只按 DISMISSED 过滤、不按 DONE——打卡完成会写 DONE,按 DONE 过滤的话习惯打一次卡就会从每日任务里消失(2026-09-28 修)。
 
-用户还可把一次性待办**转为每日习惯**(`entry_states` 的 `STATE_DAILY`):自选条目优先于白名单配额入列,planner 再补足到 3 条;自选超过 3 条时全部保留。
+用户一条习惯都没有且从未播种过时(新用户,或老用户升级到自选机制后的第一天),`DailySeedPicker` 从 `seedEntryIds` 种子池(17 条,全是「今天做一次、明天还要做」的习惯)里按档案命中挑 3 条示例写入 STATE_DAILY——种子池 ∩ 档案命中 boost ∩ 非 todo/removed ∩ 非 exclude,按 ratio/grade/cs 稳定排序取前 3。示例可删可改;DataStore 标记 `daily_habits_seeded` 无论挑到几条只播一次,用户主动删光习惯后不会再被塞回来(空态引导去条目库自选)。早期的「系统每天从白名单轮换塞 3 条 + 换一条补位」已随这次改动移除(2026-09-28)。
+
+HC 自动核销只核销当天有 DAILY 行的条目:想让计步/睡眠每天固定出现并被自动核销,保持它们在每日习惯清单里即可(首次播种的示例里就含这两条,档案命中时)。
 
 ### 每周习惯
 
@@ -117,7 +128,7 @@ ReminderScheduler:WorkManager 每天 ensureTodayTasks + 通知未完成数 + aut
 
 ```bash
 python tools/build_content.py      # 内容变更后重跑,看自检统计
-./gradlew testDebugUnitTest        # 203 例(36 类):引擎/规划器/检索器/档案映射/排序/规则一致性/提醒继承与重排/备份/统计/聊天等
+./gradlew testDebugUnitTest        # 231 例(39 类):引擎/播种挑选/检索器/档案映射/排序/规则一致性/提醒继承与重排/备份/统计/聊天/内容包完整性/同步逻辑等
 ./gradlew assembleDebug
 ```
 
@@ -128,7 +139,8 @@ python tools/build_content.py      # 内容变更后重跑,看自检统计
 - `collectAsStateWithLifecycle` 已改用官方 `androidx.lifecycle.compose` 实现(此前是本仓库 `ui/util/StateFlowExt.kt` 的本地替代品,引入 `lifecycle-runtime-compose` 后已删除)
 - 今日页 `TodayViewModel.UiState` 是 sealed:`Loading` / `Empty` / `Ready(items)` / `Error`。数据流由档案驱动(档案为 null 直接进 `Empty`,整页引导去填档案),资产与数据库读取包了 try/catch,失败不再崩溃而是出「内容加载失败」+ 重试
 - `EntryDetailScreen` 改用 `AppContainer` 的单例 `EntryRepository`,不再 `remember { EntryRepository(context) }` 每次进详情重解析 601 条 JSON
-- 条目状态 `entry_states` 用 `(entryId, state)` 复合主键:加入待办、已完成、不再推荐、已收藏、自选每日(STATE_DAILY)彼此正交,不会互相覆盖。**数据库 v6,真实迁移 + `exportSchema = true`**(v4 加 `weekly_habits`,v5 加 `custom_entries`,v6 给 tasks 加 note/doneBy/dueDate 并新增 entry_notes、streak_leaves、chat_messages 三表;schema JSON 在 `app/schemas/`,androidTest `MigrationTest` 用 `MigrationTestHelper` 校验 v5→v6,destructive fallback 已移除)。迁移链只保证 v5→v6;数据库版本 ≤4 的设备(均为未发布的开发构建)升级需卸载重装,不为 pre-release 版本补迁移链
+- 条目状态 `entry_states` 用 `(entryId, state)` 复合主键:加入待办、已完成、不再推荐、已收藏、自选每日(STATE_DAILY)彼此正交,不会互相覆盖。**数据库 v7,真实迁移 + `exportSchema = true`**(v4 加 `weekly_habits`,v5 加 `custom_entries`,v6 给 tasks 加 note/doneBy/dueDate 并新增 entry_notes、streak_leaves、chat_messages 三表,v7 加 content_sections/content_entries/content_meta 三张内容表;schema JSON 在 `app/schemas/`,androidTest `MigrationTest` 用 `MigrationTestHelper` 校验,destructive fallback 已移除)。迁移链只保证 v5→v7;数据库版本 ≤4 的设备(均为未发布的开发构建)升级需卸载重装,不为 pre-release 版本补迁移链
+- **内容入 Room 与上游同步(2026-09-28)**:条目内容从 assets 只读改为 Room 内容表驱动(见 §3);`EntryRepository.entriesData()` 变为 suspend(先经 ContentBootstrap 幂等播种),全量调用点已改;老用户五张用户表的 `SS-NN` entryId 首启时一次性改写为稳定 key(DataStore 标记 `content_id_migrated`);旧备份导入时按同一份捆绑映射改写(BackupManager,备份 format 仍 6 不 bump——格式没变只是 id 语义变了)。「第X节第Y条」标签仍由 sec/n 在展示层现算,条号顺延不影响用户数据
 - **DONE 语义(2026-09-27 起)**:任何打卡完成(手动/小组件/自动核销/每周/补卡)都顺手写 `entry_states` 的 DONE,推荐引擎据此排除「做过」的内容,推荐池得以轮换;撤销打卡不清 DONE(「做过」这个事实不变)。配套修复:`ensureTodayTasks` 里用户自选每日习惯(STATE_DAILY)只按 DISMISSED 过滤、不按 DONE——否则自选习惯打一次卡就会从每日规划里消失
 - **Health Connect 自动核销(B1)**:条目→指标的映射写在 `assets/health_rules.json`,保守起见只收无歧义的两条(02-11 步数 ≥7000、02-13 睡眠 ≥7h)——误判自动打卡比不打卡更伤信任。`TaskManager.autoCompleteByHealth` 只核销映射内且当天有未完成 DAILY 行的条目;HC 不可用/缺权限/读取异常都安静返回 0;打卡备注写达标证据(「今日步数 9234 ≥ 7000」),`doneBy` 区分来源(manual / auto:hc / widget)。睡眠窗口固定 [昨 18:00, 今 12:00),与查询时刻无关。触发点:今日页授权后、DailyReminderWorker
 - **数据导出/导入(B2)**:`data/backup/` 本地 JSON(format `version = 6`),覆盖 7 张持久表(profile/tasks/entry_states/weekly_habits/custom_entries/entry_notes/streak_leaves);chat_messages 不备份,DataStore 里的 API Key 等敏感配置不出设备。导入先完整解析+校验版本,全部通过才在单事务里清写(失败回滚,现有数据不变);taskId 原样保留,导入后重排未完成 ONCE 任务的提醒 work

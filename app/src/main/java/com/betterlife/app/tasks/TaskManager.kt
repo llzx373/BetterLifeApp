@@ -3,6 +3,7 @@ package com.betterlife.app.tasks
 import androidx.room.withTransaction
 import com.betterlife.app.data.EntryRepository
 import com.betterlife.app.data.Profile
+import com.betterlife.app.data.SettingsStore
 import com.betterlife.app.data.db.AppDatabase
 import com.betterlife.app.data.db.CustomEntryDao
 import com.betterlife.app.data.db.CustomEntryEntity
@@ -20,7 +21,7 @@ import com.betterlife.app.data.health.HealthRule
 import com.betterlife.app.data.health.HealthRulesRepository
 import com.betterlife.app.data.health.evaluateAutoCompletion
 import com.betterlife.app.data.health.healthEvidenceText
-import com.betterlife.app.recommend.DailyTaskPlanner
+import com.betterlife.app.recommend.DailySeedPicker
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,7 +37,7 @@ import java.time.ZoneId
 import java.util.UUID
 
 /**
- * 任务协调层：把 DailyTaskPlanner 的规划结果落到 Room，并处理打卡、待办与连续天数。
+ * 任务协调层：把用户自选的每日习惯（STATE_DAILY）落成当天的任务行，并处理打卡、待办与连续天数。
  *
  * 同时持有 [ReminderScheduler]：凡是动到任务生命周期（新建/打卡/删除/恢复/改提醒时间）
  * 的地方都在这里同步重排或取消对应的单任务提醒 work，ViewModel 不需要各自编排。
@@ -48,8 +49,9 @@ class TaskManager(
     private val weeklyHabitDao: WeeklyHabitDao,
     private val streakLeaveDao: StreakLeaveDao,
     private val customEntryDao: CustomEntryDao,
-    private val planner: DailyTaskPlanner,
+    private val seedPicker: DailySeedPicker,
     private val entryRepository: EntryRepository,
+    private val settingsStore: SettingsStore,
     private val reminderScheduler: ReminderScheduler,
     // B1 自动核销依赖：默认 null，缺了任何一个都安静地不启用自动核销
     private val healthConnect: HealthConnectMetrics? = null,
@@ -80,27 +82,38 @@ class TaskManager(
     fun todayFlow(): StateFlow<LocalDate> = today.asStateFlow()
 
     /**
-     * 当天没有任何 DAILY 任务时，按档案规划并插入；幂等，可反复调用。
-     * 用户自选的每日习惯（STATE_DAILY）优先入列，planner 再从白名单补足配额。
+     * 当天没有任何 DAILY 任务时，把用户自选的每日习惯（STATE_DAILY）落成今天的任务行；
+     * 幂等，可反复调用。
+     *
+     * 每日任务是纯用户自选机制：用户还一条习惯都没有且从未播种过时（新用户，或老用户
+     * 升级到自选机制后的第一天），先由 [DailySeedPicker] 按档案从种子池挑几条示例
+     * 写入 STATE_DAILY（可删可改），之后增删全由用户决定，系统不再补位。
      */
     suspend fun ensureTodayTasks(profile: Profile, date: LocalDate = LocalDate.now()) {
         val dateStr = date.toString()
         val data = entryRepository.entriesData()
-        // 「当天行是否已存在 + 插入」包进一个事务，靠 Room 单库事务串行化消除双插窗口
-        // （TodayViewModel、小组件、DailyReminderWorker 都可能同时触发）。
+        // 「当天行是否已存在 + 首次播种 + 插入」包进一个事务，靠 Room 单库事务串行化
+        // 消除双插窗口（TodayViewModel、小组件、DailyReminderWorker 都可能同时触发）。
         val toSchedule = database.withTransaction {
             if (taskDao.countDailyByDate(dateStr) > 0) return@withTransaction emptyList()
             val excluded = entryStateDao.excludedIds().toSet()
             val customIds = customEntryDao.all().mapTo(HashSet()) { it.entryId }
             // 自选每日习惯只按 DISMISSED 过滤，不按 DONE：打卡完成会写 DONE（见 completeTask），
-            // 若把 DONE 也算排除，用户自选的习惯打一次卡就会从每日规划里消失。
+            // 若把 DONE 也算排除，用户自选的习惯打一次卡就会从每日任务里消失。
             val dismissed = entryStateDao.entryIdsByState(EntryStateEntity.STATE_DISMISSED).toSet()
-            val userDaily = entryStateDao.entryIdsByState(EntryStateEntity.STATE_DAILY)
-                .filter { (it in data.byId || it in customIds) && it !in dismissed }
-            val planned = planner
-                .plan(date, profile, data.entries, data.rules, excluded + userDaily)
-                .take((planner.maxDaily - userDaily.size).coerceAtLeast(0))
-            val chosen = userDaily + planned.map { it.id }
+            var dailyIds = entryStateDao.entryIdsByState(EntryStateEntity.STATE_DAILY)
+            // 首次播种：一条自选习惯都没有且没播种过时才挑示例；标记无论挑到几条都写，
+            // 用户主动删光习惯后不会再被塞回来。播种结果直接并入今天的任务，不等明天。
+            if (dailyIds.isEmpty() && !settingsStore.isDailyHabitsSeeded()) {
+                val seeds = seedPicker.pickSeeds(profile, data.entries, data.rules, excluded)
+                val seedNow = System.currentTimeMillis()
+                seeds.forEach {
+                    entryStateDao.upsert(EntryStateEntity(it.id, EntryStateEntity.STATE_DAILY, seedNow))
+                }
+                settingsStore.setDailyHabitsSeeded()
+                dailyIds = seeds.map { it.id }
+            }
+            val chosen = dailyIds.filter { (it in data.byId || it in customIds) && it !in dismissed }
             if (chosen.isEmpty()) return@withTransaction emptyList()
             val now = System.currentTimeMillis()
             // 继承同条目最近一次的提醒设置（清除也是设置，null 不继承）：每天的任务是
@@ -277,34 +290,6 @@ class TaskManager(
     suspend fun getTask(taskId: Long): TaskEntity? = taskDao.getTask(taskId)
 
     suspend fun markNotified(taskId: Long) = taskDao.markNotified(taskId)
-
-    /**
-     * 换一条：把当前条目标记为「不再推荐」（DISMISSED，会被推荐引擎排除），
-     * 删除今天的这条任务，再按档案补一条当天还没有的顶上。
-     *
-     * 与「今天不做」区分：后者只是 [deleteTask] 移除今天的安排，
-     * 不写 DISMISSED，所以这条内容以后还可能被推荐回来。
-     */
-    suspend fun replaceTodayTask(profile: Profile, task: TaskEntity, date: LocalDate = LocalDate.now()) {
-        val dateStr = date.toString()
-        addEntryState(task.entryId, EntryStateEntity.STATE_DISMISSED)
-        deleteTask(task.taskId)
-        val data = entryRepository.entriesData()
-        val taken = entryStateDao.excludedIds().toSet() + taskDao.dailyEntryIds(dateStr)
-        val next = planner.plan(date, profile, data.entries, data.rules, taken).firstOrNull() ?: return
-        // 与 ensureTodayTasks 一致：补位行继承该条目最近一次的提醒设置
-        val minutes = inheritedReminderMinutes(taskDao.dailyReminderHistory(next.id))
-        val id = taskDao.insert(
-            TaskEntity(
-                entryId = next.id,
-                type = TaskEntity.TYPE_DAILY,
-                date = dateStr,
-                remindAtMinutes = minutes,
-                createdAt = System.currentTimeMillis(),
-            )
-        )
-        minutes?.let { reminderScheduler.scheduleTaskReminder(id, it) }
-    }
 
     /**
      * 打上某种条目状态。

@@ -52,7 +52,7 @@ import java.time.LocalDate
  * 刷新触发：
  * - 小部件上的打卡/撤销（[CheckInAction]）；
  * - 每日提醒 worker（DailyReminderWorker）跑完后 updateAll；
- * - UI 侧手动打卡、删除、换一条等改动后由 TodayViewModel 调用 [WidgetUpdater.refresh]。
+ * - UI 侧手动打卡、删除等改动后由 TodayViewModel 调用 [WidgetUpdater.refresh]。
  */
 class TodayTasksWidget : GlanceAppWidget() {
 
