@@ -8,6 +8,7 @@ package com.betterlife.app.ui.stats
 import androidx.compose.runtime.Composable
 import com.android.tools.screenshot.PreviewTest
 import com.betterlife.app.data.EntryKeys
+import com.betterlife.app.recommend.EntryStats
 import com.betterlife.app.stats.Achievement
 import com.betterlife.app.stats.AchievementKeys
 import com.betterlife.app.stats.CheckinNote
@@ -66,6 +67,25 @@ private val populatedState = StatsViewModel.UiState(
         ),
     ),
     aiConfigured = true,
+    lensCompletion = listOf(
+        StatsViewModel.LensCompletion(
+            EntryKeys.LENS_MORTALITY,
+            EntryStats(pending = 120, done = 32, dismissed = 8),
+        ),
+        StatsViewModel.LensCompletion(
+            EntryKeys.LENS_MONEY,
+            EntryStats(pending = 90, done = 18, dismissed = 4),
+        ),
+        StatsViewModel.LensCompletion(
+            EntryKeys.LENS_TIME,
+            EntryStats(pending = 60, done = 5, dismissed = 0),
+        ),
+    ),
+    sectionCompletion = listOf(
+        StatsViewModel.SectionCompletion(2, "吃与喝", EntryStats(pending = 40, done = 12, dismissed = 3)),
+        StatsViewModel.SectionCompletion(6, "钱与保险", EntryStats(pending = 35, done = 9, dismissed = 1)),
+        StatsViewModel.SectionCompletion(11, "运动", EntryStats(pending = 28, done = 4, dismissed = 0)),
+    ),
 )
 
 @PreviewTest
@@ -109,6 +129,19 @@ fun StatsPopulated() {
             onOpenSettings = {},
             onSelectPeriod = {},
             onInterpret = {},
+        )
+    }
+}
+
+// 条目完成度卡是 StatsContent 的第 5 张卡,整屏基线拍不到它(在首屏之外),单独给一张
+@PreviewTest
+@FourFoldScreenPreview
+@Composable
+fun StatsCompletionCard() {
+    PreviewScreen {
+        CompletionCard(
+            lensCompletion = populatedState.lensCompletion,
+            sectionCompletion = populatedState.sectionCompletion,
         )
     }
 }

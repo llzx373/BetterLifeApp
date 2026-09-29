@@ -44,6 +44,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -71,6 +72,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
 import com.betterlife.app.data.db.TaskEntity
+import com.betterlife.app.ui.common.DoneBadge
 import com.betterlife.app.ui.common.ReminderBellButton
 import com.betterlife.app.ui.theme.LocalLensColors
 import com.betterlife.app.ui.theme.LocalMotionLevel
@@ -128,6 +130,7 @@ fun TodoScreen(
             onConvertToWeekly = vm::convertToWeekly,
             onRemoveDailyHabit = vm::removeDailyHabit,
             onToggleWeekly = vm::toggleWeekly,
+            onDismissGraduation = vm::dismissGraduation,
             onRemoveWeekly = { entry ->
                 vm.removeWeekly(entry.item.habit.entryId)
                 scope.launch {
@@ -164,6 +167,7 @@ internal fun TodoContent(
     onRemoveDailyHabit: (String) -> Unit,
     onToggleWeekly: (String) -> Unit,
     onRemoveWeekly: (TodoViewModel.WeeklyEntry) -> Unit,
+    onDismissGraduation: (String) -> Unit,
     onAddCustom: (String, TodoViewModel.CustomTaskKind, Int, LocalDate?) -> Unit,
 ) {
     // 正在设置提醒时间的任务；非 null 时弹 TimePicker
@@ -252,12 +256,33 @@ internal fun TodoContent(
                     modifier = Modifier.animateItem(),
                 )
             }
+            // 「已养成」提示:连续达标 N 周才出现,安静的一次性横幅,不弹窗不催促
+            items(state.graduationPrompts, key = { "g-${it.entryId}" }) { prompt ->
+                GraduationBanner(
+                    title = state.weekly
+                        .firstOrNull { it.item.habit.entryId == prompt.entryId }
+                        ?.displayTitle ?: prompt.entryId,
+                    weeks = prompt.weeks,
+                    onDismiss = { onDismissGraduation(prompt.entryId) },
+                    modifier = Modifier.animateItem(),
+                )
+            }
         }
 
         item {
             SectionHeader(
                 titleRes = R.string.todo_once_title,
                 modifier = Modifier.padding(top = Spacing.space4),
+                trailing = {
+                    val doneCount = state.once.count { it.task.done }
+                    if (doneCount > 0) {
+                        Text(
+                            text = stringResource(R.string.todo_once_done_count, doneCount),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
             )
         }
         if (state.once.isEmpty()) {
@@ -828,6 +853,36 @@ private fun OnceRow(
     }
 }
 
+/** 「已养成」的一次性安静提示:不庆祝不施压,点「知道了」就不再出现 */
+@Composable
+private fun GraduationBanner(
+    title: String,
+    weeks: Int,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = MaterialTheme.shapes.medium,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = Spacing.space3),
+        ) {
+            Text(
+                text = stringResource(R.string.todo_graduation_prompt, title, weeks),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.todo_graduation_dismiss))
+            }
+        }
+    }
+}
+
 @Composable
 private fun TimerEntryButton(onClick: () -> Unit) {
     IconButton(onClick = onClick) {
@@ -843,11 +898,20 @@ private fun TimerEntryButton(onClick: () -> Unit) {
 private fun TaskText(item: TodoViewModel.TodoItem, modifier: Modifier = Modifier) {
     val task = item.task
     Column(modifier = modifier.padding(vertical = Spacing.space2)) {
-        Text(
-            text = item.displayTitle,
-            style = MaterialTheme.typography.bodyLarge,
-            textDecoration = if (task.done) TextDecoration.LineThrough else null,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.space2),
+        ) {
+            Text(
+                text = item.displayTitle,
+                style = MaterialTheme.typography.bodyLarge,
+                textDecoration = if (task.done) TextDecoration.LineThrough else null,
+                // fill=false:给「已完成」徽标留出位置,否则多行文本会把它挤成零宽
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            // 一次性待办完成后给一个明确的「已完成」标记,不只有删除线
+            if (task.type == TaskEntity.TYPE_ONCE && task.done) DoneBadge()
+        }
         // 一次性待办的到期日:安静地跟在标题下面;过期也只是弱化的说明,不用告警色施压
         if (task.type == TaskEntity.TYPE_ONCE) {
             task.parsedDueDate()?.let { due ->

@@ -41,12 +41,17 @@ class RecommendationEngine {
             rules.rules.filter { profile.matches(it.`when`) }
     }
 
+    /**
+     * @param offset 「换一批」的轮次：组内候选超过 topN 时按 [offset] 轮转取窗口，
+     * 让同一档案下的推荐可以翻页轮换；offset 为 0 时行为与之前完全一致。
+     */
     fun recommend(
         profile: Profile,
         entries: List<EntryDto>,
         rules: RulesFile,
         excludedIds: Set<String>,
         topN: Int = 5,
+        offset: Int = 0,
     ): LinkedHashMap<String, List<ScoredEntry>> {
         val matched = matchedRules(profile, rules)
 
@@ -82,8 +87,20 @@ class RecommendationEngine {
         val orderedLenses = LENS_ORDER.filter { it in grouped } +
             grouped.keys.filter { it !in LENS_ORDER }.sorted()
         for (lens in orderedLenses) {
-            result[lens] = grouped.getValue(lens).sortedWith(comparator).take(topN)
+            val sortedGroup = grouped.getValue(lens).sortedWith(comparator)
+            result[lens] = rotateWindow(sortedGroup, offset, topN)
         }
         return result
     }
+}
+
+/** 组内轮转取窗口：候选不超过 topN 时原样返回，否则按 [offset] 轮转后再取前 topN */
+internal fun rotateWindow(
+    sorted: List<ScoredEntry>,
+    offset: Int,
+    topN: Int,
+): List<ScoredEntry> {
+    if (sorted.size <= topN || offset <= 0) return sorted.take(topN)
+    val shift = offset % sorted.size
+    return (sorted.drop(shift) + sorted.take(shift)).take(topN)
 }

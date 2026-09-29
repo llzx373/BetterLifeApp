@@ -52,7 +52,9 @@ import com.betterlife.app.data.EntryKeys
 import com.betterlife.app.data.SectionDto
 import com.betterlife.app.recommend.EntryFilter
 import com.betterlife.app.ui.common.DisputeBadge
+import com.betterlife.app.ui.common.DoneBadge
 import com.betterlife.app.ui.common.GradeBadge
+import com.betterlife.app.ui.common.PlannedBadge
 import com.betterlife.app.ui.common.RatioBadge
 import com.betterlife.app.ui.common.SafeListItem
 import com.betterlife.app.ui.common.TodoBadge
@@ -142,6 +144,8 @@ internal fun SectionListContent(
             items(state.sectionEntries, key = { it.id }) { entry ->
                 EntryRow(
                     entry = entry,
+                    isDone = entry.id in state.doneIds,
+                    isPlanned = entry.id in state.plannedIds,
                     onClick = { onOpenEntry(entry.id) },
                     // 排序切换时列表项 cross-fade + 位移,而不是硬跳(§6.2)
                     modifier = Modifier.animateItem(),
@@ -311,7 +315,13 @@ private fun sortLabel(sort: EntrySort): Int = when (sort) {
 }
 
 @Composable
-private fun EntryRow(entry: EntryDto, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun EntryRow(
+    entry: EntryDto,
+    isDone: Boolean,
+    isPlanned: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     SafeListItem(
         overlineContent = { Text(entry.id) },
         supportingContent = {
@@ -320,6 +330,8 @@ private fun EntryRow(entry: EntryDto, onClick: () -> Unit, modifier: Modifier = 
                 GradeBadge(entry.grade)
                 if (entry.dispute) DisputeBadge()
                 if (entry.todo) TodoBadge()
+                if (isDone) DoneBadge()
+                if (isPlanned) PlannedBadge()
             }
         },
         modifier = modifier.clickable(onClick = onClick),

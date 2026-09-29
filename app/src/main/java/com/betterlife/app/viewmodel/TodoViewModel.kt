@@ -8,13 +8,17 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.data.EntryDto
 import com.betterlife.app.data.EntryRepository
+import com.betterlife.app.data.SettingsStore
 import com.betterlife.app.data.db.TaskEntity
+import com.betterlife.app.tasks.GRADUATION_CONSECUTIVE_WEEKS
 import com.betterlife.app.tasks.TaskManager
+import com.betterlife.app.tasks.consecutiveReachedWeeks
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
@@ -22,6 +26,7 @@ import java.time.LocalDate
 class TodoViewModel(
     private val taskManager: TaskManager,
     private val entryRepository: EntryRepository,
+    private val settingsStore: SettingsStore,
 ) : ViewModel() {
 
     data class TodoItem(
@@ -41,6 +46,12 @@ class TodoViewModel(
         val displayTitle: String get() = entry?.title ?: customTitle ?: item.habit.entryId
     }
 
+    /** 「已养成」提示:每周习惯连续达标 [GRADUATION_CONSECUTIVE_WEEKS] 周且还没提示过 */
+    data class GraduationPrompt(
+        val entryId: String,
+        val weeks: Int,
+    )
+
     /** 自定义任务的类型，AddTaskDialog 的选择项 */
     enum class CustomTaskKind { ONCE, DAILY, WEEKLY }
 
@@ -54,6 +65,8 @@ class TodoViewModel(
         val once: List<TodoItem> = emptyList(),
         /** 用户自选的每日习惯条目 id，决定行上是否显示「取消每日」 */
         val userDailyIds: Set<String> = emptySet(),
+        /** 待展示的「已养成」提示 */
+        val graduationPrompts: List<GraduationPrompt> = emptyList(),
     ) {
         val dailyDoneCount: Int get() = daily.count { it.task.done }
         val dailyAllDone: Boolean get() = daily.isNotEmpty() && dailyDoneCount == daily.size
@@ -86,6 +99,40 @@ class TodoViewModel(
                 )
             }.collect { _uiState.value = it }
         }
+
+        // 「已养成」提示:连续达标 N 周的每周习惯,一次性、可 dismiss;单独的流,
+        // 不混进上面的主分区 combine(那里已经五路了)
+        viewModelScope.launch {
+            combine(
+                taskManager.weeklyItemsFlow(),
+                taskManager.weeklyHistoryFlow(),
+                settingsStore.graduationPromptedFlow,
+            ) { items, history, prompted ->
+                val datesByEntry = history
+                    .groupBy({ it.entryId }, { it.date })
+                    .mapValues { (_, dates) -> dates.filterNotNull() }
+                val today = LocalDate.now()
+                items.mapNotNull { item ->
+                    val weeks = consecutiveReachedWeeks(
+                        datesByEntry[item.habit.entryId].orEmpty(),
+                        item.habit.timesPerWeek,
+                        today,
+                    )
+                    if (weeks >= GRADUATION_CONSECUTIVE_WEEKS && item.habit.entryId !in prompted) {
+                        GraduationPrompt(item.habit.entryId, weeks)
+                    } else {
+                        null
+                    }
+                }
+            }.collect { prompts ->
+                _uiState.update { it.copy(graduationPrompts = prompts) }
+            }
+        }
+    }
+
+    /** 「知道了」:这个习惯提示过一次就不再打扰 */
+    fun dismissGraduation(entryId: String) {
+        viewModelScope.launch(Dispatchers.IO) { settingsStore.addGraduationPrompted(entryId) }
     }
 
     fun addTodo(entryId: String) {
@@ -175,7 +222,7 @@ class TodoViewModel(
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as BetterLifeApp
                 val c = app.container
-                TodoViewModel(c.taskManager, c.entryRepository)
+                TodoViewModel(c.taskManager, c.entryRepository, c.settingsStore)
             }
         }
     }

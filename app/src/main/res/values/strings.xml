@@ -51,6 +51,12 @@
     <string name="grade_badge">证据 %1$s</string>
     <string name="badge_dispute">争议</string>
     <string name="badge_todo">待核实</string>
+    <string name="badge_done">已完成</string>
+    <string name="badge_planned">已加入</string>
+    <!-- 条目状态统计行:待看恒显示,完成/忽略为 0 时省略对应段,段间用「 · 」拼接 -->
+    <string name="entry_stats_pending">待看 %1$d</string>
+    <string name="entry_stats_done">完成 %1$d</string>
+    <string name="entry_stats_dismissed">忽略 %1$d</string>
     <string name="ratio_short_very_high">极高</string>
     <string name="ratio_short_high">高</string>
     <string name="ratio_short_normal">一般</string>
@@ -70,6 +76,7 @@
     <string name="today_tasks_empty">还没有每日习惯,去条目库挑几条放进每天。</string>
     <string name="today_action_go_library">去条目库逛逛</string>
     <string name="today_recommend_title">为你推荐</string>
+    <string name="today_reshuffle">换一批</string>
     <string name="today_all_entries">全部条目</string>
     <string name="today_recommend_empty">填一份档案,推荐会更准;也可以先随便看看。</string>
     <string name="today_action_go_profile">去填档案</string>
@@ -98,6 +105,7 @@
     <string name="todo_habit_done_desc">已完成,点击取消</string>
     <string name="todo_habit_todo_desc">打卡</string>
     <string name="todo_once_title">一次性待办</string>
+    <string name="todo_once_done_count">已完成 %1$d 项</string>
     <string name="todo_once_empty">没有一次性待办。看到想做的事,点条目上的「加入待办」。</string>
     <string name="todo_deleted">已删除「%1$s」</string>
     <string name="todo_convert_daily">转为每日习惯</string>
@@ -116,6 +124,8 @@
     <string name="todo_add_kind_once">一次性</string>
     <string name="todo_add_kind_daily">每天</string>
     <string name="todo_add_kind_weekly">每周</string>
+    <string name="todo_graduation_prompt">「%1$s」已连续 %2$d 周达标,已经养成习惯了。可以把目标次数调高,或者转为每日习惯?</string>
+    <string name="todo_graduation_dismiss">知道了</string>
 
     <!-- AI 问答:多供应商与搜索来源 -->
     <string name="chat_provider_no_key">这张供应商卡还没有配置 API Key</string>
@@ -232,6 +242,11 @@
     <string name="dismissed_empty">没有屏蔽任何建议。长按推荐条目,或在条目详情页点「不再推荐」,不感兴趣的内容就会出现在这里。</string>
     <string name="dismissed_action_restore">恢复</string>
 
+    <!-- 已完成的事 -->
+    <string name="completed_title">已完成的事</string>
+    <string name="completed_empty">还没有标记过「我做过了」。在条目详情页或推荐卡片上点「我做过了」,完成的事会出现在这里。</string>
+    <string name="completed_action_unmark">撤销完成</string>
+
     <!-- 我的 -->
     <string name="mine_title">我的</string>
     <string name="mine_profile_title">我的档案</string>
@@ -240,6 +255,8 @@
     <string name="mine_favorites_sub">详情页收藏过的条目</string>
     <string name="mine_dismissed">已屏蔽的建议</string>
     <string name="mine_dismissed_sub">管理「不再推荐」的条目</string>
+    <string name="mine_completed">已完成的事</string>
+    <string name="mine_completed_sub">标记过「我做过了」的条目</string>
     <string name="mine_age_segment">%1$s 岁段</string>
     <string name="mine_suffix_programmer"> · 程序员</string>
     <string name="mine_suffix_student"> · 学生</string>
@@ -420,6 +437,8 @@
     <string name="stats_ai_interpreting">正在回顾…</string>
     <string name="stats_ai_no_key">配置 AI 供应商后,可以让它解读这段时间的打卡</string>
     <string name="stats_ai_error">解读没有成功,可以重试</string>
+    <string name="stats_completion_title">条目完成度</string>
+    <string name="stats_completion_rate">%1$d/%2$d</string>
 
     <!-- 设置页:数据(备份导出/导入、清空对话历史) -->
     <string name="settings_section_data">数据</string>

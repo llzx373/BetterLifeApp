@@ -103,10 +103,12 @@ import com.betterlife.app.data.db.TaskEntity
 import com.betterlife.app.data.health.HealthConnectRepository
 import com.betterlife.app.data.health.StepsSource
 import com.betterlife.app.data.health.StepsState
+import com.betterlife.app.recommend.EntryStats
 import com.betterlife.app.recommend.ScoredEntry
 import com.betterlife.app.tasks.TaskManager
 import com.betterlife.app.ui.common.CostMeter
 import com.betterlife.app.ui.common.DisputeBadge
+import com.betterlife.app.ui.common.EntryStatsLine
 import com.betterlife.app.ui.common.GradeBadge
 import com.betterlife.app.ui.common.lensGroupTitle
 import com.betterlife.app.ui.common.MotionEntrance
@@ -235,6 +237,7 @@ fun TodayScreen(
                         },
                         onOpenEntry = onOpenEntry,
                         onAddTodo = libraryVm::addToTodo,
+                        onReshuffle = libraryVm::reshuffleRecommendations,
                         onDismissEntry = { entryId ->
                             libraryVm.dismissEntry(entryId)
                             scope.launch {
@@ -278,6 +281,7 @@ internal fun TodayContent(
     onAddTodo: (String) -> Unit,
     onDismissEntry: (String) -> Unit,
     onMarkDoneBefore: (String) -> Unit,
+    onReshuffle: () -> Unit,
     onAuthorizeSteps: () -> Unit,
     onStartTimer: (Long) -> Unit,
     onOpenLibrary: () -> Unit,
@@ -404,6 +408,7 @@ internal fun TodayContent(
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
                 )
+                TextButton(onClick = onReshuffle) { Text(stringResource(R.string.today_reshuffle)) }
                 TextButton(onClick = onOpenLibrary) { Text(stringResource(R.string.today_all_entries)) }
             }
         }
@@ -422,6 +427,7 @@ internal fun TodayContent(
                 item(key = "lens-$lens") {
                     LensGroupHeader(
                         lens = lens,
+                        stats = libraryState.lensStats[lens],
                         modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space1),
                     )
                 }
@@ -912,9 +918,9 @@ private fun AllDoneCard(count: Int, onReview: () -> Unit, modifier: Modifier = M
     }
 }
 
-/** 口径分组标题:标题之外再带图标 + 口径色,不依赖颜色也能区分 */
+/** 口径分组标题:标题之外再带图标 + 口径色,不依赖颜色也能区分;[stats] 是该口径全书的 待看/完成/忽略 统计 */
 @Composable
-private fun LensGroupHeader(lens: String, modifier: Modifier = Modifier) {
+private fun LensGroupHeader(lens: String, modifier: Modifier = Modifier, stats: EntryStats? = null) {
     val tint = LocalLensColors.current.forLens(lens) ?: MaterialTheme.colorScheme.onSurfaceVariant
     val icon = lensIcon(lens)
     Row(
@@ -928,6 +934,10 @@ private fun LensGroupHeader(lens: String, modifier: Modifier = Modifier) {
             Box(Modifier.size(Spacing.space2).clip(CircleShape).background(tint))
         }
         Text(lensGroupTitle(lens), style = MaterialTheme.typography.titleSmall, color = tint)
+        if (stats != null) {
+            Spacer(Modifier.weight(1f))
+            EntryStatsLine(stats)
+        }
     }
 }
 

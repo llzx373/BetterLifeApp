@@ -11,6 +11,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.android.tools.screenshot.PreviewTest
 import com.betterlife.app.data.EntryKeys
 import com.betterlife.app.data.SectionDto
+import com.betterlife.app.recommend.EntryStats
 import com.betterlife.app.ui.PreviewScreen
 import com.betterlife.app.ui.fakeEntry
 import com.betterlife.app.viewmodel.EntrySort
@@ -64,12 +65,24 @@ private val sectionEntries = listOf(
     ),
 )
 
+private val sectionStats = mapOf(
+    1 to EntryStats(pending = 20, done = 3, dismissed = 1),
+    2 to EntryStats(pending = 28, done = 2, dismissed = 1),
+    6 to EntryStats(pending = 26, done = 2, dismissed = 0),
+    8 to EntryStats(pending = 18, done = 0, dismissed = 1),
+    11 to EntryStats(pending = 20, done = 2, dismissed = 0),
+    13 to EntryStats(pending = 16, done = 1, dismissed = 0),
+)
+
 private val twoPaneState = LibraryViewModel.UiState(
     sections = sections,
     sectionLens = sectionLens,
     selectedSection = 2,
     sectionEntries = sectionEntries,
     sort = EntrySort.RATIO,
+    doneIds = setOf("02-01"),
+    plannedIds = setOf("02-04"),
+    sectionStats = sectionStats,
 )
 
 private val compactState = twoPaneState.copy(selectedSection = null, sectionEntries = emptyList())

@@ -87,8 +87,10 @@ import com.betterlife.app.R
 import com.betterlife.app.data.EntryDto
 import com.betterlife.app.ui.common.CostMeter
 import com.betterlife.app.ui.common.DisputeBadge
+import com.betterlife.app.ui.common.DoneBadge
 import com.betterlife.app.ui.common.GradeBadge
 import com.betterlife.app.ui.common.MotionEntrance
+import com.betterlife.app.ui.common.PlannedBadge
 import com.betterlife.app.ui.common.RatioBadge
 import com.betterlife.app.ui.common.TodoBadge
 import com.betterlife.app.ui.common.predictiveBackTransition
@@ -169,6 +171,7 @@ fun EntryDetailContent(
     val scope = rememberCoroutineScope()
     val view = LocalView.current
     val favorites by vm.favorites.collectAsStateWithLifecycle()
+    val libraryState by vm.uiState.collectAsStateWithLifecycle()
     val userNote by remember(entryId) { vm.noteFlow(entryId) }
         .collectAsStateWithLifecycle(initialValue = null)
     val addedTodoMessage = stringResource(R.string.detail_added_todo)
@@ -223,7 +226,13 @@ fun EntryDetailContent(
                         }
                     }
 
-                    item { HeroSection(e) }
+                    item {
+                        HeroSection(
+                            entry = e,
+                            isDone = e.id in libraryState.doneIds,
+                            isPlanned = e.id in libraryState.plannedIds,
+                        )
+                    }
 
                     if (e.dispute || e.todo) {
                         item { NoticeSection(e) }
@@ -377,15 +386,22 @@ fun EntryDetailContent(
     }
 }
 
-/** 首屏决策信息:徽标、标题、性价比图形 */
+/** 首屏决策信息:徽标、标题、性价比图形;状态徽标(已完成/已加入)跟在内容徽标之后 */
 @Composable
-private fun HeroSection(entry: EntryDto, modifier: Modifier = Modifier) {
+private fun HeroSection(
+    entry: EntryDto,
+    isDone: Boolean,
+    isPlanned: Boolean,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier) {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
             RatioBadge(entry.ratio)
             GradeBadge(entry.grade)
             if (entry.dispute) DisputeBadge()
             if (entry.todo) TodoBadge()
+            if (isDone) DoneBadge()
+            if (isPlanned) PlannedBadge()
         }
         Spacer(Modifier.height(Spacing.space2))
         Text(entry.title, style = MaterialTheme.typography.headlineSmall)

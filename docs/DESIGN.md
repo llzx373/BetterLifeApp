@@ -76,6 +76,7 @@ entries.json 单条字段:`key/secKey/hash`(稳定标识与内容哈希)、`id`(
 - `when` 全部字段匹配才生效(档案值 ∈ 数组);`{}` = 所有人;**布尔一律写字符串 `"true"/"false"`**(写成 JSON 布尔会在反序列化时崩溃,已踩过)
 - 打分:命中规则的 weight 累加(boostEntryIds 直接加;boostSections 加给该节每条);命中规则的 excludeEntryIds **无条件剔除**;todo=true 与 removed(上游下架)剔除
 - 排序:按 lens 分组(固定序 死亡率→金钱→时间→自由),组内 score desc → ratio → grade → cs asc,每组 topN(默认 5)
+- 调用方排除(LibraryViewModel):DONE、DISMISSED,以及**已加入任一计划**的条目(2026-09-29 起:TODO 一次性待办、STATE_DAILY 每日习惯、weekly_habits 每周习惯模板,由 `TaskManager.plannedEntryIdsFlow` 汇总)——已在计划里的内容不再出现在推荐列表;`EntryStateDao.excludedIds` 只服务播种,语义不变
 
 **改规则的方法论**:加分规则回答「这条建议为谁而写」,排除规则回答「备注里写了谁不能用」。新加档案字段时,先在 `Profile.fieldValues()` 注册,再补规则,最后加引擎单测。
 
@@ -128,7 +129,7 @@ ReminderScheduler:WorkManager 每天 ensureTodayTasks + 通知未完成数 + aut
 
 ```bash
 python tools/build_content.py      # 内容变更后重跑,看自检统计
-./gradlew testDebugUnitTest        # 231 例(39 类):引擎/播种挑选/检索器/档案映射/排序/规则一致性/提醒继承与重排/备份/统计/聊天/内容包完整性/同步逻辑等
+./gradlew testDebugUnitTest        # 248 例(41 类):引擎/播种挑选/检索器/档案映射/排序/规则一致性/提醒继承与重排/备份/统计/聊天/内容包完整性/同步逻辑等
 ./gradlew assembleDebug
 ```
 
@@ -141,7 +142,7 @@ python tools/build_content.py      # 内容变更后重跑,看自检统计
 - `EntryDetailScreen` 改用 `AppContainer` 的单例 `EntryRepository`,不再 `remember { EntryRepository(context) }` 每次进详情重解析 601 条 JSON
 - 条目状态 `entry_states` 用 `(entryId, state)` 复合主键:加入待办、已完成、不再推荐、已收藏、自选每日(STATE_DAILY)彼此正交,不会互相覆盖。**数据库 v7,真实迁移 + `exportSchema = true`**(v4 加 `weekly_habits`,v5 加 `custom_entries`,v6 给 tasks 加 note/doneBy/dueDate 并新增 entry_notes、streak_leaves、chat_messages 三表,v7 加 content_sections/content_entries/content_meta 三张内容表;schema JSON 在 `app/schemas/`,androidTest `MigrationTest` 用 `MigrationTestHelper` 校验,destructive fallback 已移除)。迁移链只保证 v5→v7;数据库版本 ≤4 的设备(均为未发布的开发构建)升级需卸载重装,不为 pre-release 版本补迁移链
 - **内容入 Room 与上游同步(2026-09-28)**:条目内容从 assets 只读改为 Room 内容表驱动(见 §3);`EntryRepository.entriesData()` 变为 suspend(先经 ContentBootstrap 幂等播种),全量调用点已改;老用户五张用户表的 `SS-NN` entryId 首启时一次性改写为稳定 key(DataStore 标记 `content_id_migrated`);旧备份导入时按同一份捆绑映射改写(BackupManager,备份 format 仍 6 不 bump——格式没变只是 id 语义变了)。「第X节第Y条」标签仍由 sec/n 在展示层现算,条号顺延不影响用户数据
-- **DONE 语义(2026-09-27 起)**:任何打卡完成(手动/小组件/自动核销/每周/补卡)都顺手写 `entry_states` 的 DONE,推荐引擎据此排除「做过」的内容,推荐池得以轮换;撤销打卡不清 DONE(「做过」这个事实不变)。配套修复:`ensureTodayTasks` 里用户自选每日习惯(STATE_DAILY)只按 DISMISSED 过滤、不按 DONE——否则自选习惯打一次卡就会从每日规划里消失
+- **DONE 语义(2026-09-27 起)**:任何打卡完成(手动/小组件/自动核销/每周/补卡)都顺手写 `entry_states` 的 DONE,推荐引擎据此排除「做过」的内容,推荐池得以轮换;撤销打卡不清 DONE(「做过」这个事实不变)。配套修复:`ensureTodayTasks` 里用户自选每日习惯(STATE_DAILY)只按 DISMISSED 过滤、不按 DONE——否则自选习惯打一次卡就会从每日规划里消失。DONE 在 UI 上展示为「已完成」徽标(条目库列表/详情、待办页一次性分区),「已加入计划」展示为「已加入」徽标;书库目录每章与今日页每个口径分组显示 待看/完成/忽略 统计(`recommend/EntryStats.kt` 纯函数,每条目只落一个桶、DONE 优先于 DISMISSED)。TODO 与 ONCE 任务行同生命周期:完成/删除 ONCE 行清 TODO,撤销打卡/恢复删除补回(2026-09-29)
 - **Health Connect 自动核销(B1)**:条目→指标的映射写在 `assets/health_rules.json`,保守起见只收无歧义的两条(02-11 步数 ≥7000、02-13 睡眠 ≥7h)——误判自动打卡比不打卡更伤信任。`TaskManager.autoCompleteByHealth` 只核销映射内且当天有未完成 DAILY 行的条目;HC 不可用/缺权限/读取异常都安静返回 0;打卡备注写达标证据(「今日步数 9234 ≥ 7000」),`doneBy` 区分来源(manual / auto:hc / widget)。睡眠窗口固定 [昨 18:00, 今 12:00),与查询时刻无关。触发点:今日页授权后、DailyReminderWorker
 - **数据导出/导入(B2)**:`data/backup/` 本地 JSON(format `version = 6`),覆盖 7 张持久表(profile/tasks/entry_states/weekly_habits/custom_entries/entry_notes/streak_leaves);chat_messages 不备份,DataStore 里的 API Key 等敏感配置不出设备。导入先完整解析+校验版本,全部通过才在单事务里清写(失败回滚,现有数据不变);taskId 原样保留,导入后重排未完成 ONCE 任务的提醒 work
 - **聊天持久化与流式(C5)**:对话落 `chat_messages` 表,封顶保留最新 200 条(ChatViewModel.trimToLatest);`LlmClient.chatStream` 按 SSE 逐行读增量,`AiAdvisor.askStream`/`interpretStatsStream` 流式失败时保留已收残缺内容、一条没收到则回退单发。统计页 AI 解读用 STATS_INTERPRET 提示词(不检索不搜网,统计摘要直接进 prompt)
@@ -153,4 +154,8 @@ python tools/build_content.py      # 内容变更后重跑,看自检统计
 - AI 配置改为多供应商卡片:DataStore 单 key `ai_providers_json` 存 `List<AiProvider>`(kotlinx.serialization),`active_provider_id` 记「当前使用」;生效卡 = active 且 enabled,否则回退第一个 enabled(`resolveActiveProvider`)。JSON 缺失时一次性内存迁移:旧 `api_base_url/api_key/api_model` 有值折成单张启用卡,否则播种 Kimi/DeepSeek 两张无 key、默认禁用的预设卡,首次写卡时落盘
 - 番茄钟结束提示音可自定义:`timer_ringtone_uri`(空串=系统默认通知音),设置页走系统 `ACTION_RINGTONE_PICKER`;响铃仍挂在 Composition 上,页面不在前台不响(前台服务是另一件事)
 - ~~第二阶段计划:Health Connect 接入、数据图表、成就系统~~ **已完成(2026-09-27)**:HC 自动核销、统计页(图表 + 周/月报)、回顾式成就均已落地,见本节上文对应条目;剩 Google Play 健康数据申报(上架流程里处理)
+- **已完成列表页(C9)**:「我的」页入口进 `ui/completed/CompletedScreen.kt`(镜像 DismissedScreen),列出全部 DONE 条目,行尾「撤销完成」走 `TaskManager.unmarkDoneBefore` 清状态、条目回到推荐池
+- **统计页条目完成度(C10)**:`StatsViewModel` 消费 `EntryStateDao.allStatesFlow()` + `computeEntryStats`,按口径(固定口径序)与按章出完成度;`StatsScreen.CompletionCard` 每行 名称 + 细进度条 + 完成/总数——进度条只是加强、数字才是主信息,保持「回顾而非竞争」。整屏截图基线拍不到第 5 张卡(首屏之外),另给组件级 `StatsCompletionCard` 基线
+- **推荐「换一批」(C11)**:`RecommendationEngine.recommend` 加 `offset` 参数,组内候选超过 topN 时 `rotateWindow` 轮转取窗口(offset=0 与旧行为完全一致);轮次存 DataStore(`recommendOffsetFlow`/`bumpRecommendOffset`),今日页推荐区标题行「换一批」按钮触发
+- **习惯养成提示(C12)**:`tasks/WeeklyGraduation.kt` 纯函数 `consecutiveReachedWeeks`(本周未达标不算断签,从上周起计;某周打卡数不足 timesPerWeek 即断签),阈值 `GRADUATION_CONSECUTIVE_WEEKS = 4`;`TodoScreen.GraduationBanner` 是一次性安静横幅,不弹窗不催促,点「知道了」记入 DataStore 不再出现
 - 条目内容的 LICENSE 归原书仓库,分发 APK 即分发其内容,关于页须保留出处

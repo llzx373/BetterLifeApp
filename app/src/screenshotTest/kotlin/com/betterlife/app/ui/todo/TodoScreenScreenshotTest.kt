@@ -109,6 +109,12 @@ fun TodoBothSections() {
                     ),
                 ),
                 userDailyIds = setOf(walkAfterDinner.id),
+                graduationPrompts = listOf(
+                    TodoViewModel.GraduationPrompt(
+                        entryId = playBadminton.id,
+                        weeks = 4,
+                    ),
+                ),
             ),
             contentPadding = PaddingValues(Spacing.space4),
             onToggle = {},
@@ -122,6 +128,7 @@ fun TodoBothSections() {
             onRemoveDailyHabit = {},
             onToggleWeekly = {},
             onRemoveWeekly = {},
+            onDismissGraduation = {},
             onAddCustom = { _, _, _, _ -> },
         )
     }

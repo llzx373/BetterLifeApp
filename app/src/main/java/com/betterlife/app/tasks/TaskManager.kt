@@ -141,10 +141,17 @@ class TaskManager(
      * Health Connect 自动核销 [DONE_BY_AUTO_HC]）。
      * 任何打卡完成都会顺手给条目写 STATE_DONE（推荐引擎据此排除「做过」的内容），
      * 撤销打卡不清它——撤销只影响当天任务行，「做过」这个事实不变。
+     * 一次性待办完成时清掉 STATE_TODO：计划已兑现，TODO 只表示仍在生效的计划。
      */
     suspend fun completeTask(taskId: Long, note: String? = null, doneBy: String = "manual") {
+        val task = taskDao.getTask(taskId)
         taskDao.markDone(taskId, System.currentTimeMillis(), note, doneBy)
-        taskDao.getTask(taskId)?.entryId?.let { addEntryState(it, EntryStateEntity.STATE_DONE) }
+        task?.entryId?.let { entryId ->
+            addEntryState(entryId, EntryStateEntity.STATE_DONE)
+            if (task.type == TaskEntity.TYPE_ONCE) {
+                removeEntryState(entryId, EntryStateEntity.STATE_TODO)
+            }
+        }
         // 已完成的任务的提醒 work 触发时也会自查 done 跳过，提前取消省一次唤醒
         reminderScheduler.cancelTaskReminder(taskId)
     }
@@ -215,11 +222,15 @@ class TaskManager(
 
     /**
      * 撤销打卡：复位任务行；完成备注保留在行里（数据不丢），DONE 状态也不动。
+     * 一次性待办回到待办态，补回完成时清掉的 STATE_TODO。
      * 完成时（completeTask）会取消单任务提醒，撤销时若触发时刻仍在未来则补排回来。
      */
     suspend fun uncompleteTask(taskId: Long) {
         taskDao.markUndone(taskId)
         val task = taskDao.getTask(taskId) ?: return
+        if (task.type == TaskEntity.TYPE_ONCE) {
+            addEntryState(task.entryId, EntryStateEntity.STATE_TODO)
+        }
         val minutes = task.remindAtMinutes
         val dueDate = task.onceDueDate()
         if (minutes != null &&
@@ -229,17 +240,22 @@ class TaskManager(
         }
     }
 
-    /** 把条目加入一次性待办，并把条目标记为 TODO 状态；[dueDate] 为可选截止日 */
+    /**
+     * 把条目加入一次性待办，并把条目标记为 TODO 状态；[dueDate] 为可选截止日。
+     * 幂等：同条目已有未完成的 ONCE 行时不重复插入，只确保 TODO 状态在。
+     */
     suspend fun addOneOffTodo(entryId: String, dueDate: LocalDate? = null) {
-        taskDao.insert(
-            TaskEntity(
-                entryId = entryId,
-                type = TaskEntity.TYPE_ONCE,
-                date = null,
-                dueDate = dueDate?.toString(),
-                createdAt = System.currentTimeMillis(),
+        if (taskDao.activeOnceByEntry(entryId) == null) {
+            taskDao.insert(
+                TaskEntity(
+                    entryId = entryId,
+                    type = TaskEntity.TYPE_ONCE,
+                    date = null,
+                    dueDate = dueDate?.toString(),
+                    createdAt = System.currentTimeMillis(),
+                )
             )
-        )
+        }
         entryStateDao.upsert(
             EntryStateEntity(entryId, EntryStateEntity.STATE_TODO, System.currentTimeMillis())
         )
@@ -257,14 +273,25 @@ class TaskManager(
         reminderScheduler.scheduleTaskReminder(taskId, minutes, dueDate)
     }
 
+    /**
+     * 删除任务行。删掉未完成的一次性待办时清掉 STATE_TODO：TODO 只表示仍在生效的
+     * 计划，残留会让这条内容永远被推荐排除。每日行的「今天不做」不动 STATE_DAILY。
+     */
     suspend fun deleteTask(taskId: Long) {
+        val task = taskDao.getTask(taskId)
         taskDao.delete(taskId)
+        if (task != null && task.type == TaskEntity.TYPE_ONCE && !task.done) {
+            removeEntryState(task.entryId, EntryStateEntity.STATE_TODO)
+        }
         reminderScheduler.cancelTaskReminder(taskId)
     }
 
-    /** 撤销删除:按原 taskId 把任务写回,顺序与状态都保持不变 */
+    /** 撤销删除:按原 taskId 把任务写回,顺序与状态都保持不变;一次性待办补回 TODO 状态 */
     suspend fun restoreTask(task: TaskEntity) {
         taskDao.insert(task)
+        if (task.type == TaskEntity.TYPE_ONCE && !task.done) {
+            addEntryState(task.entryId, EntryStateEntity.STATE_TODO)
+        }
         task.remindAtMinutes?.let {
             reminderScheduler.scheduleTaskReminder(task.taskId, it, task.onceDueDate())
         }
@@ -326,6 +353,10 @@ class TaskManager(
     fun dismissedIdsFlow(): Flow<List<String>> =
         entryStateDao.entryIdsByStateFlow(EntryStateEntity.STATE_DISMISSED)
 
+    /** 已完成（DONE）的条目 id，「已完成列表」页用 */
+    fun doneIdsFlow(): Flow<List<String>> =
+        entryStateDao.entryIdsByStateFlow(EntryStateEntity.STATE_DONE)
+
     /** 「我做过了」：写 DONE 状态（推荐引擎据此排除），不产生任务行；正向反馈，无压力 */
     suspend fun markDoneBefore(entryId: String) =
         addEntryState(entryId, EntryStateEntity.STATE_DONE)
@@ -337,6 +368,19 @@ class TaskManager(
     /** 用户自选的每日习惯条目 id */
     fun userDailyIdsFlow(): Flow<List<String>> =
         entryStateDao.entryIdsByStateFlow(EntryStateEntity.STATE_DAILY)
+
+    /**
+     * 已加入任一计划（一次性待办 TODO / 每日习惯 DAILY / 每周习惯模板）的条目 id。
+     * 推荐引擎据此把「已在计划里」的条目排除出推荐列表。
+     */
+    fun plannedEntryIdsFlow(): Flow<Set<String>> =
+        combine(
+            entryStateDao.entryIdsByStateFlow(EntryStateEntity.STATE_TODO),
+            entryStateDao.entryIdsByStateFlow(EntryStateEntity.STATE_DAILY),
+            weeklyHabitDao.allFlow(),
+        ) { todo, daily, weekly ->
+            (todo + daily).toHashSet().apply { weekly.forEach { add(it.entryId) } }
+        }
 
     /**
      * 把一次性待办转为每日习惯：删 ONCE 行、清 TODO、写 STATE_DAILY。
@@ -508,6 +552,9 @@ class TaskManager(
             WeeklyHabitEntity(entryId, timesPerWeek.coerceIn(1, 7), System.currentTimeMillis())
         )
     }
+
+    /** 全部 WEEKLY 打卡历史：连续达标周数（「已养成」提示）统计用 */
+    fun weeklyHistoryFlow(): Flow<List<TaskEntity>> = taskDao.weeklyAllFlow()
 
     /** 把一次性待办转为每周习惯：删 ONCE 行、清 TODO、建模板 */
     suspend fun convertToWeekly(entryId: String, taskId: Long, timesPerWeek: Int) {

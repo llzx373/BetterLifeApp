@@ -81,8 +81,12 @@ import com.betterlife.app.R
 import com.betterlife.app.ai.RetrievedEntry
 import com.betterlife.app.data.SectionDto
 import com.betterlife.app.recommend.EntryFilter
+import com.betterlife.app.recommend.EntryStats
 import com.betterlife.app.ui.common.DisputeBadge
+import com.betterlife.app.ui.common.DoneBadge
+import com.betterlife.app.ui.common.EntryStatsLine
 import com.betterlife.app.ui.common.GradeBadge
+import com.betterlife.app.ui.common.PlannedBadge
 import com.betterlife.app.ui.common.RatioBadge
 import com.betterlife.app.ui.common.SafeListItem
 import com.betterlife.app.ui.common.TodoBadge
@@ -286,7 +290,12 @@ internal fun LibraryListDetail(
                 Column(Modifier.fillMaxSize()) {
                     Box(Modifier.weight(1f)) {
                         if (state.query.isNotBlank()) {
-                            SearchResults(results = state.searchResults, onOpenEntry = onSelectEntry)
+                            SearchResults(
+                                results = state.searchResults,
+                                doneIds = state.doneIds,
+                                plannedIds = state.plannedIds,
+                                onOpenEntry = onSelectEntry,
+                            )
                         } else {
                             SectionListContent(
                                 state = state,
@@ -457,11 +466,17 @@ internal fun LibraryCatalogContent(
 
         Box(Modifier.weight(1f)) {
             if (state.query.isNotBlank()) {
-                SearchResults(results = state.searchResults, onOpenEntry = onOpenEntry)
+                SearchResults(
+                    results = state.searchResults,
+                    doneIds = state.doneIds,
+                    plannedIds = state.plannedIds,
+                    onOpenEntry = onOpenEntry,
+                )
             } else {
                 Catalog(
                     sections = state.sections,
                     sectionLens = state.sectionLens,
+                    sectionStats = state.sectionStats,
                     totalEntries = totalEntries,
                     onOpenSection = onOpenSection,
                 )
@@ -646,7 +661,12 @@ private fun RecentSearches(history: List<String>, onPick: (String) -> Unit) {
 }
 
 @Composable
-private fun SearchResults(results: List<RetrievedEntry>, onOpenEntry: (String) -> Unit) {
+private fun SearchResults(
+    results: List<RetrievedEntry>,
+    doneIds: Set<String>,
+    plannedIds: Set<String>,
+    onOpenEntry: (String) -> Unit,
+) {
     if (results.isEmpty()) {
         Text(
             text = stringResource(R.string.library_no_match),
@@ -667,6 +687,8 @@ private fun SearchResults(results: List<RetrievedEntry>, onOpenEntry: (String) -
                         GradeBadge(entry.grade)
                         if (entry.dispute) DisputeBadge()
                         if (entry.todo) TodoBadge()
+                        if (entry.id in doneIds) DoneBadge()
+                        if (entry.id in plannedIds) PlannedBadge()
                     }
                 },
                 modifier = Modifier.clickable { onOpenEntry(entry.id) },
@@ -677,11 +699,12 @@ private fun SearchResults(results: List<RetrievedEntry>, onOpenEntry: (String) -
     }
 }
 
-/** 章目录:左边是这章的主导口径(图标 + 口径色),右边是它在全书里的分量 */
+/** 章目录:左边是这章的主导口径(图标 + 口径色),右边是它在全书里的分量 + 状态统计 */
 @Composable
 private fun Catalog(
     sections: List<SectionDto>,
     sectionLens: Map<Int, String>,
+    sectionStats: Map<Int, EntryStats>,
     totalEntries: Int,
     onOpenSection: (Int) -> Unit,
 ) {
@@ -708,6 +731,10 @@ private fun Catalog(
                             fraction = section.entries.toFloat() / totalEntries,
                             color = lensTint(lens),
                         )
+                        sectionStats[section.n]?.let { stats ->
+                            Spacer(Modifier.height(Spacing.space1))
+                            EntryStatsLine(stats)
+                        }
                     }
                 },
                 modifier = Modifier.clickable { onOpenSection(section.n) },

@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Insights
@@ -51,6 +52,7 @@ fun MineScreen(
     onOpenChat: () -> Unit,
     onOpenFavorites: () -> Unit,
     onOpenDismissed: () -> Unit,
+    onOpenCompleted: () -> Unit,
     onOpenStats: () -> Unit,
     vm: ProfileViewModel = viewModel(factory = ProfileViewModel.Factory),
 ) {
@@ -126,6 +128,12 @@ fun MineScreen(
                     subtitleRes = R.string.mine_dismissed_sub,
                     icon = Icons.Filled.NotInterested,
                     onClick = onOpenDismissed,
+                ),
+                EntryItem(
+                    titleRes = R.string.mine_completed,
+                    subtitleRes = R.string.mine_completed_sub,
+                    icon = Icons.Filled.CheckCircle,
+                    onClick = onOpenCompleted,
                 ),
                 EntryItem(
                     titleRes = R.string.mine_chat,

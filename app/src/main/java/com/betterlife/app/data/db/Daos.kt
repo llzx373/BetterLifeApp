@@ -84,9 +84,17 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE type = 'DAILY' AND date = :date AND entryId = :entryId")
     suspend fun dailyTaskByEntry(entryId: String, date: String): TaskEntity?
 
+    /** 某条目尚未完成的一次性待办（addOneOffTodo 防重插入用） */
+    @Query("SELECT * FROM tasks WHERE type = 'ONCE' AND entryId = :entryId AND done = 0")
+    suspend fun activeOnceByEntry(entryId: String): TaskEntity?
+
     /** 一周区间 [start, end] 内的 WEEKLY 打卡行，聚合每周习惯进度用 */
     @Query("SELECT * FROM tasks WHERE type = 'WEEKLY' AND date >= :start AND date <= :end")
     fun weeklyCheckinsFlow(start: String, end: String): Flow<List<TaskEntity>>
+
+    /** 全部 WEEKLY 打卡行（连续达标周数统计用） */
+    @Query("SELECT * FROM tasks WHERE type = 'WEEKLY'")
+    fun weeklyAllFlow(): Flow<List<TaskEntity>>
 
     /** 撤销某条目某天的 WEEKLY 打卡，返回删除的行数（0 = 今天没打过卡） */
     @Query("DELETE FROM tasks WHERE type = 'WEEKLY' AND entryId = :entryId AND date = :date")

@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import com.android.tools.screenshot.PreviewTest
 import com.betterlife.app.data.EntryKeys
 import com.betterlife.app.data.health.StepsState
+import com.betterlife.app.recommend.EntryStats
 import com.betterlife.app.ui.FourFoldScreenPreview
 import com.betterlife.app.ui.PreviewScreen
 import com.betterlife.app.ui.fakeEntry
@@ -107,6 +108,11 @@ private val libraryState = LibraryViewModel.UiState(
         EntryKeys.LENS_MONEY to listOf(fakeScored(creditCardDebt, 110)),
         EntryKeys.LENS_FREEDOM to listOf(fakeScored(socialSecurityQuery, 90)),
     ),
+    lensStats = mapOf(
+        EntryKeys.LENS_MORTALITY to EntryStats(pending = 152, done = 12, dismissed = 3),
+        EntryKeys.LENS_MONEY to EntryStats(pending = 98, done = 5, dismissed = 0),
+        EntryKeys.LENS_FREEDOM to EntryStats(pending = 87, done = 0, dismissed = 2),
+    ),
 )
 
 @PreviewTest
@@ -130,6 +136,7 @@ fun TodayReady() {
             onAddTodo = {},
             onDismissEntry = {},
             onMarkDoneBefore = {},
+            onReshuffle = {},
             onAuthorizeSteps = {},
             onStartTimer = {},
             onOpenLibrary = {},
@@ -165,6 +172,7 @@ fun TodayAllDone() {
             onAddTodo = {},
             onDismissEntry = {},
             onMarkDoneBefore = {},
+            onReshuffle = {},
             onAuthorizeSteps = {},
             onStartTimer = {},
             onOpenLibrary = {},

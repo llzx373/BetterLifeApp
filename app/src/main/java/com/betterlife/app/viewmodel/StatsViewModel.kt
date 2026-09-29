@@ -13,10 +13,16 @@ import com.betterlife.app.data.Profile
 import com.betterlife.app.data.ProfileRepo
 import com.betterlife.app.data.SettingsStore
 import com.betterlife.app.data.db.CustomEntryDao
+import com.betterlife.app.data.db.CustomEntryEntity
+import com.betterlife.app.data.db.EntryStateDao
 import com.betterlife.app.data.db.StreakLeaveDao
+import com.betterlife.app.data.db.StreakLeaveEntity
 import com.betterlife.app.data.db.TaskDao
 import com.betterlife.app.data.db.TaskEntity
 import com.betterlife.app.data.resolveActiveProvider
+import com.betterlife.app.recommend.EntryStats
+import com.betterlife.app.recommend.RecommendationEngine
+import com.betterlife.app.recommend.computeEntryStats
 import com.betterlife.app.stats.Achievement
 import com.betterlife.app.stats.AchievementInput
 import com.betterlife.app.stats.DailyStreak
@@ -47,6 +53,7 @@ class StatsViewModel(
     private val taskDao: TaskDao,
     private val streakLeaveDao: StreakLeaveDao,
     private val customEntryDao: CustomEntryDao,
+    private val entryStateDao: EntryStateDao,
     private val entryRepository: EntryRepository,
     private val settingsStore: SettingsStore,
     private val aiAdvisor: AiAdvisor,
@@ -76,7 +83,17 @@ class StatsViewModel(
         val report: PeriodReport? = null,
         val aiConfigured: Boolean = false,
         val insight: InsightState = InsightState(),
+        /** 按口径的条目完成度（全书的 待看/完成/忽略，按口径固定序） */
+        val lensCompletion: List<LensCompletion> = emptyList(),
+        /** 按章的条目完成度，章号升序 */
+        val sectionCompletion: List<SectionCompletion> = emptyList(),
     )
+
+    /** 一个口径的完成度 */
+    data class LensCompletion(val lens: String, val stats: EntryStats)
+
+    /** 一章的完成度 */
+    data class SectionCompletion(val n: Int, val title: String, val stats: EntryStats)
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -98,14 +115,22 @@ class StatsViewModel(
             }
         }
         viewModelScope.launch {
-            val libraryEntries = withContext(Dispatchers.IO) { entryRepository.entriesData().byId }
+            val entriesData = withContext(Dispatchers.IO) { entryRepository.entriesData() }
+            val libraryEntries = entriesData.byId
+            // 主统计五路 combine 已满是其一;条目状态(完成度卡)变化频率低,嵌套一层即可
             combine(
-                taskDao.allFlow(),
-                streakLeaveDao.allFlow(),
-                customEntryDao.allFlow(),
-                todayFlow,
-                settingsStore.celebratedMilestonesFlow,
-            ) { tasks, leaves, customs, today, celebrated ->
+                combine(
+                    taskDao.allFlow(),
+                    streakLeaveDao.allFlow(),
+                    customEntryDao.allFlow(),
+                    todayFlow,
+                    settingsStore.celebratedMilestonesFlow,
+                ) { tasks, leaves, customs, today, celebrated ->
+                    Bundle0(tasks, leaves, customs, today, celebrated)
+                },
+                entryStateDao.allStatesFlow(),
+            ) { bundle0, states ->
+                val (tasks, leaves, customs, today, celebrated) = bundle0
                 val entries = buildEntryMap(libraryEntries.mapValues { (_, e) -> e.title to e.lens }, customs.map { it.entryId to it.title })
                 val rows = tasks.map { it.toStatsRow() }
                 val leaveMap = leaves.groupBy({ it.entryId }, { it.date }).mapValues { (_, v) -> v.toSet() }
@@ -113,7 +138,25 @@ class StatsViewModel(
                 val achievements = evaluateAchievements(
                     AchievementInput(stats.bestStreak, stats.totalCompletions, stats.perfectWeeks)
                 )
-                Bundle(rows, entries, today, stats, achievements, celebrated)
+                // 全书的 待看/完成/忽略 完成度:按口径与按章两个视角
+                val statesByEntry = states.groupBy({ it.entryId }, { it.state })
+                    .mapValues { (_, v) -> v.toSet() }
+                val lensCompletion = entriesData.entries
+                    .filter { !it.removed }
+                    .groupBy { it.lens }
+                    .map { (lens, lensEntries) -> LensCompletion(lens, computeEntryStats(lensEntries, statesByEntry)) }
+                    .sortedBy { lensCompletionOrder(it.lens) }
+                val sectionCompletion = entriesData.sections.map { section ->
+                    SectionCompletion(
+                        section.n,
+                        section.title,
+                        computeEntryStats(
+                            entriesData.bySection[section.n].orEmpty().filter { !it.removed },
+                            statesByEntry,
+                        ),
+                    )
+                }
+                Bundle(rows, entries, today, stats, achievements, celebrated, lensCompletion, sectionCompletion)
             }.flowOn(Dispatchers.Default).collect { bundle ->
                 val firstVisit = celebratedAtEntry == null
                 if (firstVisit) {
@@ -140,6 +183,8 @@ class StatsViewModel(
                         bestStreak = stats.bestStreak,
                         weeklyTrend = stats.weeklyTrend,
                         report = reportFor(s.selectedPeriod),
+                        lensCompletion = bundle.lensCompletion,
+                        sectionCompletion = bundle.sectionCompletion,
                     )
                 }
             }
@@ -200,6 +245,15 @@ class StatsViewModel(
         }
     }
 
+    /** 内层 combine 的中间打包：主统计的五路输入 */
+    private data class Bundle0(
+        val tasks: List<TaskEntity>,
+        val leaves: List<StreakLeaveEntity>,
+        val customs: List<CustomEntryEntity>,
+        val today: LocalDate,
+        val celebrated: Set<String>,
+    )
+
     private class Bundle(
         val rows: List<StatsTaskRow>,
         val entries: Map<String, StatsEntry>,
@@ -207,6 +261,8 @@ class StatsViewModel(
         val stats: StatsResult,
         val achievements: List<Achievement>,
         val celebrated: Set<String>,
+        val lensCompletion: List<LensCompletion>,
+        val sectionCompletion: List<SectionCompletion>,
     )
 
     companion object {
@@ -218,6 +274,7 @@ class StatsViewModel(
                     taskDao = c.database.taskDao(),
                     streakLeaveDao = c.database.streakLeaveDao(),
                     customEntryDao = c.database.customEntryDao(),
+                    entryStateDao = c.database.entryStateDao(),
                     entryRepository = c.entryRepository,
                     settingsStore = c.settingsStore,
                     aiAdvisor = c.aiAdvisor,
@@ -227,6 +284,12 @@ class StatsViewModel(
             }
         }
     }
+}
+
+/** 完成度卡的口径排序:固定序优先,其余口径字典序排后 */
+private fun lensCompletionOrder(lens: String): Int {
+    val index = RecommendationEngine.LENS_ORDER.indexOf(lens)
+    return if (index >= 0) index else RecommendationEngine.LENS_ORDER.size
 }
 
 private fun TaskEntity.toStatsRow() = StatsTaskRow(

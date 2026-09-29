@@ -79,6 +79,12 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
 
         // 每日习惯是否已首次播种过示例的一次性标记（TaskManager.ensureTodayTasks 用）
         val DAILY_HABITS_SEEDED = booleanPreferencesKey("daily_habits_seeded")
+
+        // 推荐「换一批」的轮次:每组候选按此偏移轮转取 topN,持久化避免进程重启后跳回第一批
+        val RECOMMEND_OFFSET = intPreferencesKey("recommend_offset")
+
+        // 已提示过「已养成」的每周习惯条目 id,逗号分隔;无顺序要求
+        val GRADUATION_PROMPTED = stringPreferencesKey("graduation_prompted")
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -248,6 +254,41 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
 
     suspend fun setDailyHabitsSeeded() {
         context.dataStore.edit { it[Keys.DAILY_HABITS_SEEDED] = true }
+    }
+
+    /**
+     * 推荐「换一批」的轮次偏移：LibraryViewModel 的推荐组合随它重算。
+     * 与 searchHistory 同理不进 AppSettings —— 它是推荐区的局部状态。
+     */
+    val recommendOffsetFlow: Flow<Int> = context.dataStore.data.map { p ->
+        p[Keys.RECOMMEND_OFFSET] ?: 0
+    }
+
+    suspend fun bumpRecommendOffset() {
+        context.dataStore.edit { p ->
+            p[Keys.RECOMMEND_OFFSET] = (p[Keys.RECOMMEND_OFFSET] ?: 0) + 1
+        }
+    }
+
+    /**
+     * 已提示过「已养成」的每周习惯条目 id：提示是一次性的，点过「知道了」就不再打扰。
+     * 与 celebratedMilestones 同理不进 AppSettings。
+     */
+    val graduationPromptedFlow: Flow<Set<String>> = context.dataStore.data.map { p ->
+        p[Keys.GRADUATION_PROMPTED].orEmpty()
+            .split(",")
+            .filter { it.isNotBlank() }
+            .toSet()
+    }
+
+    suspend fun addGraduationPrompted(entryId: String) {
+        context.dataStore.edit { p ->
+            val old = p[Keys.GRADUATION_PROMPTED].orEmpty()
+                .split(",")
+                .filter { it.isNotBlank() }
+                .toSet()
+            p[Keys.GRADUATION_PROMPTED] = (old + entryId).joinToString(",")
+        }
     }
 
     /**

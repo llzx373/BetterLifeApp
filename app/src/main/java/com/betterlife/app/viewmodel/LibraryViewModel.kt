@@ -11,6 +11,7 @@ import com.betterlife.app.ai.RetrievedEntry
 import com.betterlife.app.data.EntriesData
 import com.betterlife.app.data.EntryDto
 import com.betterlife.app.data.EntryRepository
+import com.betterlife.app.data.Profile
 import com.betterlife.app.data.ProfileRepository
 import com.betterlife.app.data.SectionDto
 import com.betterlife.app.data.SettingsStore
@@ -19,9 +20,11 @@ import com.betterlife.app.data.db.EntryNoteEntity
 import com.betterlife.app.data.db.EntryStateDao
 import com.betterlife.app.data.db.EntryStateEntity
 import com.betterlife.app.recommend.EntryFilter
+import com.betterlife.app.recommend.EntryStats
 import com.betterlife.app.recommend.RecommendationEngine
 import com.betterlife.app.recommend.ScoredEntry
 import com.betterlife.app.recommend.applyFilter
+import com.betterlife.app.recommend.computeEntryStats
 import com.betterlife.app.recommend.matchesFilter
 import com.betterlife.app.tasks.TaskManager
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +58,14 @@ class LibraryViewModel(
         /** 章内列表与搜索结果共用的筛选条件;推荐不受影响 */
         val filter: EntryFilter = EntryFilter(),
         val recommended: LinkedHashMap<String, List<ScoredEntry>> = LinkedHashMap(),
+        /** 已完成(STATE_DONE)的条目 id,条目库/详情页据此显示「已完成」徽标 */
+        val doneIds: Set<String> = emptySet(),
+        /** 已加入任一计划(一次性/每日/每周)的条目 id,条目库据此显示「已加入」徽标 */
+        val plannedIds: Set<String> = emptySet(),
+        /** 每章的 待看/已完成/已忽略 统计,目录行展示用 */
+        val sectionStats: Map<Int, EntryStats> = emptyMap(),
+        /** 每个口径的 待看/已完成/已忽略 统计,今日页推荐分组头展示用 */
+        val lensStats: Map<String, EntryStats> = emptyMap(),
         val query: String = "",
         val searchResults: List<RetrievedEntry> = emptyList(),
         /** 最近提交的搜索词,新词在前;输入框为空时展示 */
@@ -82,19 +93,41 @@ class LibraryViewModel(
                 sectionEntries = first?.let { sortedSectionEntries(data, it.n, _uiState.value.sort) }.orEmpty(),
             )
 
-            // 档案或条目状态变化时重算推荐
+            // 档案、条目状态或计划成员变化时重算推荐与统计
+            // 推荐排除:做过(DONE)、不再推荐(DISMISSED)、已加入任一计划(TODO/DAILY/每周习惯)
+            // recommendOffset:「换一批」的轮次,组内候选按它轮转
             kotlinx.coroutines.flow.combine(
                 profileRepository.profileFlow,
                 entryStateDao.allStatesFlow(),
-            ) { profile, states -> profile to states }.collect { (profile, states) ->
-                val excluded = states.filter {
-                    it.state == EntryStateEntity.STATE_DONE || it.state == EntryStateEntity.STATE_DISMISSED
-                }.mapTo(HashSet()) { it.entryId }
-                val recommended = profile?.let {
-                    recommendationEngine.recommend(it, data.entries, data.rules, excluded)
-                } ?: LinkedHashMap()
-                _uiState.value = _uiState.value.copy(recommended = recommended)
-            }
+                taskManager.plannedEntryIdsFlow(),
+                settingsStore.recommendOffsetFlow,
+            ) { profile, states, planned, offset -> RecommendInput(profile, states, planned, offset) }
+                .collect { (profile, states, planned, offset) ->
+                    val doneIds = states.filter { it.state == EntryStateEntity.STATE_DONE }
+                        .mapTo(HashSet()) { it.entryId }
+                    val dismissedIds = states.filter { it.state == EntryStateEntity.STATE_DISMISSED }
+                        .mapTo(HashSet()) { it.entryId }
+                    val excluded = HashSet<String>(doneIds.size + dismissedIds.size + planned.size).apply {
+                        addAll(doneIds); addAll(dismissedIds); addAll(planned)
+                    }
+                    val recommended = profile?.let {
+                        recommendationEngine.recommend(it, data.entries, data.rules, excluded, offset = offset)
+                    } ?: LinkedHashMap()
+                    val statesByEntry = states.groupBy({ it.entryId }, { it.state })
+                        .mapValues { it.value.toSet() }
+                    val sectionStats = data.sections.associate { section ->
+                        section.n to computeEntryStats(data.bySection[section.n].orEmpty(), statesByEntry)
+                    }
+                    val lensStats = data.entries.groupBy { it.lens }
+                        .mapValues { (_, lensEntries) -> computeEntryStats(lensEntries, statesByEntry) }
+                    _uiState.value = _uiState.value.copy(
+                        recommended = recommended,
+                        doneIds = doneIds,
+                        plannedIds = planned,
+                        sectionStats = sectionStats,
+                        lensStats = lensStats,
+                    )
+                }
         }
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -197,6 +230,11 @@ class LibraryViewModel(
         viewModelScope.launch(Dispatchers.IO) { taskManager.addOneOffTodo(entryId) }
     }
 
+    /** 「换一批」:推荐组内候选按轮次轮转(持久化在 SettingsStore,重启不跳回第一批) */
+    fun reshuffleRecommendations() {
+        viewModelScope.launch(Dispatchers.IO) { settingsStore.bumpRecommendOffset() }
+    }
+
     /** 提交搜索:当前词非空白才进历史(输入即搜不产生历史,否则每敲一个字都是一条) */
     fun submitSearch() {
         val query = _uiState.value.query
@@ -248,6 +286,14 @@ class LibraryViewModel(
         }
     }
 }
+
+/** 推荐重算的输入打包:四路 combine 的超长 lambda 参数不好读,收成一个元组类 */
+private data class RecommendInput(
+    val profile: Profile?,
+    val states: List<EntryStateEntity>,
+    val planned: Set<String>,
+    val offset: Int,
+)
 
 /** 章内条目排序方式 */
 enum class EntrySort { RATIO, GRADE, ORDER }

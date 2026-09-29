@@ -2,7 +2,8 @@
 
 面向继续开发这个 App 的人。本文档是当前全部需求的唯一入口;2026-09-27 之前的执行记录与已完成项
 见 [`docs/archive/todo-2026-09-27.md`](docs/archive/todo-2026-09-27.md),
-同天第二波完成的 A1、B1–B7、C1–C6 见 [`docs/archive/todo-2026-09-27-b.md`](docs/archive/todo-2026-09-27-b.md)。
+同天第二波完成的 A1、B1–B7、C1–C6 见 [`docs/archive/todo-2026-09-27-b.md`](docs/archive/todo-2026-09-27-b.md),
+2026-09-29 完成的推荐去重/徽标/统计行与 C9–C12 见 [`docs/archive/todo-2026-09-29.md`](docs/archive/todo-2026-09-29.md)。
 各条目的技术背景在 [`docs/DESIGN.md`](docs/DESIGN.md) 与 [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md)。
 
 **已定的边界**(免得后来者反复纠结):

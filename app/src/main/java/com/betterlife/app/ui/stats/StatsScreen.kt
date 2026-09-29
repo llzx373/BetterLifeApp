@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -27,8 +28,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -45,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -52,11 +56,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
+import com.betterlife.app.recommend.EntryStats
 import com.betterlife.app.stats.Achievement
 import com.betterlife.app.stats.AchievementKeys
 import com.betterlife.app.stats.CheckinNote
@@ -165,6 +171,9 @@ internal fun StatsContent(
             }
             MotionEntrance(visibleState = staggeredCardVisible(3), slideFromBottom = true) {
                 PeriodReportCard(state, onSelectPeriod, onInterpret, onOpenSettings)
+            }
+            MotionEntrance(visibleState = staggeredCardVisible(4), slideFromBottom = true) {
+                CompletionCard(state.lensCompletion, state.sectionCompletion)
             }
         }
     }
@@ -389,6 +398,79 @@ private fun TrendCard(trend: List<WeeklyCompletion>) {
                 }
             }
         }
+    }
+}
+
+// ---- 条目完成度（口径 / 章节） ----
+
+@Composable
+internal fun CompletionCard(
+    lensCompletion: List<StatsViewModel.LensCompletion>,
+    sectionCompletion: List<StatsViewModel.SectionCompletion>,
+) {
+    StatsCard(R.string.stats_completion_title) {
+        lensCompletion.forEach { item ->
+            CompletionRow(
+                label = lensGroupTitle(item.lens),
+                stats = item.stats,
+                tint = LocalLensColors.current.forLens(item.lens)
+                    ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                icon = lensIcon(item.lens),
+            )
+        }
+        if (sectionCompletion.isNotEmpty()) {
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant,
+                modifier = Modifier.padding(vertical = Spacing.space1),
+            )
+            sectionCompletion.forEach { item ->
+                CompletionRow(
+                    label = stringResource(R.string.section_title, item.n, item.title),
+                    stats = item.stats,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    icon = null,
+                )
+            }
+        }
+    }
+}
+
+/** 一行完成度:名称 + 细进度条 + 完成/总数;进度条只是加强,数字才是主信息 */
+@Composable
+private fun CompletionRow(
+    label: String,
+    stats: EntryStats,
+    tint: Color,
+    icon: ImageVector?,
+) {
+    val total = stats.pending + stats.done + stats.dismissed
+    val fraction = if (total == 0) 0f else stats.done.toFloat() / total
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.space2),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 32.dp),
+    ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(Spacing.space4))
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        LinearProgressIndicator(
+            progress = { fraction },
+            modifier = Modifier.width(64.dp),
+            color = tint,
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        )
+        Text(
+            text = stringResource(R.string.stats_completion_rate, stats.done, total),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

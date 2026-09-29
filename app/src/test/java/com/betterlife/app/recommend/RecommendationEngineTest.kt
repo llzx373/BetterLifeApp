@@ -111,6 +111,34 @@ class RecommendationEngineTest {
     }
 
     @Test
+    fun `offset 为 0 时与之前行为一致`() {
+        val many = (1..8).map { entry("01-%02d".format(it), 1, ratio = "高") }
+        val result = engine.recommend(nonSmoker, many, RulesFile(), emptySet(), topN = 3, offset = 0)
+        assertEquals(listOf("01-01", "01-02", "01-03"), result["死亡率"]!!.map { it.entry.id })
+    }
+
+    @Test
+    fun `换一批 offset 轮转窗口`() {
+        val many = (1..8).map { entry("01-%02d".format(it), 1, ratio = "高") }
+        val result = engine.recommend(nonSmoker, many, RulesFile(), emptySet(), topN = 3, offset = 3)
+        assertEquals(listOf("01-04", "01-05", "01-06"), result["死亡率"]!!.map { it.entry.id })
+    }
+
+    @Test
+    fun `offset 超过组内数量时取模回绕`() {
+        val many = (1..8).map { entry("01-%02d".format(it), 1, ratio = "高") }
+        val result = engine.recommend(nonSmoker, many, RulesFile(), emptySet(), topN = 3, offset = 7)
+        assertEquals(listOf("01-08", "01-01", "01-02"), result["死亡率"]!!.map { it.entry.id })
+    }
+
+    @Test
+    fun `候选不超过 topN 时 offset 不改变结果`() {
+        val result = engine.recommend(nonSmoker, entries, rules, emptySet(), topN = 10, offset = 3)
+        val ids = result["死亡率"]!!.map { it.entry.id }
+        assertEquals(listOf("01-01", "01-02"), ids)
+    }
+
+    @Test
     fun `非吸烟者规则不命中时 score 为 0 且条目保留`() {
         val result = engine.recommend(nonSmoker, entries, rules, emptySet())
         val deathIds = result["死亡率"]!!.map { it.entry.id }

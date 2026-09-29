@@ -12,6 +12,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.betterlife.app.R
 import com.betterlife.app.data.EntryKeys
+import com.betterlife.app.recommend.EntryStats
 
 /** 口径 → 人性化组名(未识别的口径原样展示) */
 @Composable
@@ -105,6 +106,44 @@ fun TodoBadge(modifier: Modifier = Modifier) {
         text = stringResource(R.string.badge_todo),
         container = MaterialTheme.colorScheme.tertiaryContainer,
         content = MaterialTheme.colorScheme.onTertiaryContainer,
+        modifier = modifier,
+    )
+}
+
+/** 已完成角标:条目做过(STATE_DONE)后的正向标记 */
+@Composable
+fun DoneBadge(modifier: Modifier = Modifier) {
+    SmallBadge(
+        text = stringResource(R.string.badge_done),
+        container = MaterialTheme.colorScheme.primaryContainer,
+        content = MaterialTheme.colorScheme.onPrimaryContainer,
+        modifier = modifier,
+    )
+}
+
+/** 已加入角标:条目已在任一计划(一次性/每日/每周)里,保持安静不抢完成态 */
+@Composable
+fun PlannedBadge(modifier: Modifier = Modifier) {
+    SmallBadge(
+        text = stringResource(R.string.badge_planned),
+        container = MaterialTheme.colorScheme.surfaceVariant,
+        content = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier,
+    )
+}
+
+/** 条目状态统计行:「待看 x · 完成 y · 忽略 z」;完成/忽略为 0 时省略对应段 */
+@Composable
+fun EntryStatsLine(stats: EntryStats, modifier: Modifier = Modifier) {
+    val parts = buildList {
+        add(stringResource(R.string.entry_stats_pending, stats.pending))
+        if (stats.done > 0) add(stringResource(R.string.entry_stats_done, stats.done))
+        if (stats.dismissed > 0) add(stringResource(R.string.entry_stats_dismissed, stats.dismissed))
+    }
+    Text(
+        text = parts.joinToString(" · "),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier,
     )
 }
