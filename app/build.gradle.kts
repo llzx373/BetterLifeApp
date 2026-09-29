@@ -70,7 +70,7 @@ android {
         // 版本约定：versionName 三段式 —— 大重构迭代第一位、大特性更新迭代第二位、
         // 正式版本迭代第三位；versionCode 即版本号后面的「-n」开发迭代号
         // （0.1.0-1 ↔ versionCode 1），开发中只递增 versionCode。
-        versionCode = 3
+        versionCode = 4
         versionName = "0.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
