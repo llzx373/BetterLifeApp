@@ -157,24 +157,42 @@ class TaskManager(
     }
 
     /**
-     * B1：用 Health Connect 数据自动核销今天的 DAILY 任务，返回自动完成的条数。
+     * 一轮 HC 自动核销的结果：核销条数 + 每条的达标证据文案（N2b 报喜通知直接用证据）。
+     * 核销顺序与当日任务顺序一致。
+     */
+    data class AutoCompleteResult(
+        val count: Int,
+        val evidences: List<String>,
+    ) {
+        /** 报喜/合并汇总文案里的证据部分，多条用「；」连接 */
+        val evidenceText: String get() = evidences.joinToString("；")
+
+        companion object {
+            val NONE = AutoCompleteResult(0, emptyList())
+        }
+    }
+
+    /**
+     * B1：用 Health Connect 数据自动核销今天的 DAILY 任务，返回核销结果（条数 + 证据）。
      *
      * 保守原则（误核销比不核销更糟糕）：
-     * - HC 不可用、没装、缺权限、读取异常 → 安静地返回 0；
+     * - HC 不可用、没装、缺权限、读取异常 → 安静地返回 [AutoCompleteResult.NONE]；
      * - 只核销 health_rules.json 里显式映射的条目，且该条目今天有未完成的 DAILY 行；
      * - 某类数据没权限/读不到时按 null 处理，该类型的规则本轮永不命中。
      * 备注写入达标证据（如「今日步数 9234 ≥ 7000」），doneBy = [DONE_BY_AUTO_HC]。
      */
-    suspend fun autoCompleteByHealth(today: LocalDate = LocalDate.now()): Int {
-        val hc = healthConnect ?: return 0
-        val rulesRepo = healthRulesRepository ?: return 0
-        if (runCatching { hc.status() }.getOrNull() != HealthConnectStatus.AVAILABLE) return 0
+    suspend fun autoCompleteByHealth(today: LocalDate = LocalDate.now()): AutoCompleteResult {
+        val hc = healthConnect ?: return AutoCompleteResult.NONE
+        val rulesRepo = healthRulesRepository ?: return AutoCompleteResult.NONE
+        if (runCatching { hc.status() }.getOrNull() != HealthConnectStatus.AVAILABLE) {
+            return AutoCompleteResult.NONE
+        }
         val rules = runCatching { rulesRepo.rules().rules }.getOrNull().orEmpty()
-        if (rules.isEmpty()) return 0
+        if (rules.isEmpty()) return AutoCompleteResult.NONE
 
         val undone = taskDao.dailyTasksFlow(today.toString()).first().filter { !it.done }
         val candidates = undone.filter { task -> rules.any { it.entryId == task.entryId } }
-        if (candidates.isEmpty()) return 0
+        if (candidates.isEmpty()) return AutoCompleteResult.NONE
 
         // 只读规则里用得上的数据类型；没权限的类型保持 null（对应规则不命中）
         val needed = rules.mapTo(HashSet()) { it.type }
@@ -193,14 +211,15 @@ class TaskManager(
         val matched = evaluateAutoCompletion(
             rules, steps, exerciseMin, sleepHours, candidates.mapTo(HashSet()) { it.entryId },
         )
-        if (matched.isEmpty()) return 0
+        if (matched.isEmpty()) return AutoCompleteResult.NONE
 
-        candidates.filter { it.entryId in matched }.forEach { task ->
+        val evidences = candidates.filter { it.entryId in matched }.map { task ->
             val rule = rules.first { it.entryId == task.entryId }
             val evidence = healthEvidenceText(rule, steps, exerciseMin, sleepHours)
             completeTask(task.taskId, "Health Connect 自动核销：$evidence", DONE_BY_AUTO_HC)
+            evidence
         }
-        return matched.size
+        return AutoCompleteResult(evidences.size, evidences)
     }
 
     /** 权限检查与读取都可能抛（HC 服务异常等），任何一步失败都退化为 null = 该类型不命中 */

@@ -42,6 +42,9 @@ class ReminderScheduler(private val context: Context) {
         const val CHANNEL_ID = "daily"
         const val NOTIFICATION_ID = 1001
 
+        /** N2b 报喜通知的 id，与每日汇总（[NOTIFICATION_ID]）互不覆盖 */
+        const val PRAISE_NOTIFICATION_ID = 1002
+
         /** 单任务提醒的 unique work 名前缀，按 taskId 一一对应 */
         const val TASK_WORK_PREFIX = "remind_task_"
 
@@ -82,6 +85,28 @@ class ReminderScheduler(private val context: Context) {
     }
 
     /**
+     * N2b 报喜通知：HC 自动核销达标且今日任务全部完成时发一条（证据文案如「今日步数 9234 ≥ 7000」）。
+     * 复用 "daily" 渠道——同属每日任务提醒，单开渠道会让用户多管一个开关。
+     * 同日重发抑制由调用方（decideAutoNotify + SettingsStore 的当日标记）负责，这里只管发。
+     */
+    fun notifyAutoCompletePraise(evidenceText: String) {
+        if (!hasNotificationPermission(context)) return
+        ensureChannel(context)
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.notification_praise_title))
+            .setContentText(context.getString(R.string.notification_praise_body, evidenceText))
+            .setContentIntent(reminderContentIntent(context))
+            .setAutoCancel(true)
+            .build()
+        try {
+            NotificationManagerCompat.from(context).notify(PRAISE_NOTIFICATION_ID, notification)
+        } catch (_: SecurityException) {
+            // 权限被收回等情况，忽略
+        }
+    }
+
+    /**
      * 给单条任务排到点精准触发的一次性 work（按 taskId 命名，重排即 REPLACE）。
      * [minutesOfDay] 是一天内的分钟数；[date] 非空（一次性待办的截止日）时定在该日期触发，
      * 否则已过点顺延到明天（见 [nextTriggerMillis]）。
@@ -119,22 +144,45 @@ class DailyReminderWorker(
             container.taskManager.ensureTodayTasks(ProfileQuestions.effectiveProfile(profile, answered))
         }
         // B1：先用 Health Connect 数据自动核销达标的每日任务，再统计未完成数发通知；
-        // 尽力而为——HC 不可用/没权限/出异常都安静跳过
-        runCatching { container.taskManager.autoCompleteByHealth() }
+        // 尽力而为——HC 不可用/没权限/出异常都安静跳过（按无核销处理）
+        val completed = runCatching { container.taskManager.autoCompleteByHealth() }
+            .getOrDefault(TaskManager.AutoCompleteResult.NONE)
         // B5：新一天任务已生成 / 自动核销已落库，同步刷新桌面小部件
         WidgetUpdater.refresh(applicationContext)
-        notifyUndone(container.taskManager.todayUndoneCount())
+        // N2b：核销结果交给纯函数决策——全部完成只报喜、有未完成合并进汇总、同日重发抑制
+        val today = LocalDate.now().toString()
+        val decision = decideAutoNotify(
+            completions = completed.evidences,
+            undoneCount = container.taskManager.todayUndoneCount(),
+            praiseEnabled = container.settingsStore.current().hcPraiseEnabled,
+            praiseSentToday = container.settingsStore.hcPraiseSentDate() == today,
+        )
+        when (decision) {
+            AutoNotifyType.PRAISE -> {
+                container.reminderScheduler.notifyAutoCompletePraise(completed.evidenceText)
+                container.settingsStore.setHcPraiseSentDate(today)
+            }
+            AutoNotifyType.SUMMARY -> notifyUndone(
+                undone = container.taskManager.todayUndoneCount(),
+                praiseText = completed.evidenceText.takeIf { completed.count > 0 },
+            )
+            AutoNotifyType.NONE -> {}
+        }
         return Result.success()
     }
 
-    private fun notifyUndone(undone: Int) {
+    /** [praiseText] 非空（本轮有核销且有未完成）时把报喜证据并进汇总文案，一条通知说完 */
+    private fun notifyUndone(undone: Int, praiseText: String? = null) {
         if (!hasNotificationPermission(applicationContext)) return
 
         ReminderScheduler.ensureChannel(applicationContext)
-        val text = if (undone > 0) {
-            applicationContext.getString(R.string.notification_daily_undone, undone)
-        } else {
-            applicationContext.getString(R.string.notification_daily_all_done)
+        val text = when {
+            undone > 0 && praiseText != null ->
+                applicationContext.getString(R.string.notification_daily_undone_with_praise, praiseText, undone)
+            undone > 0 ->
+                applicationContext.getString(R.string.notification_daily_undone, undone)
+            else ->
+                applicationContext.getString(R.string.notification_daily_all_done)
         }
         val notification = NotificationCompat.Builder(applicationContext, ReminderScheduler.CHANNEL_ID)
             // 必须是单色白剪影资源；此前用的 android.R.drawable 是框架资源，

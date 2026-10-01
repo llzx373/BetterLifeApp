@@ -355,7 +355,7 @@ fun SettingsScreen(
                     }
                     enableReminder(want)
                 },
-                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 2),
+                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 3),
             ) {
                 Text(stringResource(R.string.settings_reminder_enable))
             }
@@ -363,12 +363,21 @@ fun SettingsScreen(
                 onClick = {
                     showTimePicker = true
                 },
-                shapes = ListItemDefaults.segmentedShapes(index = 1, count = 2),
+                shapes = ListItemDefaults.segmentedShapes(index = 1, count = 3),
                 trailingContent = {
                     Text("%02d:%02d".format(settings.reminderHour, settings.reminderMinute))
                 },
             ) {
                 Text(stringResource(R.string.settings_reminder_time))
+            }
+            // N2b：HC 达标自动打卡后的报喜开关,默认开;只是通知偏好,不需要通知权限弹窗
+            SegmentedListItem(
+                checked = settings.hcPraiseEnabled,
+                onCheckedChange = { vm.setHcPraiseEnabled(it) },
+                shapes = ListItemDefaults.segmentedShapes(index = 2, count = 3),
+                supportingContent = { Text(stringResource(R.string.settings_hc_praise_sub)) },
+            ) {
+                Text(stringResource(R.string.settings_hc_praise))
             }
 
             // 开关还开着、权限却没了:静默失效比关开关更糟,给一行明说 + 出口

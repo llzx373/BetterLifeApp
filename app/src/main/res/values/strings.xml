@@ -9,6 +9,12 @@
     <string name="notification_daily_title">BetterLife 每日任务</string>
     <string name="notification_daily_undone">今天还有 %1$d 条任务未完成</string>
     <string name="notification_daily_all_done">今日任务已全部完成，继续保持</string>
+    <!-- N2b：HC 核销后还有未完成项时，报喜证据并进每日汇总，一条说完 -->
+    <string name="notification_daily_undone_with_praise">%1$s，已自动打卡；今天还有 %2$d 条任务未完成</string>
+
+    <!-- N2b HC 自动核销报喜通知（证据来自核销备注，如「今日步数 9234 ≥ 7000」） -->
+    <string name="notification_praise_title">自动打卡</string>
+    <string name="notification_praise_body">%1$s，已自动打卡</string>
 
     <!-- 单任务提醒通知 -->
     <string name="notification_task_title">任务提醒</string>
@@ -397,6 +403,8 @@
     <string name="settings_reminder_time">提醒时间</string>
     <string name="settings_reminder_denied">没有通知权限,提醒发不出来</string>
     <string name="settings_reminder_revoked">通知权限已被关闭,提醒发不出来</string>
+    <string name="settings_hc_praise">自动打卡报喜</string>
+    <string name="settings_hc_praise_sub">健康数据达标自动打卡后,发一条通知报喜</string>
     <string name="action_open_settings">去开启</string>
     <string name="settings_section_theme">主题</string>
     <string name="settings_section_motion">动效</string>

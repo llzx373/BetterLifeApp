@@ -15,7 +15,9 @@ import com.betterlife.app.data.SettingsStore
 import com.betterlife.app.data.db.TaskEntity
 import com.betterlife.app.data.withAnswer
 import com.betterlife.app.recommend.ProfileQuestions
+import com.betterlife.app.tasks.AutoNotifyType
 import com.betterlife.app.tasks.TaskManager
+import com.betterlife.app.tasks.decideAutoNotify
 import com.betterlife.app.widget.WidgetUpdater
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +43,8 @@ class TodayViewModel(
     private val settingsStore: SettingsStore,
     /** 任务数据变化后刷新桌面小部件；默认空实现，单元测试/预览不用碰 Context */
     private val refreshWidgets: suspend () -> Unit = {},
+    /** N2b：HC 核销报喜通知的发送出口；默认空实现，单元测试不碰通知 */
+    private val notifyPraise: (String) -> Unit = {},
 ) : ViewModel() {
 
     data class TaskItem(
@@ -246,10 +250,27 @@ class TodayViewModel(
         }
     }
 
-    /** B1：回前台时安静地跑一次 Health Connect 自动核销；无 HC/权限时是 no-op */
+    /**
+     * B1：回前台时安静地跑一次 Health Connect 自动核销；无 HC/权限时是 no-op。
+     * N2b：核销出结果后按 [decideAutoNotify] 决策——全部完成且今天没报喜过就发一条报喜
+     * （发完写当日标记，同日不重发）；还有未完成时不在这里催，留给每日汇总合并。
+     */
     fun autoCompleteByHealth() {
         viewModelScope.launch(Dispatchers.IO) {
-            if (taskManager.autoCompleteByHealth() > 0) refreshWidgets()
+            val result = taskManager.autoCompleteByHealth()
+            if (result.count <= 0) return@launch
+            refreshWidgets()
+            val today = LocalDate.now().toString()
+            val decision = decideAutoNotify(
+                completions = result.evidences,
+                undoneCount = taskManager.todayUndoneCount(),
+                praiseEnabled = settingsStore.current().hcPraiseEnabled,
+                praiseSentToday = settingsStore.hcPraiseSentDate() == today,
+            )
+            if (decision == AutoNotifyType.PRAISE) {
+                notifyPraise(result.evidenceText)
+                settingsStore.setHcPraiseSentDate(today)
+            }
         }
     }
 
@@ -309,9 +330,10 @@ class TodayViewModel(
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as BetterLifeApp
                 val c = app.container
-                TodayViewModel(c.taskManager, c.profileRepository, c.entryRepository, c.settingsStore) {
-                    WidgetUpdater.refresh(app.applicationContext)
-                }
+                TodayViewModel(c.taskManager, c.profileRepository, c.entryRepository, c.settingsStore,
+                    refreshWidgets = { WidgetUpdater.refresh(app.applicationContext) },
+                    notifyPraise = { c.reminderScheduler.notifyAutoCompletePraise(it) },
+                )
             }
         }
     }

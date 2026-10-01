@@ -29,6 +29,8 @@ data class AppSettings(
     val reminderHour: Int = 8,
     val reminderMinute: Int = 0,
     val reminderEnabled: Boolean = false,
+    /** N2b：HC 自动核销达标后是否发报喜通知，默认开 */
+    val hcPraiseEnabled: Boolean = true,
     val onboardingDone: Boolean = false,
     val themeMode: String = SettingsStore.DEFAULT_THEME_MODE,
     val motionLevel: String = SettingsStore.DEFAULT_MOTION_LEVEL,
@@ -66,6 +68,10 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
         val REMINDER_HOUR = intPreferencesKey("reminder_hour")
         val REMINDER_MINUTE = intPreferencesKey("reminder_minute")
         val REMINDER_ENABLED = booleanPreferencesKey("reminder_enabled")
+
+        // N2b:HC 自动核销报喜开关(默认开)与当日已发标记(yyyy-MM-dd,空串 = 今天没发过)
+        val HC_PRAISE_ENABLED = booleanPreferencesKey("hc_praise_enabled")
+        val HC_PRAISE_SENT_DATE = stringPreferencesKey("hc_praise_sent_date")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val MOTION_LEVEL = stringPreferencesKey("motion_level")
@@ -112,6 +118,7 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
             reminderHour = p[Keys.REMINDER_HOUR] ?: 8,
             reminderMinute = p[Keys.REMINDER_MINUTE] ?: 0,
             reminderEnabled = p[Keys.REMINDER_ENABLED] ?: false,
+            hcPraiseEnabled = p[Keys.HC_PRAISE_ENABLED] ?: true,
             onboardingDone = p[Keys.ONBOARDING_DONE] ?: false,
             themeMode = p[Keys.THEME_MODE] ?: DEFAULT_THEME_MODE,
             motionLevel = p[Keys.MOTION_LEVEL] ?: DEFAULT_MOTION_LEVEL,
@@ -188,6 +195,22 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
             it[Keys.REMINDER_HOUR] = hour
             it[Keys.REMINDER_MINUTE] = minute
         }
+    }
+
+    /** N2b：「自动打卡报喜」开关 */
+    suspend fun setHcPraiseEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.HC_PRAISE_ENABLED] = enabled }
+    }
+
+    /**
+     * N2b 当日已发报喜的日期（yyyy-MM-dd），空串 = 今天没发过。
+     * 与 searchHistory 同理不进 AppSettings —— 它是通知频控的局部状态，只需读一次。
+     */
+    suspend fun hcPraiseSentDate(): String =
+        context.dataStore.data.first()[Keys.HC_PRAISE_SENT_DATE].orEmpty()
+
+    suspend fun setHcPraiseSentDate(date: String) {
+        context.dataStore.edit { it[Keys.HC_PRAISE_SENT_DATE] = date }
     }
 
     override suspend fun setOnboardingDone(done: Boolean) {

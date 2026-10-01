@@ -39,6 +39,7 @@ tasks/
   TaskManager.kt           任务读写、打卡、streak、加待办、HC 自动核销
   Streak.kt                computeStreak:连签 + 请假搭桥(纯函数)
   ReminderScheduler.kt     WorkManager 周期任务 + 本地通知(渠道 "daily");单任务提醒带日期维度
+  NotifyDecision.kt        N2b 核销报喜的决策纯函数(报喜/汇总/不发,同日重发抑制)
 stats/       统计纯逻辑(零 Android 依赖,可单测):StatsCalculator / Achievements / StatsPeriod / StatsPrompt
 ai/
   LlmClient.kt             OpenAI 兼容 chat/completions(预设 Kimi/DeepSeek);chatStream 走 SSE 流式
@@ -130,7 +131,7 @@ ReminderScheduler:WorkManager 每天 ensureTodayTasks + 通知未完成数 + aut
 
 ```bash
 python tools/build_content.py      # 内容变更后重跑,看自检统计
-./gradlew testDebugUnitTest        # 248 例(41 类):引擎/播种挑选/检索器/档案映射/排序/规则一致性/提醒继承与重排/备份/统计/聊天/内容包完整性/同步逻辑等
+./gradlew testDebugUnitTest        # 280 例(46 类):引擎/播种挑选/检索器/档案映射/排序/规则一致性/提醒继承与重排/备份/统计/聊天/内容包完整性/同步逻辑等
 ./gradlew assembleDebug
 ```
 
@@ -146,7 +147,8 @@ python tools/build_content.py      # 内容变更后重跑,看自检统计
 - 条目状态 `entry_states` 用 `(entryId, state)` 复合主键:加入待办、已完成、不再推荐、已收藏、自选每日(STATE_DAILY)彼此正交,不会互相覆盖。**数据库 v7,真实迁移 + `exportSchema = true`**(v4 加 `weekly_habits`,v5 加 `custom_entries`,v6 给 tasks 加 note/doneBy/dueDate 并新增 entry_notes、streak_leaves、chat_messages 三表,v7 加 content_sections/content_entries/content_meta 三张内容表;schema JSON 在 `app/schemas/`,androidTest `MigrationTest` 用 `MigrationTestHelper` 校验,destructive fallback 已移除)。迁移链只保证 v5→v7;数据库版本 ≤4 的设备(均为未发布的开发构建)升级需卸载重装,不为 pre-release 版本补迁移链
 - **内容入 Room 与上游同步(2026-09-28)**:条目内容从 assets 只读改为 Room 内容表驱动(见 §3);`EntryRepository.entriesData()` 变为 suspend(先经 ContentBootstrap 幂等播种),全量调用点已改;老用户五张用户表的 `SS-NN` entryId 首启时一次性改写为稳定 key(DataStore 标记 `content_id_migrated`);旧备份导入时按同一份捆绑映射改写(BackupManager,备份 format 仍 6 不 bump——格式没变只是 id 语义变了)。「第X节第Y条」标签仍由 sec/n 在展示层现算,条号顺延不影响用户数据
 - **DONE 语义(2026-09-27 起)**:任何打卡完成(手动/小组件/自动核销/每周/补卡)都顺手写 `entry_states` 的 DONE,推荐引擎据此排除「做过」的内容,推荐池得以轮换;撤销打卡不清 DONE(「做过」这个事实不变)。配套修复:`ensureTodayTasks` 里用户自选每日习惯(STATE_DAILY)只按 DISMISSED 过滤、不按 DONE——否则自选习惯打一次卡就会从每日规划里消失。DONE 在 UI 上展示为「已完成」徽标(条目库列表/详情、待办页一次性分区),「已加入计划」展示为「已加入」徽标;书库目录每章与今日页每个口径分组显示 待看/完成/忽略 统计(`recommend/EntryStats.kt` 纯函数,每条目只落一个桶、DONE 优先于 DISMISSED)。TODO 与 ONCE 任务行同生命周期:完成/删除 ONCE 行清 TODO,撤销打卡/恢复删除补回(2026-09-29)
-- **Health Connect 自动核销(B1)**:条目→指标的映射写在 `assets/health_rules.json`,保守起见只收无歧义的两条(02-11 步数 ≥7000、02-13 睡眠 ≥7h)——误判自动打卡比不打卡更伤信任。`TaskManager.autoCompleteByHealth` 只核销映射内且当天有未完成 DAILY 行的条目;HC 不可用/缺权限/读取异常都安静返回 0;打卡备注写达标证据(「今日步数 9234 ≥ 7000」),`doneBy` 区分来源(manual / auto:hc / widget)。睡眠窗口固定 [昨 18:00, 今 12:00),与查询时刻无关。触发点:今日页授权后、DailyReminderWorker
+- **Health Connect 自动核销(B1)**:条目→指标的映射写在 `assets/health_rules.json`,保守起见只收无歧义的两条(02-11 步数 ≥7000、02-13 睡眠 ≥7h)——误判自动打卡比不打卡更伤信任。`TaskManager.autoCompleteByHealth` 只核销映射内且当天有未完成 DAILY 行的条目;HC 不可用/缺权限/读取异常都安静返回空结果;打卡备注写达标证据(「今日步数 9234 ≥ 7000」),`doneBy` 区分来源(manual / auto:hc / widget)。睡眠窗口固定 [昨 18:00, 今 12:00),与查询时刻无关。触发点:今日页授权后、DailyReminderWorker
+- **HC 达标报喜通知(N2b,2026-10-01)**:核销结果(`AutoCompleteResult`:条数 + 证据文案)交给纯函数 `tasks/NotifyDecision.kt` 的 `decideAutoNotify` 决策——全部完成且当天没报喜过 → 只发一条报喜(证据进文案,复用 "daily" 渠道,通知 id 1002);还有未完成 → 证据合并进每日汇总(「…已自动打卡;今天还有 N 条任务未完成」);同日同事件不重复发(DataStore `hc_praise_sent_date` 记当日已发);报喜开关 `hc_praise_enabled` 默认开,设置页「每日提醒」分组。两个触发点(今日页授权后由 TodayViewModel 发、DailyReminderWorker 由 worker 发)共用同一决策与频控标记
 - **数据导出/导入(B2)**:`data/backup/` 本地 JSON(format `version = 6`),覆盖 7 张持久表(profile/tasks/entry_states/weekly_habits/custom_entries/entry_notes/streak_leaves);chat_messages 不备份,DataStore 里的 API Key 等敏感配置不出设备。导入先完整解析+校验版本,全部通过才在单事务里清写(失败回滚,现有数据不变);taskId 原样保留,导入后重排未完成 ONCE 任务的提醒 work
 - **聊天持久化与流式(C5)**:对话落 `chat_messages` 表,封顶保留最新 200 条(ChatViewModel.trimToLatest);`LlmClient.chatStream` 按 SSE 逐行读增量,`AiAdvisor.askStream`/`interpretStatsStream` 流式失败时保留已收残缺内容、一条没收到则回退单发。统计页 AI 解读用 STATS_INTERPRET 提示词(不检索不搜网,统计摘要直接进 prompt)
 - **统计与成就(B6/B7)**:`stats/` 是纯 Kotlin(StatsCalculator 出连续天数/近 8 周趋势/周期报告,Achievements 出里程碑判定),ViewModel 把 TaskEntity 折成 StatsTaskRow 喂进去,趋势数学与成就判定都能脱机单测。UI 手写 Canvas 柱状图(§10 禁图表库),带 TalkBack 逐周摘要;成就定位**回顾**而非竞争——无徽章墙/排行榜,新达成只在统计页一次性低调「新」徽标(已庆祝集合存 DataStore)

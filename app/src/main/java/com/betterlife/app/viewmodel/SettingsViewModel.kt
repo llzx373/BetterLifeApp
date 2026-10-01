@@ -268,6 +268,13 @@ class SettingsViewModel(
         }
     }
 
+    /** N2b：「自动打卡报喜」开关 */
+    fun setHcPraiseEnabled(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            settingsStore.setHcPraiseEnabled(enabled)
+        }
+    }
+
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch(Dispatchers.IO) {
             settingsStore.setThemeMode(mode.key)
