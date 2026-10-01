@@ -447,6 +447,10 @@
     <string name="theme_brand_teal">青</string>
     <string name="theme_material_you">跟随系统壁纸</string>
     <string name="theme_dark">深色优先</string>
+    <!-- N9 设置分层:常用开关一级露出,供应商/搜索/动效/主题收进「高级」二级页 -->
+    <string name="settings_section_advanced">高级</string>
+    <string name="settings_advanced_title">高级设置</string>
+    <string name="settings_advanced_sub">AI 供应商、搜索引擎、动效与主题</string>
     <string name="settings_section_profile">档案</string>
     <string name="settings_edit_profile">修改我的档案</string>
     <string name="settings_edit_profile_sub">重新走一遍引导,已填内容会保留</string>

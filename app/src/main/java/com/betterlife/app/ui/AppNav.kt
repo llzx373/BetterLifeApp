@@ -72,6 +72,7 @@ import com.betterlife.app.ui.library.LibraryScreen
 import com.betterlife.app.ui.library.SectionScreen
 import com.betterlife.app.ui.mine.MineScreen
 import com.betterlife.app.ui.onboarding.OnboardingScreen
+import com.betterlife.app.ui.settings.SettingsAdvancedScreen
 import com.betterlife.app.ui.settings.SettingsScreen
 import com.betterlife.app.ui.stats.StatsScreen
 import com.betterlife.app.ui.theme.LocalMotionLevel
@@ -111,6 +112,9 @@ data class ChatRoute(val entryId: String? = null)
 
 @Serializable
 data object SettingsRoute
+
+@Serializable
+data object SettingsAdvancedRoute
 
 @Serializable
 data object FavoritesRoute
@@ -405,7 +409,11 @@ private fun AppScaffold(
                 SettingsScreen(
                     onBack = { navController.popBackStack() },
                     onEditProfile = { navController.navigate(OnboardingRoute) },
+                    onOpenAdvanced = { navController.navigate(SettingsAdvancedRoute) },
                 )
+            }
+            composable<SettingsAdvancedRoute> {
+                SettingsAdvancedScreen(onBack = { navController.popBackStack() })
             }
             composable<OnboardingRoute> {
                 // 进入本页时 onboardingDone 还没被本次保存改写:首次完成为 false,
