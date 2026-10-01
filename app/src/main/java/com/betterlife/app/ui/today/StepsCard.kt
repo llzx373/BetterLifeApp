@@ -34,8 +34,8 @@ import com.betterlife.app.R
 import com.betterlife.app.data.health.StepsSource
 import com.betterlife.app.data.health.StepsState
 import com.betterlife.app.ui.theme.LocalMotionLevel
+import com.betterlife.app.ui.theme.LocalSpacing
 import com.betterlife.app.ui.theme.MotionLevel
-import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.ui.theme.motionEffectsSpec
 
 @Composable
@@ -69,7 +69,7 @@ private fun StepsCountRow(state: StepsState.Available) {
     )
     Row(
         modifier = Modifier
-            .padding(Spacing.space4)
+            .padding(LocalSpacing.current.space4)
             .semantics(mergeDescendants = true) {
                 contentDescription = "$title ${state.steps} $sourceLabel"
             },
@@ -79,9 +79,9 @@ private fun StepsCountRow(state: StepsState.Available) {
             imageVector = Icons.AutoMirrored.Filled.DirectionsWalk,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(Spacing.space6),
+            modifier = Modifier.size(LocalSpacing.current.space6),
         )
-        Spacer(Modifier.width(Spacing.space3))
+        Spacer(Modifier.width(LocalSpacing.current.space3))
         Column(Modifier.weight(1f)) {
             Text(
                 text = title,
@@ -122,7 +122,7 @@ private fun StepsCountRow(state: StepsState.Available) {
 @Composable
 private fun AuthorizeRow(onAuthorize: () -> Unit) {
     Row(
-        modifier = Modifier.padding(Spacing.space4),
+        modifier = Modifier.padding(LocalSpacing.current.space4),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -130,7 +130,7 @@ private fun AuthorizeRow(onAuthorize: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f),
         )
-        Spacer(Modifier.width(Spacing.space3))
+        Spacer(Modifier.width(LocalSpacing.current.space3))
         FilledTonalButton(onClick = onAuthorize) {
             Text(stringResource(R.string.steps_authorize))
         }

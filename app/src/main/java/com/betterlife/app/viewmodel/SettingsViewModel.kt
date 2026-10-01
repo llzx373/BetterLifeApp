@@ -296,6 +296,20 @@ class SettingsViewModel(
         }
     }
 
+    /** N7：「长辈模式」开关 */
+    fun setSeniorMode(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            settingsStore.setSeniorMode(enabled)
+        }
+    }
+
+    /** N7：一次性询问已问过（开启/暂不都算） */
+    fun markSeniorModeAsked() {
+        viewModelScope.launch(Dispatchers.IO) {
+            settingsStore.markSeniorModeAsked()
+        }
+    }
+
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch(Dispatchers.IO) {
             settingsStore.setThemeMode(mode.key)

@@ -20,12 +20,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldValue
@@ -33,6 +36,10 @@ import androidx.compose.material3.adaptive.navigationsuite.rememberNavigationSui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -54,6 +61,7 @@ import androidx.navigation.toRoute
 import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.MainActivity
 import com.betterlife.app.R
+import com.betterlife.app.data.AppSettings
 import com.betterlife.app.ui.chat.ChatScreen
 import com.betterlife.app.ui.common.OfflineBanner
 import com.betterlife.app.ui.completed.CompletedScreen
@@ -132,17 +140,40 @@ internal data class TabSpec(
 /**
  * 每个 tab 各自写死具体路由类型,不把它们退化成 `Any` ——
  * 类型安全路由的序列化信息来自路由对象的**静态类型**,退化成 Any 会丢掉这层保障。
+ *
+ * N7 长辈模式:tab 简化为「今日 + AI 问答」两个;条目库/统计/待办收进「我的」页,
+ * 「我的」由今日页问候区右侧的人形入口进入。
  */
-internal val tabs = listOf(
-    TabSpec(TodayRoute::class, R.string.nav_today, Icons.Filled.Home) { it.navigate(TodayRoute) { tabOptions() } },
-    TabSpec(TodoRoute::class, R.string.nav_todo, Icons.Filled.Done) { it.navigate(TodoRoute) { tabOptions() } },
-    TabSpec(
-        LibraryRoute::class,
-        R.string.nav_library,
-        Icons.AutoMirrored.Filled.List,
-    ) { it.navigate(LibraryRoute) { tabOptions() } },
-    TabSpec(MineRoute::class, R.string.nav_mine, Icons.Filled.Person) { it.navigate(MineRoute) { tabOptions() } },
-)
+internal fun tabsFor(seniorMode: Boolean): List<TabSpec> =
+    if (seniorMode) {
+        listOf(
+            TabSpec(TodayRoute::class, R.string.nav_today, Icons.Filled.Home) {
+                it.navigate(TodayRoute) { tabOptions() }
+            },
+            TabSpec(
+                ChatRoute::class,
+                R.string.title_chat,
+                Icons.AutoMirrored.Filled.Send,
+            ) { it.navigate(ChatRoute()) { tabOptions() } },
+        )
+    } else {
+        listOf(
+            TabSpec(TodayRoute::class, R.string.nav_today, Icons.Filled.Home) {
+                it.navigate(TodayRoute) { tabOptions() }
+            },
+            TabSpec(TodoRoute::class, R.string.nav_todo, Icons.Filled.Done) {
+                it.navigate(TodoRoute) { tabOptions() }
+            },
+            TabSpec(
+                LibraryRoute::class,
+                R.string.nav_library,
+                Icons.AutoMirrored.Filled.List,
+            ) { it.navigate(LibraryRoute) { tabOptions() } },
+            TabSpec(MineRoute::class, R.string.nav_mine, Icons.Filled.Person) {
+                it.navigate(MineRoute) { tabOptions() }
+            },
+        )
+    }
 
 @Composable
 fun AppNav(
@@ -168,13 +199,26 @@ fun AppNav(
                 startDestination = if (state.settings.onboardingDone) TodayRoute else OnboardingRoute,
                 navTarget = navTarget,
                 onNavTargetConsumed = onNavTargetConsumed,
+                settings = state.settings,
+                onSeniorAskAnswered = { enable ->
+                    if (enable) vm.setSeniorMode(true)
+                    vm.markSeniorModeAsked()
+                },
             )
         }
     }
 }
 
 @Composable
-private fun AppScaffold(startDestination: Any, navTarget: String?, onNavTargetConsumed: () -> Unit) {
+private fun AppScaffold(
+    startDestination: Any,
+    navTarget: String?,
+    onNavTargetConsumed: () -> Unit,
+    settings: AppSettings,
+    onSeniorAskAnswered: (Boolean) -> Unit,
+) {
+    val seniorMode = settings.seniorMode
+    val tabs = remember(seniorMode) { tabsFor(seniorMode) }
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -183,17 +227,26 @@ private fun AppScaffold(startDestination: Any, navTarget: String?, onNavTargetCo
     }
 
     // 非 tab 页(详情/设置/聊天/引导)收起导航组件,让内容占满。
+    // 长辈模式例外:条目库/待办/我的不再是 tab,但它们自身没有返回键,
+    // 导航栏是唯一的回家路径,必须保持可见。
     // 初始值跟着起始路由走,避免引导页先闪一下导航栏再看它收回去。
+    val navVisible = selectedTab != null ||
+        (seniorMode && currentDestination.isSeniorNavVisibleDestination())
     val navState = rememberNavigationSuiteScaffoldState(
-        initialValue = if (tabs.any { it.routeClass == startDestination::class }) {
+        initialValue = if (
+            tabs.any { it.routeClass == startDestination::class }
+        ) {
             NavigationSuiteScaffoldValue.Visible
         } else {
             NavigationSuiteScaffoldValue.Hidden
         },
     )
-    LaunchedEffect(selectedTab) {
-        if (selectedTab == null) navState.hide() else navState.show()
+    LaunchedEffect(navVisible) {
+        if (navVisible) navState.show() else navState.hide()
     }
+
+    // N7:onboarding 首次完成后的一次性长辈模式询问(可跳过,只问一次)
+    var showSeniorAsk by rememberSaveable { mutableStateOf(false) }
 
     // N2c/N4/N5:通知深链——点通知直达目标页(挽回→今日页,周报→统计页,每日一条→条目详情);消费一次即回调置空,重组不会反复跳
     LaunchedEffect(navTarget) {
@@ -243,8 +296,8 @@ private fun AppScaffold(startDestination: Any, navTarget: String?, onNavTargetCo
                     when {
                         motionOff -> EnterTransition.None
                         // tab 之间切换只淡入;推进二级页时新页从右侧滑入,给出方向感
-                        initialState.destination.isTabDestination() &&
-                            targetState.destination.isTabDestination() -> fadeIn(animationSpec = navFade)
+                        initialState.destination.isTabDestination(tabs) &&
+                            targetState.destination.isTabDestination(tabs) -> fadeIn(animationSpec = navFade)
                         else -> fadeIn(animationSpec = navFade) +
                             slideInHorizontally(animationSpec = navSlide) { it / 4 }
                     }
@@ -265,6 +318,7 @@ private fun AppScaffold(startDestination: Any, navTarget: String?, onNavTargetCo
                     onOpenChat = { navController.navigate(ChatRoute()) },
                     onEditProfile = { navController.navigate(OnboardingRoute) },
                     onOpenLibrary = { navController.navigate(LibraryRoute) { tabOptions() } },
+                    onOpenMine = { navController.navigate(MineRoute) },
                     onStartTimer = { id -> navController.navigate(TimerRoute(id)) },
                 )
             }
@@ -304,6 +358,9 @@ private fun AppScaffold(startDestination: Any, navTarget: String?, onNavTargetCo
                     onOpenDismissed = { navController.navigate(DismissedRoute) },
                     onOpenCompleted = { navController.navigate(CompletedRoute) },
                     onOpenStats = { navController.navigate(StatsRoute) },
+                    // N7:长辈模式下条目库/待办不再是 tab,入口收进「我的」页(二级页语义,不带 tabOptions)
+                    onOpenLibrary = { navController.navigate(LibraryRoute) },
+                    onOpenTodo = { navController.navigate(TodoRoute) },
                 )
             }
             composable<StatsRoute> {
@@ -351,7 +408,13 @@ private fun AppScaffold(startDestination: Any, navTarget: String?, onNavTargetCo
                 )
             }
             composable<OnboardingRoute> {
+                // 进入本页时 onboardingDone 还没被本次保存改写:首次完成为 false,
+                // 从「我的」进编辑档案为 true —— 只有首次完成才触发长辈模式询问
+                val firstRun = remember { !settings.onboardingDone }
                 OnboardingScreen(onFinished = {
+                    if (firstRun && !settings.seniorModeAsked && !settings.seniorMode) {
+                        showSeniorAsk = true
+                    }
                     navController.navigate(TodayRoute) {
                         popUpTo(OnboardingRoute) { inclusive = true }
                     }
@@ -359,6 +422,30 @@ private fun AppScaffold(startDestination: Any, navTarget: String?, onNavTargetCo
             }
             }
         }
+    }
+
+    // N7 一次性询问:开启/暂不/点外部关闭都只问这一次(标记由 onSeniorAskAnswered 落盘)
+    if (showSeniorAsk) {
+        AlertDialog(
+            onDismissRequest = {
+                showSeniorAsk = false
+                onSeniorAskAnswered(false)
+            },
+            title = { Text(stringResource(R.string.senior_ask_title)) },
+            text = { Text(stringResource(R.string.senior_ask_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSeniorAsk = false
+                    onSeniorAskAnswered(true)
+                }) { Text(stringResource(R.string.senior_ask_enable)) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showSeniorAsk = false
+                    onSeniorAskAnswered(false)
+                }) { Text(stringResource(R.string.senior_ask_skip)) }
+            },
+        )
     }
 }
 
@@ -370,6 +457,15 @@ private fun NavOptionsBuilder.tabOptions() {
     restoreState = true
 }
 
-/** 目的地是否属于四个 tab 之一(含其栈内层级),用于区分 tab 切换与二级页推进 */
-private fun NavDestination?.isTabDestination(): Boolean =
+/** 目的地是否属于当前 tab 集合之一(含其栈内层级),用于区分 tab 切换与二级页推进 */
+private fun NavDestination?.isTabDestination(tabs: List<TabSpec>): Boolean =
     this?.hierarchy?.any { dest -> tabs.any { tab -> dest.hasRoute(tab.routeClass) } } == true
+
+/**
+ * N7:长辈模式下不再是 tab、但自身没有返回键的页面(从「我的」进入),
+ * 导航栏必须保持可见 —— 它是这些页面唯一的回家路径。
+ */
+private fun NavDestination?.isSeniorNavVisibleDestination(): Boolean =
+    this?.hierarchy?.any {
+        it.hasRoute<MineRoute>() || it.hasRoute<LibraryRoute>() || it.hasRoute<TodoRoute>()
+    } == true

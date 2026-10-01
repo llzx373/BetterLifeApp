@@ -49,6 +49,8 @@ class MainActivity : ComponentActivity() {
                     MotionLevel.fromKey(settings.motionLevel),
                     systemAnimationsOff,
                 ),
+                // N7：长辈模式同样是持久化设置,切换即时生效
+                seniorMode = settings.seniorMode,
             ) {
                 AppNav(
                     navTarget = navTarget,

@@ -75,8 +75,8 @@ import com.betterlife.app.ai.ChatMessage
 import com.betterlife.app.data.resolveActiveProvider
 import com.betterlife.app.ui.common.predictiveBackTransition
 import com.betterlife.app.ui.theme.LocalMotionLevel
+import com.betterlife.app.ui.theme.LocalSpacing
 import com.betterlife.app.ui.theme.MotionLevel
-import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.ui.theme.motionEffectsSpec
 import com.betterlife.app.viewmodel.ChatViewModel
 import com.betterlife.app.viewmodel.SettingsViewModel
@@ -165,8 +165,8 @@ fun ChatScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f).fillMaxWidth().imeNestedScroll(),
-                contentPadding = PaddingValues(Spacing.space4),
-                verticalArrangement = Arrangement.spacedBy(Spacing.space3),
+                contentPadding = PaddingValues(LocalSpacing.current.space4),
+                verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.space3),
             ) {
                 if (state.messages.isEmpty() && state.sampleQuestions.isNotEmpty()) {
                     item(key = "suggestions") {
@@ -189,7 +189,7 @@ fun ChatScreen(
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(Spacing.space3),
+                modifier = Modifier.fillMaxWidth().padding(LocalSpacing.current.space3),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // 来源切换：知识库 / 互联网
@@ -302,11 +302,11 @@ private fun SafetyNotice() {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space2),
+            modifier = Modifier.padding(horizontal = LocalSpacing.current.space4, vertical = LocalSpacing.current.space2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(Spacing.space4))
-            Spacer(Modifier.width(Spacing.space2))
+            Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(LocalSpacing.current.space4))
+            Spacer(Modifier.width(LocalSpacing.current.space2))
             Text(
                 text = stringResource(R.string.chat_safety_notice),
                 style = MaterialTheme.typography.bodySmall,
@@ -329,7 +329,7 @@ private fun Banner(textRes: Int, onOpenSettings: () -> Unit) {
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space1),
+            modifier = Modifier.padding(horizontal = LocalSpacing.current.space4, vertical = LocalSpacing.current.space1),
         ) {
             Text(
                 stringResource(textRes),
@@ -344,7 +344,7 @@ private fun Banner(textRes: Int, onOpenSettings: () -> Unit) {
 /** 空状态:与其留白,不如给三个能直接点的问题(按档案出模板,点击只填入输入框) */
 @Composable
 private fun Suggestions(questions: List<String>, onPick: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.space2)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.space2)) {
         Text(
             text = stringResource(R.string.chat_suggestions_title),
             style = MaterialTheme.typography.labelSmall,
@@ -364,7 +364,7 @@ private fun Suggestions(questions: List<String>, onPick: (String) -> Unit) {
 private fun ThinkingRow(entryCount: Int) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.space2),
+        horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.space2),
     ) {
         LinearWavyProgressIndicator(
             modifier = Modifier.width(ThinkingIndicatorWidth),
@@ -464,7 +464,7 @@ private fun Bubble(
                 },
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = Spacing.space3, vertical = Spacing.space2),
+                    modifier = Modifier.padding(horizontal = LocalSpacing.current.space3, vertical = LocalSpacing.current.space2),
                 ) {
                     // 多供应商并行时标注这张气泡是谁答的
                     msg.providerName?.let {
@@ -476,8 +476,8 @@ private fun Bubble(
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (isError) {
-                            Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(Spacing.space4))
-                            Spacer(Modifier.width(Spacing.space2))
+                            Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(LocalSpacing.current.space4))
+                            Spacer(Modifier.width(LocalSpacing.current.space2))
                         }
                         Text(text = text, style = MaterialTheme.typography.bodyMedium)
                     }
@@ -506,7 +506,7 @@ private fun SourcesRow(
     onOpenEntry: (String) -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
-    Column(modifier = Modifier.padding(top = Spacing.space1, start = Spacing.space2)) {
+    Column(modifier = Modifier.padding(top = LocalSpacing.current.space1, start = LocalSpacing.current.space2)) {
         Text(
             text = stringResource(R.string.chat_sources_label),
             style = MaterialTheme.typography.labelSmall,
@@ -525,7 +525,7 @@ private fun SourcesRow(
         } else {
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.space2),
+                horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.space2),
             ) {
                 sources.take(KB_SOURCES_SHOWN).forEach { s ->
                     val entryId = s.entryId
@@ -579,7 +579,7 @@ private fun SourceChip(
                     Icon(
                         Icons.Filled.Check,
                         contentDescription = stringResource(R.string.chat_source_added),
-                        modifier = Modifier.size(Spacing.space4),
+                        modifier = Modifier.size(LocalSpacing.current.space4),
                     )
                 }
             } else {

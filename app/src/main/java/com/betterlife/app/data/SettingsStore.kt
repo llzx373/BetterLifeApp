@@ -38,6 +38,10 @@ data class AppSettings(
     /** N5：每天早 8 点档是否推一条内容，默认关（唯一默认关的推送：每日触达翻倍是打扰红线） */
     val dailyContentEnabled: Boolean = false,
     val onboardingDone: Boolean = false,
+    /** N7：长辈模式（大字号 + 双 tab 极简导航），默认关 */
+    val seniorMode: Boolean = false,
+    /** N7：onboarding 完成后的长辈模式询问是否已问过（只问一次，跳过也算问过） */
+    val seniorModeAsked: Boolean = false,
     val themeMode: String = SettingsStore.DEFAULT_THEME_MODE,
     val motionLevel: String = SettingsStore.DEFAULT_MOTION_LEVEL,
 )
@@ -92,6 +96,10 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
         val DAILY_CONTENT_ENABLED = booleanPreferencesKey("daily_content_enabled")
         val DAILY_CONTENT_PUSHED = stringPreferencesKey("daily_content_pushed")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
+
+        // N7:长辈模式开关(默认关)与「一次性询问已问过」标记
+        val SENIOR_MODE = booleanPreferencesKey("senior_mode")
+        val SENIOR_MODE_ASKED = booleanPreferencesKey("senior_mode_asked")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val MOTION_LEVEL = stringPreferencesKey("motion_level")
 
@@ -142,6 +150,8 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
             weeklyReportEnabled = p[Keys.WEEKLY_REPORT_ENABLED] ?: true,
             dailyContentEnabled = p[Keys.DAILY_CONTENT_ENABLED] ?: false,
             onboardingDone = p[Keys.ONBOARDING_DONE] ?: false,
+            seniorMode = p[Keys.SENIOR_MODE] ?: false,
+            seniorModeAsked = p[Keys.SENIOR_MODE_ASKED] ?: false,
             themeMode = p[Keys.THEME_MODE] ?: DEFAULT_THEME_MODE,
             motionLevel = p[Keys.MOTION_LEVEL] ?: DEFAULT_MOTION_LEVEL,
         )
@@ -297,6 +307,16 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
 
     override suspend fun setOnboardingDone(done: Boolean) {
         context.dataStore.edit { it[Keys.ONBOARDING_DONE] = done }
+    }
+
+    /** N7：「长辈模式」开关；settingsFlow 全链路透出,切换即时生效不重启 */
+    suspend fun setSeniorMode(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.SENIOR_MODE] = enabled }
+    }
+
+    /** N7：长辈模式询问只问一次——无论选「开启」还是「暂不」都记下已问过 */
+    suspend fun markSeniorModeAsked() {
+        context.dataStore.edit { it[Keys.SENIOR_MODE_ASKED] = true }
     }
 
     suspend fun setThemeMode(modeKey: String) {

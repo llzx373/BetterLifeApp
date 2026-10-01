@@ -8,7 +8,15 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
+
+/**
+ * N7 长辈模式开关。界面结构分支（今日页简化、我的页补入口）读它；
+ * 字号/间距的放大走 typography 参数与 LocalSpacing,不读它。
+ * 切换时整树随主题重组,用 static 与 LocalMotionLevel 一致。
+ */
+val LocalSeniorMode = staticCompositionLocalOf { false }
 
 @Composable
 fun BetterLifeTheme(
@@ -16,6 +24,8 @@ fun BetterLifeTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     /** 动效档位。预览传 OFF,否则入场动画的中间态会被截图拍成空白(见 design 文档 §8 P3-A1)。 */
     motionLevel: MotionLevel = MotionLevel.STANDARD,
+    /** N7 长辈模式:字号与间距按 SENIOR_UI_SCALE 整体放大,界面经 LocalSeniorMode 简化 */
+    seniorMode: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -35,12 +45,14 @@ fun BetterLifeTheme(
     CompositionLocalProvider(
         LocalLensColors provides lensColors,
         LocalMotionLevel provides motionLevel,
+        LocalSeniorMode provides seniorMode,
+        LocalSpacing provides if (seniorMode) SeniorSpacing else Spacing,
     ) {
         MaterialExpressiveTheme(
             colorScheme = colorScheme,
             motionScheme = AppMotionScheme,
             shapes = AppShapes,
-            typography = AppTypography,
+            typography = if (seniorMode) SeniorTypography else AppTypography,
             content = content,
         )
     }

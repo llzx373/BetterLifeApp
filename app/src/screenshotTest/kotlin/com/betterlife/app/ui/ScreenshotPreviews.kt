@@ -54,8 +54,12 @@ internal annotation class FourFoldScreenPreview
  * 那种基线比没有更糟。关掉动效才有确定性的图（见 docs/DESIGN_SYSTEM.md §8 P3-A1）。
  */
 @Composable
-internal fun PreviewSurface(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    BetterLifeTheme(motionLevel = MotionLevel.OFF) {
+internal fun PreviewSurface(
+    modifier: Modifier = Modifier,
+    seniorMode: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    BetterLifeTheme(motionLevel = MotionLevel.OFF, seniorMode = seniorMode) {
         Surface(color = MaterialTheme.colorScheme.surface, modifier = modifier) {
             Box(Modifier.padding(Spacing.space4)) { content() }
         }
@@ -64,8 +68,8 @@ internal fun PreviewSurface(modifier: Modifier = Modifier, content: @Composable 
 
 /** 整屏预览的外壳：真实主题 + 铺满，屏幕边距交给各屏自己的 contentPadding。动效同样关掉。 */
 @Composable
-internal fun PreviewScreen(content: @Composable () -> Unit) {
-    BetterLifeTheme(motionLevel = MotionLevel.OFF) {
+internal fun PreviewScreen(seniorMode: Boolean = false, content: @Composable () -> Unit) {
+    BetterLifeTheme(motionLevel = MotionLevel.OFF, seniorMode = seniorMode) {
         Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxSize()) {
             content()
         }

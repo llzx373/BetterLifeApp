@@ -47,7 +47,7 @@ fun NavigationShellByWidth() {
     BetterLifeTheme {
         NavigationSuiteScaffold(
             navigationItems = {
-                tabs.forEach { tab ->
+                tabsFor(seniorMode = false).forEach { tab ->
                     val label = stringResource(tab.labelRes)
                     NavigationSuiteItem(
                         selected = tab.routeClass == TodayRoute::class,
@@ -59,6 +59,50 @@ fun NavigationShellByWidth() {
             },
         ) {
             // 占位内容:这里要看的是导航组件占哪条边、内容区还剩多少,不是内容本身
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceContainerLowest),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "内容区",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * N7 长辈模式的导航壳:tab 只剩「今日 + AI 问答」两个,
+ * 字号/间距同时放大 —— 导航栏在大字下不能挤出 label。
+ */
+@PreviewTest
+@Preview(name = "senior-compact-light", widthDp = PHONE_WIDTH, heightDp = 915)
+@Preview(
+    name = "senior-compact-dark",
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+    widthDp = PHONE_WIDTH,
+    heightDp = 915,
+)
+@Composable
+fun NavigationShellSenior() {
+    BetterLifeTheme(seniorMode = true) {
+        NavigationSuiteScaffold(
+            navigationItems = {
+                tabsFor(seniorMode = true).forEach { tab ->
+                    val label = stringResource(tab.labelRes)
+                    NavigationSuiteItem(
+                        selected = tab.routeClass == TodayRoute::class,
+                        onClick = {},
+                        icon = { Icon(tab.icon, contentDescription = label) },
+                        label = { Text(label) },
+                    )
+                }
+            },
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()

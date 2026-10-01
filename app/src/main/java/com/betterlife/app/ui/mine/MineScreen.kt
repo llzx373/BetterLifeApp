@@ -13,7 +13,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Insights
@@ -41,7 +43,8 @@ import com.betterlife.app.data.Goal
 import com.betterlife.app.data.Profile
 import com.betterlife.app.data.ProfileLabels
 import com.betterlife.app.data.toggleGoal
-import com.betterlife.app.ui.theme.Spacing
+import com.betterlife.app.ui.theme.LocalSeniorMode
+import com.betterlife.app.ui.theme.LocalSpacing
 import com.betterlife.app.viewmodel.ProfileViewModel
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -54,6 +57,9 @@ fun MineScreen(
     onOpenDismissed: () -> Unit,
     onOpenCompleted: () -> Unit,
     onOpenStats: () -> Unit,
+    /** N7:长辈模式下条目库/待办不再是 tab,入口收进本页(普通模式不渲染,默认空实现) */
+    onOpenLibrary: () -> Unit = {},
+    onOpenTodo: () -> Unit = {},
     vm: ProfileViewModel = viewModel(factory = ProfileViewModel.Factory),
 ) {
     val profile by vm.profile.collectAsStateWithLifecycle()
@@ -65,8 +71,8 @@ fun MineScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(Spacing.space4),
-            verticalArrangement = Arrangement.spacedBy(Spacing.space3),
+                .padding(LocalSpacing.current.space4),
+            verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.space3),
         ) {
             Text(stringResource(R.string.mine_title), style = MaterialTheme.typography.headlineSmall)
 
@@ -79,8 +85,8 @@ fun MineScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(
-                    modifier = Modifier.padding(Spacing.space4),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.space2),
+                    modifier = Modifier.padding(LocalSpacing.current.space4),
+                    verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.space2),
                 ) {
                     Text(stringResource(R.string.mine_profile_title), style = MaterialTheme.typography.titleSmall)
                     Text(summary, style = MaterialTheme.typography.bodyMedium)
@@ -89,7 +95,7 @@ fun MineScreen(
                         text = stringResource(R.string.mine_goals_hint),
                         style = MaterialTheme.typography.labelSmall,
                     )
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.space2)) {
                         Goal.entries.forEach { goal ->
                             val selected = goal in profile.goals
                             ToggleButton(
@@ -104,7 +110,28 @@ fun MineScreen(
                 }
             }
 
-            val entries = listOf(
+            val entries = buildList {
+                // N7:长辈模式下条目库/待办不再是 tab,在这里保留可达(长辈也可能由子女帮忙操作)
+                if (LocalSeniorMode.current) {
+                    add(
+                        EntryItem(
+                            titleRes = R.string.mine_library,
+                            subtitleRes = R.string.mine_library_sub,
+                            icon = Icons.AutoMirrored.Filled.List,
+                            onClick = onOpenLibrary,
+                        ),
+                    )
+                    add(
+                        EntryItem(
+                            titleRes = R.string.mine_todo,
+                            subtitleRes = R.string.mine_todo_sub,
+                            icon = Icons.Filled.Done,
+                            onClick = onOpenTodo,
+                        ),
+                    )
+                }
+                addAll(
+                    listOf(
                 EntryItem(
                     titleRes = R.string.mine_stats,
                     subtitleRes = R.string.mine_stats_sub,
@@ -147,7 +174,9 @@ fun MineScreen(
                     icon = Icons.Filled.Settings,
                     onClick = onOpenSettings,
                 ),
-            )
+                    ),
+                )
+            }
             entries.forEachIndexed { index, entry ->
                 SegmentedListItem(
                     onClick = entry.onClick,

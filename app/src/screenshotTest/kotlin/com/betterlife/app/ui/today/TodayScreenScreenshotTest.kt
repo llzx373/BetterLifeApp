@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import com.android.tools.screenshot.PreviewTest
 import com.betterlife.app.data.EntryKeys
+import com.betterlife.app.data.health.StepsSource
 import com.betterlife.app.data.health.StepsState
 import com.betterlife.app.recommend.EntryStats
 import com.betterlife.app.ui.FourFoldScreenPreview
@@ -196,6 +197,42 @@ fun TodayStreakZero() {
             ),
             libraryState = libraryState,
             stepsState = StepsState.Unavailable,
+            now = FIXED_NOW,
+            onCheckIn = { _, _ -> },
+            onUndo = {},
+            onDrop = {},
+            onTakeLeave = {},
+            onCancelLeave = {},
+            onBackfill = {},
+            onOpenEntry = {},
+            onAddTodo = {},
+            onDismissEntry = {},
+            onMarkDoneBefore = {},
+            onReshuffle = {},
+            onAuthorizeSteps = {},
+            onStartTimer = {},
+            onOpenLibrary = {},
+            onEditProfile = {},
+            contentPadding = PaddingValues(Spacing.space4),
+        )
+    }
+}
+
+/**
+ * N7 长辈模式的今日页:隐藏问题卡片与四组推荐区,只留打卡列表 + 步数卡;
+ * 问候区右侧带「我的」入口。字号/间距比默认大 1.25 倍 —— 这张图同时是
+ * 「200% 系统字体 × 长辈模式」叠加场景的破版检查(light-200% / dark-200%)。
+ */
+@PreviewTest
+@FourFoldScreenPreview
+@Composable
+fun TodaySenior() {
+    PreviewScreen(seniorMode = true) {
+        TodayContent(
+            state = TodayViewModel.UiState.Ready(todayTasks(allDone = false)),
+            // 推荐区在长辈模式下不渲染,这份数据用于证明它确实被忽略
+            libraryState = libraryState,
+            stepsState = StepsState.Available(steps = 8432, source = StepsSource.HEALTH_CONNECT),
             now = FIXED_NOW,
             onCheckIn = { _, _ -> },
             onUndo = {},

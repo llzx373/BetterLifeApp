@@ -286,6 +286,11 @@
     <string name="mine_chat_sub">基于你的档案和 601 条建议回答</string>
     <string name="mine_settings">设置</string>
     <string name="mine_settings_sub">API Key、提醒、关于</string>
+    <!-- N7:长辈模式下条目库/待办不再是 tab,入口收进「我的」页 -->
+    <string name="mine_library">条目库</string>
+    <string name="mine_library_sub">按章节浏览全部建议</string>
+    <string name="mine_todo">待办</string>
+    <string name="mine_todo_sub">每日习惯与一次性待办</string>
 
     <!-- 目标（我的页与引导页共用） -->
     <string name="goal_health">健康长寿</string>
@@ -421,6 +426,14 @@
     <string name="settings_daily_content_sub">每天早 8 点档推一条精选内容,30 天内不重样;没有合适的内容就不发</string>
     <string name="action_open_settings">去开启</string>
     <string name="settings_section_theme">主题</string>
+    <!-- N7 长辈模式:一级开关 + onboarding 完成后的一次性询问 -->
+    <string name="settings_section_senior">长辈模式</string>
+    <string name="settings_senior_mode">长辈模式</string>
+    <string name="settings_senior_mode_sub">字更大,界面简化为「今日」和「AI 问答」两页,其余功能收进「我的」</string>
+    <string name="senior_ask_title">试试长辈模式</string>
+    <string name="senior_ask_message">字会变大,首页只留「今日」和「AI 问答」两页,其余功能收进「我的」。给爸妈用,或者喜欢大字,都可以开;随时能在设置里关掉。</string>
+    <string name="senior_ask_enable">开启长辈模式</string>
+    <string name="senior_ask_skip">暂不开启</string>
     <string name="settings_section_motion">动效</string>
     <string name="motion_standard">标准</string>
     <string name="motion_reduced">减弱</string>

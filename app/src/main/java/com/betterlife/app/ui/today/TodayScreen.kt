@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -130,8 +131,9 @@ import com.betterlife.app.ui.common.ReminderTimeLabel
 import com.betterlife.app.ui.common.SafeListItem
 import com.betterlife.app.ui.theme.LocalLensColors
 import com.betterlife.app.ui.theme.LocalMotionLevel
+import com.betterlife.app.ui.theme.LocalSeniorMode
+import com.betterlife.app.ui.theme.LocalSpacing
 import com.betterlife.app.ui.theme.MotionLevel
-import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.ui.theme.lensIcon
 import com.betterlife.app.ui.theme.motionEffectsSpec
 import com.betterlife.app.ui.theme.motionSpatialSpec
@@ -159,6 +161,8 @@ fun TodayScreen(
     onEditProfile: () -> Unit,
     onOpenLibrary: () -> Unit,
     onStartTimer: (Long) -> Unit,
+    /** N7:长辈模式下问候区右侧的「我的」入口(普通模式不渲染,默认空实现供预览) */
+    onOpenMine: () -> Unit = {},
     todayVm: TodayViewModel = viewModel(factory = TodayViewModel.Factory),
     libraryVm: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
     stepsVm: StepsViewModel = viewModel(factory = StepsViewModel.Factory),
@@ -204,8 +208,11 @@ fun TodayScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
-            FloatingActionButton(onClick = onOpenChat) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.title_chat))
+            // N7:长辈模式下 AI 问答已是 tab,FAB 是重复入口,不渲染
+            if (!LocalSeniorMode.current) {
+                FloatingActionButton(onClick = onOpenChat) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.title_chat))
+                }
             }
         },
     ) { padding ->
@@ -268,6 +275,7 @@ fun TodayScreen(
                         onAuthorizeSteps = onAuthorizeSteps,
                         onStartTimer = onStartTimer,
                         onOpenLibrary = onOpenLibrary,
+                        onOpenMine = onOpenMine,
                         onEditProfile = onEditProfile,
                         contentPadding = padding,
                     )
@@ -300,6 +308,8 @@ internal fun TodayContent(
     onOpenLibrary: () -> Unit,
     onEditProfile: () -> Unit,
     contentPadding: PaddingValues,
+    /** N7:长辈模式问候区右侧的「我的」入口 */
+    onOpenMine: () -> Unit = {},
     /** 答完每日一问的轻反馈：推荐区标题短暂显示「推荐已更新」（N1） */
     recommendUpdated: Boolean = false,
     onAnswerQuestion: (String, Set<String>) -> Unit = { _, _ -> },
@@ -334,37 +344,58 @@ internal fun TodayContent(
     var reviewing by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(state.allDone) { if (!state.allDone) reviewing = false }
 
+    val senior = LocalSeniorMode.current
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(contentPadding),
-        contentPadding = PaddingValues(vertical = Spacing.space4),
-        verticalArrangement = Arrangement.spacedBy(Spacing.space3),
+        contentPadding = PaddingValues(vertical = LocalSpacing.current.space4),
+        verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.space3),
     ) {
         item(key = "greeting") {
-            GreetingHeader(
-                streak = streak,
-                now = now,
-                modifier = Modifier.padding(horizontal = Spacing.space4),
-            )
+            if (senior) {
+                // N7:长辈模式没有「我的」tab,问候区右侧的人形图标是它的入口
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = LocalSpacing.current.space4),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    GreetingHeader(streak = streak, now = now, modifier = Modifier.weight(1f))
+                    IconButton(onClick = onOpenMine) {
+                        Icon(
+                            Icons.Filled.Person,
+                            contentDescription = stringResource(R.string.nav_mine),
+                        )
+                    }
+                }
+            } else {
+                GreetingHeader(
+                    streak = streak,
+                    now = now,
+                    modifier = Modifier.padding(horizontal = LocalSpacing.current.space4),
+                )
+            }
         }
 
         // N1 渐进式档案收集:今天有题可问时出问题卡片;答过/暂缓过、但档案还没填完时,
-        // 兜底为常驻的「完善档案」Banner(点了进档案编辑)
+        // 兜底为常驻的「完善档案」Banner(点了进档案编辑)。
+        // N7 长辈模式下两者都隐藏 —— 今日页只留打卡列表 + 步数卡,档案由「我的」页编辑
         val questionField = state.questionField
-        if (questionField != null) {
+        if (!senior && questionField != null) {
             item(key = "profile-question") {
                 ProfileQuestionCard(
                     field = questionField,
                     onAnswer = { onAnswerQuestion(questionField, it) },
                     onSkip = { onSkipQuestion(questionField) },
                     onFillAll = onEditProfile,
-                    modifier = Modifier.padding(horizontal = Spacing.space4),
+                    modifier = Modifier.padding(horizontal = LocalSpacing.current.space4),
                 )
             }
-        } else if (state.profileIncomplete) {
+        } else if (!senior && state.profileIncomplete) {
             item(key = "profile-banner") {
                 ProfileNudgeBanner(
                     onEditProfile = onEditProfile,
-                    modifier = Modifier.padding(horizontal = Spacing.space4),
+                    modifier = Modifier.padding(horizontal = LocalSpacing.current.space4),
                 )
             }
         }
@@ -375,7 +406,7 @@ internal fun TodayContent(
                 StepsCard(
                     state = stepsState,
                     onAuthorize = onAuthorizeSteps,
-                    modifier = Modifier.padding(horizontal = Spacing.space4),
+                    modifier = Modifier.padding(horizontal = LocalSpacing.current.space4),
                 )
             }
         }
@@ -387,7 +418,7 @@ internal fun TodayContent(
                 text = stringResource(R.string.today_tasks_title),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier
-                    .padding(horizontal = Spacing.space4)
+                    .padding(horizontal = LocalSpacing.current.space4)
                     .then(
                         if (tasks.isEmpty()) Modifier
                         else Modifier.semantics { contentDescription = progress },
@@ -402,7 +433,7 @@ internal fun TodayContent(
                     text = stringResource(R.string.today_tasks_empty),
                     actionText = stringResource(R.string.today_action_go_library),
                     onAction = onOpenLibrary,
-                    modifier = Modifier.padding(horizontal = Spacing.space4),
+                    modifier = Modifier.padding(horizontal = LocalSpacing.current.space4),
                 )
             }
 
@@ -410,7 +441,7 @@ internal fun TodayContent(
                 AllDoneCard(
                     count = tasks.size,
                     onReview = { reviewing = true },
-                    modifier = Modifier.padding(horizontal = Spacing.space4),
+                    modifier = Modifier.padding(horizontal = LocalSpacing.current.space4),
                 )
             }
 
@@ -431,15 +462,17 @@ internal fun TodayContent(
                     onStartTimer = { onStartTimer(item.task.taskId) },
                     onOpenEntry = { item.entry?.let { onOpenEntry(it.id) } },
                     modifier = Modifier
-                        .padding(horizontal = Spacing.space4)
+                        .padding(horizontal = LocalSpacing.current.space4)
                         .animateItem(),
                 )
             }
         }
 
-        item(key = "recommend-title") {
+        // N7:长辈模式隐藏四组推荐区(标题行 + 分段列表),条目库从「我的」页进
+        if (!senior) {
+            item(key = "recommend-title") {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(start = Spacing.space4, end = Spacing.space1),
+                modifier = Modifier.fillMaxWidth().padding(start = LocalSpacing.current.space4, end = LocalSpacing.current.space1),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -448,7 +481,7 @@ internal fun TodayContent(
                 )
                 // N1:答完每日一问的轻反馈,短暂显示后由 ViewModel 复位
                 if (recommendUpdated) {
-                    Spacer(Modifier.width(Spacing.space2))
+                    Spacer(Modifier.width(LocalSpacing.current.space2))
                     Text(
                         text = stringResource(R.string.today_recommend_updated),
                         style = MaterialTheme.typography.labelSmall,
@@ -467,7 +500,7 @@ internal fun TodayContent(
                     text = stringResource(R.string.today_recommend_empty),
                     actionText = stringResource(R.string.today_action_go_profile),
                     onAction = onEditProfile,
-                    modifier = Modifier.padding(horizontal = Spacing.space4),
+                    modifier = Modifier.padding(horizontal = LocalSpacing.current.space4),
                 )
             }
         } else {
@@ -476,7 +509,7 @@ internal fun TodayContent(
                     LensGroupHeader(
                         lens = lens,
                         stats = libraryState.lensStats[lens],
-                        modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space1),
+                        modifier = Modifier.padding(horizontal = LocalSpacing.current.space4, vertical = LocalSpacing.current.space1),
                     )
                 }
                 itemsIndexed(entries, key = { _, scored -> "rec-${scored.entry.id}" }) { index, scored ->
@@ -484,7 +517,7 @@ internal fun TodayContent(
                         if (index > 0) {
                             HorizontalDivider(
                                 color = MaterialTheme.colorScheme.outlineVariant,
-                                modifier = Modifier.padding(start = Spacing.space4),
+                                modifier = Modifier.padding(start = LocalSpacing.current.space4),
                             )
                         }
                         RecommendedRow(
@@ -498,8 +531,9 @@ internal fun TodayContent(
                 }
             }
         }
+        }
 
-        item(key = "bottom-spacer") { Spacer(Modifier.height(Spacing.space12)) }
+        item(key = "bottom-spacer") { Spacer(Modifier.height(LocalSpacing.current.space12)) }
     }
 
     // 打卡备注(C2):可留空,跳过 = 不带备注直接打卡;点外部取消 = 不打卡
@@ -638,7 +672,7 @@ private fun StreakPill(days: Int) {
                 stringResource(R.string.streak_fresh_start)
             },
             style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
-            modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space2),
+            modifier = Modifier.padding(horizontal = LocalSpacing.current.space4, vertical = LocalSpacing.current.space2),
         )
     }
 }
@@ -678,7 +712,7 @@ private fun DailyTaskCard(
         ),
         modifier = modifier.fillMaxWidth().hoverable(interactionSource),
     ) {
-        Column(Modifier.padding(Spacing.space4)) {
+        Column(Modifier.padding(LocalSpacing.current.space4)) {
             Text(
                 text = item.displayTitle,
                 style = MaterialTheme.typography.titleSmall,
@@ -688,7 +722,7 @@ private fun DailyTaskCard(
             )
             // B1:Health Connect 自动核销的卡标出来源,小而弱,不抢完成态的安静
             if (done && item.doneBy == TaskManager.DONE_BY_AUTO_HC) {
-                Spacer(Modifier.height(Spacing.space1))
+                Spacer(Modifier.height(LocalSpacing.current.space1))
                 Text(
                     text = stringResource(R.string.today_auto_done_label),
                     style = MaterialTheme.typography.bodySmall,
@@ -696,7 +730,7 @@ private fun DailyTaskCard(
                 )
             }
             item.entry?.human?.takeIf { it.isNotBlank() }?.let {
-                Spacer(Modifier.height(Spacing.space1))
+                Spacer(Modifier.height(LocalSpacing.current.space1))
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodySmall,
@@ -708,7 +742,7 @@ private fun DailyTaskCard(
             // C2:完成备注只显示手动打卡的随手记;自动核销的备注是达标证据,已由来源标签表达
             if (done && item.doneBy != TaskManager.DONE_BY_AUTO_HC) {
                 item.task.note?.takeIf { it.isNotBlank() }?.let {
-                    Spacer(Modifier.height(Spacing.space1))
+                    Spacer(Modifier.height(LocalSpacing.current.space1))
                     Text(
                         text = it,
                         style = MaterialTheme.typography.bodySmall,
@@ -717,10 +751,10 @@ private fun DailyTaskCard(
                 }
             }
             item.task.remindAtMinutes?.let {
-                Spacer(Modifier.height(Spacing.space2))
+                Spacer(Modifier.height(LocalSpacing.current.space2))
                 ReminderTimeLabel(it)
             }
-            Spacer(Modifier.height(Spacing.space3))
+            Spacer(Modifier.height(LocalSpacing.current.space3))
             if (onLeave) {
                 LeaveAction(onCancelLeave = onCancelLeave)
             } else {
@@ -831,7 +865,7 @@ private fun TaskActionContent(
                 onUndo()
             }) {
                 CheckPopIcon(playPop = playPop, onPopPlayed = onPopPlayed)
-                Spacer(Modifier.width(Spacing.space1))
+                Spacer(Modifier.width(LocalSpacing.current.space1))
                 Text(stringResource(R.string.today_task_undo))
             }
         } else {
@@ -932,7 +966,7 @@ private fun CheckPopIcon(playPop: Boolean, onPopPlayed: () -> Unit) {
         Icons.Filled.Check,
         contentDescription = null,
         modifier = Modifier
-            .size(Spacing.space4)
+            .size(LocalSpacing.current.space4)
             .graphicsLayer {
                 scaleX = scale.value
                 scaleY = scale.value
@@ -951,7 +985,7 @@ private fun AllDoneCard(count: Int, onReview: () -> Unit, modifier: Modifier = M
             modifier = Modifier.fillMaxWidth(),
         ) {
             Row(
-                modifier = Modifier.padding(Spacing.space4),
+                modifier = Modifier.padding(LocalSpacing.current.space4),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
@@ -959,7 +993,7 @@ private fun AllDoneCard(count: Int, onReview: () -> Unit, modifier: Modifier = M
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                 )
-                Spacer(Modifier.width(Spacing.space3))
+                Spacer(Modifier.width(LocalSpacing.current.space3))
                 Text(
                     text = stringResource(R.string.today_all_done, count),
                     style = MaterialTheme.typography.bodyMedium,
@@ -979,12 +1013,12 @@ private fun LensGroupHeader(lens: String, modifier: Modifier = Modifier, stats: 
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.space2),
+        horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.space2),
     ) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(Spacing.space4))
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(LocalSpacing.current.space4))
         } else {
-            Box(Modifier.size(Spacing.space2).clip(CircleShape).background(tint))
+            Box(Modifier.size(LocalSpacing.current.space2).clip(CircleShape).background(tint))
         }
         Text(lensGroupTitle(lens), style = MaterialTheme.typography.titleSmall, color = tint)
         if (stats != null) {
@@ -1013,7 +1047,7 @@ private fun RecommendedRow(
     val overline: (@Composable () -> Unit)? =
         if (entry.grade.isNotBlank() || entry.dispute) {
             {
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.space2)) {
                     GradeBadge(entry.grade)
                     if (entry.dispute) DisputeBadge()
                 }
@@ -1049,7 +1083,7 @@ private fun RecommendedRow(
                             overflow = TextOverflow.Ellipsis,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Spacer(Modifier.height(Spacing.space2))
+                        Spacer(Modifier.height(LocalSpacing.current.space2))
                     }
                     CostMeter(entry)
                 }
@@ -1085,23 +1119,23 @@ private fun RecommendedRow(
 @Composable
 internal fun TodaySkeleton(modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space4),
-        verticalArrangement = Arrangement.spacedBy(Spacing.space3),
+        modifier = modifier.padding(horizontal = LocalSpacing.current.space4, vertical = LocalSpacing.current.space4),
+        verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.space3),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.space2)) {
-            SkeletonBlock(Modifier.fillMaxWidth(0.45f).height(Spacing.space6))
-            SkeletonBlock(Modifier.fillMaxWidth(0.6f).height(Spacing.space4))
+        Column(verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.space2)) {
+            SkeletonBlock(Modifier.fillMaxWidth(0.45f).height(LocalSpacing.current.space6))
+            SkeletonBlock(Modifier.fillMaxWidth(0.6f).height(LocalSpacing.current.space4))
         }
-        SkeletonBlock(Modifier.fillMaxWidth(0.3f).height(Spacing.space4))
+        SkeletonBlock(Modifier.fillMaxWidth(0.3f).height(LocalSpacing.current.space4))
         // 任务卡:内边距 + 标题 + 两行正文 + 按钮,实测约 128dp
         SkeletonBlock(
-            Modifier.fillMaxWidth().height(Spacing.space12 + Spacing.space12 + Spacing.space8),
+            Modifier.fillMaxWidth().height(LocalSpacing.current.space12 + LocalSpacing.current.space12 + LocalSpacing.current.space8),
             shape = MaterialTheme.shapes.large,
         )
-        SkeletonBlock(Modifier.fillMaxWidth(0.5f).height(Spacing.space4))
+        SkeletonBlock(Modifier.fillMaxWidth(0.5f).height(LocalSpacing.current.space4))
         repeat(3) {
             // ListItem 带 overline + supporting 的标准行高
-            SkeletonBlock(Modifier.fillMaxWidth().height(Spacing.space12 + Spacing.space6))
+            SkeletonBlock(Modifier.fillMaxWidth().height(LocalSpacing.current.space12 + LocalSpacing.current.space6))
         }
     }
 }
@@ -1128,7 +1162,7 @@ private fun EmptyCard(
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(Spacing.space4),
+            modifier = Modifier.padding(LocalSpacing.current.space4),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
@@ -1146,7 +1180,7 @@ private fun ProfileNudgeBanner(onEditProfile: () -> Unit, modifier: Modifier = M
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(Spacing.space4),
+            modifier = Modifier.padding(LocalSpacing.current.space4),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -1183,11 +1217,11 @@ private fun ProfileQuestionCard(
         modifier = modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.padding(Spacing.space4),
-            verticalArrangement = Arrangement.spacedBy(Spacing.space3),
+            modifier = Modifier.padding(LocalSpacing.current.space4),
+            verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.space3),
         ) {
             Text(stringResource(titleRes), style = MaterialTheme.typography.titleSmall)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.space2)) {
                 options.forEach { (key, label) ->
                     ToggleButton(
                         checked = key in selected,
@@ -1309,7 +1343,7 @@ private fun questionOptions(field: String): List<Pair<String, String>> = when (f
 @Composable
 private fun ErrorState(onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.padding(Spacing.space6),
+        modifier = modifier.padding(LocalSpacing.current.space6),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -1318,7 +1352,7 @@ private fun ErrorState(onRetry: () -> Unit, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(Spacing.space3))
+        Spacer(Modifier.height(LocalSpacing.current.space3))
         Button(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
     }
 }

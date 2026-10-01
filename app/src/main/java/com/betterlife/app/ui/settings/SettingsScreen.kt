@@ -432,6 +432,18 @@ fun SettingsScreen(
                 }
             }
 
+            SectionTitle(stringResource(R.string.settings_section_senior))
+
+            // N7：长辈模式一级开关;切换即时生效(主题/导航/今日页都订阅 settingsFlow)
+            SegmentedListItem(
+                checked = settings.seniorMode,
+                onCheckedChange = { vm.setSeniorMode(it) },
+                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
+                supportingContent = { Text(stringResource(R.string.settings_senior_mode_sub)) },
+            ) {
+                Text(stringResource(R.string.settings_senior_mode))
+            }
+
             SectionTitle(stringResource(R.string.settings_section_theme))
 
             val themeModes = remember {
