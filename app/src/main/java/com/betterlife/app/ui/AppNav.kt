@@ -195,10 +195,11 @@ private fun AppScaffold(startDestination: Any, navTarget: String?, onNavTargetCo
         if (selectedTab == null) navState.hide() else navState.show()
     }
 
-    // N2c:通知深链——点挽回通知直达待办页;消费一次即回调置空,重组不会反复跳
+    // N2c:通知深链——点挽回通知直达今日页(「补昨天的卡」入口在今日页);消费一次即回调置空,重组不会反复跳
     LaunchedEffect(navTarget) {
         when (navTarget) {
             MainActivity.ROUTE_TODO -> navController.navigate(TodoRoute) { tabOptions() }
+            MainActivity.ROUTE_TODAY -> navController.navigate(TodayRoute) { tabOptions() }
         }
         if (navTarget != null) onNavTargetConsumed()
     }

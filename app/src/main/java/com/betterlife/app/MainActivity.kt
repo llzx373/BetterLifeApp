@@ -79,5 +79,6 @@ class MainActivity : ComponentActivity() {
         /** 通知点击的深链目标 extra：值为 ROUTE_* 之一，由 AppNav 导航过去 */
         const val EXTRA_OPEN_ROUTE = "com.betterlife.app.extra.OPEN_ROUTE"
         const val ROUTE_TODO = "todo"
+        const val ROUTE_TODAY = "today"
     }
 }

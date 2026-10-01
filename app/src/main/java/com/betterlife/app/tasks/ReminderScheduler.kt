@@ -111,7 +111,8 @@ class ReminderScheduler(private val context: Context) {
 
     /**
      * N2c 挽回通知：3 日未打开时发一条（触发窗口与 7 天频控由 decideReengageNotify +
-     * SettingsStore 的日期标记负责，这里只管发）。复用 "daily" 渠道，点击深链到待办页。
+     * SettingsStore 的日期标记负责，这里只管发）。复用 "daily" 渠道，点击深链到今日页
+     * （「补昨天的卡」入口在今日页，不在待办页）。
      */
     fun notifyReengage() {
         if (!hasNotificationPermission(context)) return
@@ -120,7 +121,7 @@ class ReminderScheduler(private val context: Context) {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.notification_reengage_title))
             .setContentText(context.getString(R.string.notification_reengage_body))
-            .setContentIntent(reminderContentIntent(context, MainActivity.ROUTE_TODO))
+            .setContentIntent(reminderContentIntent(context, MainActivity.ROUTE_TODAY))
             .setAutoCancel(true)
             .build()
         try {
