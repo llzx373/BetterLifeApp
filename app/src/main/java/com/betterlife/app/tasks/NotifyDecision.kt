@@ -4,7 +4,12 @@
 // - 自动核销后若无未完成项，当天只发一条报喜，不再发「你还有 N 件事没做」式的汇总；
 // - 若还有未完成项，报喜证据合并进每日汇总文案，不单独报喜；
 // - 同日同事件不重复发（当日已发过报喜则由 DataStore 标记抑制，见 SettingsStore）。
+//
+// N2c：3 日未打开挽回通知的决策（decideReengageNotify）也在本文件，同为纯函数。
 package com.betterlife.app.tasks
+
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 /** 核销后的通知动作 */
 enum class AutoNotifyType {
@@ -42,3 +47,34 @@ fun decideAutoNotify(
     praiseSentToday -> AutoNotifyType.NONE
     else -> AutoNotifyType.PRAISE
 }
+
+// N2c 挽回通知的发送窗口：满 3 天没打开才发，每 7 天最多一条
+private const val REENGAGE_AFTER_DAYS = 3L
+private const val REENGAGE_MIN_INTERVAL_DAYS = 7L
+
+/**
+ * N2c：决定今天是否发「久未打开」挽回通知。
+ *
+ * @param lastActiveDate 最近一次打开 App 的日期（yyyy-MM-dd），空 = 从未记录过
+ * @param lastSentDate 上次发挽回通知的日期（yyyy-MM-dd），空 = 从未发过
+ * @param today 今天（yyyy-MM-dd）
+ * @param enabled 设置页「久未打开提醒」开关
+ */
+fun decideReengageNotify(
+    lastActiveDate: String,
+    lastSentDate: String,
+    today: String,
+    enabled: Boolean,
+): Boolean {
+    if (!enabled) return false
+    val todayD = parseDate(today) ?: return false
+    // 从未记录过活跃日期（升级前的老用户还没打开过新版）：不发，等第一次打开落日期。
+    // 打开 App 写入当天日期后，间隔归零 < 3 天，计时即自然重置
+    val lastActive = parseDate(lastActiveDate) ?: return false
+    if (ChronoUnit.DAYS.between(lastActive, todayD) < REENGAGE_AFTER_DAYS) return false
+    val lastSent = parseDate(lastSentDate) ?: return true
+    return ChronoUnit.DAYS.between(lastSent, todayD) >= REENGAGE_MIN_INTERVAL_DAYS
+}
+
+private fun parseDate(value: String): LocalDate? =
+    runCatching { LocalDate.parse(value) }.getOrNull()

@@ -61,7 +61,7 @@
 
 ### N2 · 断签与正向召回
 
-> **状态:2a/2b 已完成(2026-10-01);2c 未开始**
+> **状态:已完成(2026-10-01)**
 
 **为什么**:打卡产品的死亡时刻是断签,负罪感直接卸载;而 HC 自动核销是现成的
 正向素材,目前静默核销浪费了。三个子项,2a/2b 小,2c 中。
@@ -85,14 +85,16 @@
   「你还有 N 件事没做」;同日同事件不重复发(DataStore 记当日已发标记)。
 - 设置页加开关「自动打卡报喜」,默认开。
 
-**2c · 3 日未打开挽回通知**
+**2c · 3 日未打开挽回通知** ✅ 已完成(2026-10-01)
 
 - `MainActivity.onResume` 已有 `refreshToday()` 时机,顺手写 DataStore
-  `last_active_date`。
-- `tasks/ReminderScheduler.kt` 的每日周期 work 里加判断:
-  `today - lastActiveDate >= 3` → 发「回来补个卡?昨天的还能补」,
+  `last_active_date`(打开即重置计时)。
+- `tasks/ReminderScheduler.kt` 的每日周期 work 里加判断(纯函数 `decideReengageNotify`,
+  同 `tasks/NotifyDecision.kt`):
+  `today - lastActiveDate >= 3` → 发「回来补卡」挽回通知(复用 "daily" 渠道,id 1003),
   点击深链到待办页(补昨天的卡是现有能力)。
-- **频控**:每 7 天最多一条,用户补卡或打开 App 即重置计时。
+- **频控**:每 7 天最多一条(`reengage_sent_date`),用户补卡或打开 App 即重置计时。
+- 设置页开关「久未打开提醒」(`reengage_enabled`),默认开。
 
 **怎么验**:
 

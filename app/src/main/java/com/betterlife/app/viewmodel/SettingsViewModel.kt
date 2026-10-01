@@ -275,6 +275,13 @@ class SettingsViewModel(
         }
     }
 
+    /** N2c：「久未打开提醒」开关 */
+    fun setReengageEnabled(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            settingsStore.setReengageEnabled(enabled)
+        }
+    }
+
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch(Dispatchers.IO) {
             settingsStore.setThemeMode(mode.key)

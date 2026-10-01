@@ -16,6 +16,10 @@
     <string name="notification_praise_title">自动打卡</string>
     <string name="notification_praise_body">%1$s，已自动打卡</string>
 
+    <!-- N2c：3 日未打开挽回通知，7 天频控，点击深链到待办页 -->
+    <string name="notification_reengage_title">回来补个卡?</string>
+    <string name="notification_reengage_body">昨天的还能补</string>
+
     <!-- 单任务提醒通知 -->
     <string name="notification_task_title">任务提醒</string>
     <string name="notification_task_body">别忘了：%1$s</string>
@@ -405,6 +409,8 @@
     <string name="settings_reminder_revoked">通知权限已被关闭,提醒发不出来</string>
     <string name="settings_hc_praise">自动打卡报喜</string>
     <string name="settings_hc_praise_sub">健康数据达标自动打卡后,发一条通知报喜</string>
+    <string name="settings_reengage">久未打开提醒</string>
+    <string name="settings_reengage_sub">几天没打开时发一条通知,提醒你回来补卡;每 7 天最多一条</string>
     <string name="action_open_settings">去开启</string>
     <string name="settings_section_theme">主题</string>
     <string name="settings_section_motion">动效</string>

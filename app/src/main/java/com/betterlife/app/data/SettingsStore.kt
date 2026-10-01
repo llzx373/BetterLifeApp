@@ -31,6 +31,8 @@ data class AppSettings(
     val reminderEnabled: Boolean = false,
     /** N2b：HC 自动核销达标后是否发报喜通知，默认开 */
     val hcPraiseEnabled: Boolean = true,
+    /** N2c：3 日未打开时是否发挽回通知，默认开 */
+    val reengageEnabled: Boolean = true,
     val onboardingDone: Boolean = false,
     val themeMode: String = SettingsStore.DEFAULT_THEME_MODE,
     val motionLevel: String = SettingsStore.DEFAULT_MOTION_LEVEL,
@@ -72,6 +74,11 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
         // N2b:HC 自动核销报喜开关(默认开)与当日已发标记(yyyy-MM-dd,空串 = 今天没发过)
         val HC_PRAISE_ENABLED = booleanPreferencesKey("hc_praise_enabled")
         val HC_PRAISE_SENT_DATE = stringPreferencesKey("hc_praise_sent_date")
+
+        // N2c:挽回通知开关(默认开)、最近一次打开 App 的日期、上次发挽回通知的日期(均 yyyy-MM-dd)
+        val REENGAGE_ENABLED = booleanPreferencesKey("reengage_enabled")
+        val LAST_ACTIVE_DATE = stringPreferencesKey("last_active_date")
+        val REENGAGE_SENT_DATE = stringPreferencesKey("reengage_sent_date")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val MOTION_LEVEL = stringPreferencesKey("motion_level")
@@ -119,6 +126,7 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
             reminderMinute = p[Keys.REMINDER_MINUTE] ?: 0,
             reminderEnabled = p[Keys.REMINDER_ENABLED] ?: false,
             hcPraiseEnabled = p[Keys.HC_PRAISE_ENABLED] ?: true,
+            reengageEnabled = p[Keys.REENGAGE_ENABLED] ?: true,
             onboardingDone = p[Keys.ONBOARDING_DONE] ?: false,
             themeMode = p[Keys.THEME_MODE] ?: DEFAULT_THEME_MODE,
             motionLevel = p[Keys.MOTION_LEVEL] ?: DEFAULT_MOTION_LEVEL,
@@ -211,6 +219,31 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
 
     suspend fun setHcPraiseSentDate(date: String) {
         context.dataStore.edit { it[Keys.HC_PRAISE_SENT_DATE] = date }
+    }
+
+    /** N2c：「久未打开提醒」开关 */
+    suspend fun setReengageEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.REENGAGE_ENABLED] = enabled }
+    }
+
+    /**
+     * N2c 最近一次打开 App 的日期（yyyy-MM-dd），空串 = 从未记录过。
+     * 与 hcPraiseSentDate 同理不进 AppSettings —— 它是挽回通知频控的局部状态。
+     */
+    suspend fun lastActiveDate(): String =
+        context.dataStore.data.first()[Keys.LAST_ACTIVE_DATE].orEmpty()
+
+    /** MainActivity.onResume 每次写入当天日期；写入即重置挽回通知的计时 */
+    suspend fun setLastActiveDate(date: String) {
+        context.dataStore.edit { it[Keys.LAST_ACTIVE_DATE] = date }
+    }
+
+    /** N2c 上次发挽回通知的日期（yyyy-MM-dd），空串 = 从未发过；7 天频控依据 */
+    suspend fun reengageSentDate(): String =
+        context.dataStore.data.first()[Keys.REENGAGE_SENT_DATE].orEmpty()
+
+    suspend fun setReengageSentDate(date: String) {
+        context.dataStore.edit { it[Keys.REENGAGE_SENT_DATE] = date }
     }
 
     override suspend fun setOnboardingDone(done: Boolean) {

@@ -355,7 +355,7 @@ fun SettingsScreen(
                     }
                     enableReminder(want)
                 },
-                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 3),
+                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 4),
             ) {
                 Text(stringResource(R.string.settings_reminder_enable))
             }
@@ -363,7 +363,7 @@ fun SettingsScreen(
                 onClick = {
                     showTimePicker = true
                 },
-                shapes = ListItemDefaults.segmentedShapes(index = 1, count = 3),
+                shapes = ListItemDefaults.segmentedShapes(index = 1, count = 4),
                 trailingContent = {
                     Text("%02d:%02d".format(settings.reminderHour, settings.reminderMinute))
                 },
@@ -374,10 +374,19 @@ fun SettingsScreen(
             SegmentedListItem(
                 checked = settings.hcPraiseEnabled,
                 onCheckedChange = { vm.setHcPraiseEnabled(it) },
-                shapes = ListItemDefaults.segmentedShapes(index = 2, count = 3),
+                shapes = ListItemDefaults.segmentedShapes(index = 2, count = 4),
                 supportingContent = { Text(stringResource(R.string.settings_hc_praise_sub)) },
             ) {
                 Text(stringResource(R.string.settings_hc_praise))
+            }
+            // N2c：久未打开的挽回通知开关,默认开;7 天频控在决策纯函数里,开关只管发不发
+            SegmentedListItem(
+                checked = settings.reengageEnabled,
+                onCheckedChange = { vm.setReengageEnabled(it) },
+                shapes = ListItemDefaults.segmentedShapes(index = 3, count = 4),
+                supportingContent = { Text(stringResource(R.string.settings_reengage_sub)) },
+            ) {
+                Text(stringResource(R.string.settings_reengage))
             }
 
             // 开关还开着、权限却没了:静默失效比关开关更糟,给一行明说 + 出口

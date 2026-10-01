@@ -45,6 +45,9 @@ class ReminderScheduler(private val context: Context) {
         /** N2b 报喜通知的 id，与每日汇总（[NOTIFICATION_ID]）互不覆盖 */
         const val PRAISE_NOTIFICATION_ID = 1002
 
+        /** N2c 挽回通知的 id，与汇总（1001）/报喜（1002）互不覆盖 */
+        const val REENGAGE_NOTIFICATION_ID = 1003
+
         /** 单任务提醒的 unique work 名前缀，按 taskId 一一对应 */
         const val TASK_WORK_PREFIX = "remind_task_"
 
@@ -107,6 +110,27 @@ class ReminderScheduler(private val context: Context) {
     }
 
     /**
+     * N2c 挽回通知：3 日未打开时发一条（触发窗口与 7 天频控由 decideReengageNotify +
+     * SettingsStore 的日期标记负责，这里只管发）。复用 "daily" 渠道，点击深链到待办页。
+     */
+    fun notifyReengage() {
+        if (!hasNotificationPermission(context)) return
+        ensureChannel(context)
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.notification_reengage_title))
+            .setContentText(context.getString(R.string.notification_reengage_body))
+            .setContentIntent(reminderContentIntent(context, MainActivity.ROUTE_TODO))
+            .setAutoCancel(true)
+            .build()
+        try {
+            NotificationManagerCompat.from(context).notify(REENGAGE_NOTIFICATION_ID, notification)
+        } catch (_: SecurityException) {
+            // 权限被收回等情况，忽略
+        }
+    }
+
+    /**
      * 给单条任务排到点精准触发的一次性 work（按 taskId 命名，重排即 REPLACE）。
      * [minutesOfDay] 是一天内的分钟数；[date] 非空（一次性待办的截止日）时定在该日期触发，
      * 否则已过点顺延到明天（见 [nextTriggerMillis]）。
@@ -136,9 +160,10 @@ class DailyReminderWorker(
 
     override suspend fun doWork(): Result {
         val container = (applicationContext as BetterLifeApp).container
+        val settings = container.settingsStore.current()
         // N1：没档案也能规划（空档案走普惠推荐 + 种子池兜底），门槛改为「看过引导」——
         // 装完从未打开过的用户不应被静默播种和提醒
-        if (container.settingsStore.current().onboardingDone) {
+        if (settings.onboardingDone) {
             val profile = container.profileRepository.getProfile()
             val answered = container.settingsStore.profileQuestionsAnsweredFlow.first()
             container.taskManager.ensureTodayTasks(ProfileQuestions.effectiveProfile(profile, answered))
@@ -154,7 +179,7 @@ class DailyReminderWorker(
         val decision = decideAutoNotify(
             completions = completed.evidences,
             undoneCount = container.taskManager.todayUndoneCount(),
-            praiseEnabled = container.settingsStore.current().hcPraiseEnabled,
+            praiseEnabled = settings.hcPraiseEnabled,
             praiseSentToday = container.settingsStore.hcPraiseSentDate() == today,
         )
         when (decision) {
@@ -167,6 +192,17 @@ class DailyReminderWorker(
                 praiseText = completed.evidenceText.takeIf { completed.count > 0 },
             )
             AutoNotifyType.NONE -> {}
+        }
+        // N2c：3 日未打开发挽回通知（7 天频控）；用户打开 App 写 last_active_date 即自然重置
+        if (decideReengageNotify(
+                lastActiveDate = container.settingsStore.lastActiveDate(),
+                lastSentDate = container.settingsStore.reengageSentDate(),
+                today = today,
+                enabled = settings.reengageEnabled,
+            )
+        ) {
+            container.reminderScheduler.notifyReengage()
+            container.settingsStore.setReengageSentDate(today)
         }
         return Result.success()
     }
@@ -263,12 +299,14 @@ private fun hasNotificationPermission(context: Context): Boolean =
         PackageManager.PERMISSION_GRANTED
 
 /**
- * 点通知回到 App。
+ * 点通知回到 App。[openRoute] 非空时带上深链目标（见 MainActivity.EXTRA_OPEN_ROUTE），
+ * AppNav 消费后导航过去。
  * targetSdk 31 起 PendingIntent 必须显式声明可变性；这里不需要外部修改，用 FLAG_IMMUTABLE。
  */
-private fun reminderContentIntent(context: Context): PendingIntent {
+private fun reminderContentIntent(context: Context, openRoute: String? = null): PendingIntent {
     val intent = Intent(context, MainActivity::class.java).apply {
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        if (openRoute != null) putExtra(MainActivity.EXTRA_OPEN_ROUTE, openRoute)
     }
     return PendingIntent.getActivity(
         context,

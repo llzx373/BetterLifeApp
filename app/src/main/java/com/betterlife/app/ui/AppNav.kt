@@ -52,6 +52,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.betterlife.app.BetterLifeApp
+import com.betterlife.app.MainActivity
 import com.betterlife.app.R
 import com.betterlife.app.ui.chat.ChatScreen
 import com.betterlife.app.ui.common.OfflineBanner
@@ -144,7 +145,11 @@ internal val tabs = listOf(
 )
 
 @Composable
-fun AppNav(vm: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)) {
+fun AppNav(
+    navTarget: String? = null,
+    onNavTargetConsumed: () -> Unit = {},
+    vm: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
+) {
     val state by vm.uiState.collectAsStateWithLifecycle()
 
     // DataStore 还没读出来时不要先渲染 today 再跳走,那会闪一下。
@@ -161,13 +166,15 @@ fun AppNav(vm: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory
         } else {
             AppScaffold(
                 startDestination = if (state.settings.onboardingDone) TodayRoute else OnboardingRoute,
+                navTarget = navTarget,
+                onNavTargetConsumed = onNavTargetConsumed,
             )
         }
     }
 }
 
 @Composable
-private fun AppScaffold(startDestination: Any) {
+private fun AppScaffold(startDestination: Any, navTarget: String?, onNavTargetConsumed: () -> Unit) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -186,6 +193,14 @@ private fun AppScaffold(startDestination: Any) {
     )
     LaunchedEffect(selectedTab) {
         if (selectedTab == null) navState.hide() else navState.show()
+    }
+
+    // N2c:通知深链——点挽回通知直达待办页;消费一次即回调置空,重组不会反复跳
+    LaunchedEffect(navTarget) {
+        when (navTarget) {
+            MainActivity.ROUTE_TODO -> navController.navigate(TodoRoute) { tabOptions() }
+        }
+        if (navTarget != null) onNavTargetConsumed()
     }
 
     // 初始值 true:启动时 NetworkMonitor 的第一帧快照还没到,先按在线处理,避免横幅闪一下。
