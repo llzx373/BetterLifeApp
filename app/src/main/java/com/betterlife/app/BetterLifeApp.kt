@@ -23,6 +23,7 @@ import com.betterlife.app.data.health.StepsRepository
 import com.betterlife.app.recommend.DailySeedPicker
 import com.betterlife.app.recommend.RecommendationEngine
 import com.betterlife.app.tasks.ContentSyncWorker
+import com.betterlife.app.tasks.DailyContentWorker
 import com.betterlife.app.tasks.ReminderScheduler
 import com.betterlife.app.tasks.TaskManager
 import com.betterlife.app.tasks.WeeklyReportWorker
@@ -39,6 +40,8 @@ class BetterLifeApp : Application() {
         ContentSyncWorker.enqueuePeriodic(this)
         // N4：每周日晚周报（7 天周期，锚定周日 20:07）；KEEP 语义，重复注册不重置锚点
         WeeklyReportWorker.enqueuePeriodic(this)
+        // N5：每日一条内容推送（24h 周期，锚定 08:07，默认关——开关只在 doWork 里门控）
+        DailyContentWorker.enqueuePeriodic(this)
     }
 }
 

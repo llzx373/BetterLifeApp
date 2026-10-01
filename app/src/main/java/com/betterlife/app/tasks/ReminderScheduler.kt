@@ -51,6 +51,9 @@ class ReminderScheduler(private val context: Context) {
         /** N4 周报的 id，与汇总（1001）/报喜（1002）/挽回（1003）互不覆盖 */
         const val WEEKLY_REPORT_NOTIFICATION_ID = 1004
 
+        /** N5 每日一条的 id，与汇总/报喜/挽回/周报互不覆盖 */
+        const val DAILY_CONTENT_NOTIFICATION_ID = 1005
+
         /** 单任务提醒的 unique work 名前缀，按 taskId 一一对应 */
         const val TASK_WORK_PREFIX = "remind_task_"
 
@@ -151,6 +154,28 @@ class ReminderScheduler(private val context: Context) {
             .build()
         try {
             NotificationManagerCompat.from(context).notify(WEEKLY_REPORT_NOTIFICATION_ID, notification)
+        } catch (_: SecurityException) {
+            // 权限被收回等情况，忽略
+        }
+    }
+
+    /**
+     * N5 每日一条内容推送：标题 + 一句「说人话」（选条与 30 天去重由
+     * DailyContentWorker + pickDailyContent 负责，这里只管发）。复用 "daily" 渠道，
+     * 点击深链条目详情页（"entry/<entryId>"，见 MainActivity.ROUTE_ENTRY_PREFIX）。
+     */
+    fun notifyDailyContent(entryId: String, title: String, human: String) {
+        if (!hasNotificationPermission(context)) return
+        ensureChannel(context)
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(human)
+            .setContentIntent(reminderContentIntent(context, MainActivity.ROUTE_ENTRY_PREFIX + entryId))
+            .setAutoCancel(true)
+            .build()
+        try {
+            NotificationManagerCompat.from(context).notify(DAILY_CONTENT_NOTIFICATION_ID, notification)
         } catch (_: SecurityException) {
             // 权限被收回等情况，忽略
         }

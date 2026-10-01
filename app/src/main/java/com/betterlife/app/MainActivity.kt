@@ -24,7 +24,7 @@ import java.time.LocalDate
 
 class MainActivity : ComponentActivity() {
 
-    /** 通知深链目标（N2c 挽回通知直达待办页）：AppNav 消费一次后由回调置空 */
+    /** 通知深链目标（N2c 挽回通知直达待办页等）：AppNav 消费一次后由回调置空 */
     private val navRequest = MutableStateFlow<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,12 +76,15 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        /** 通知点击的深链目标 extra：值为 ROUTE_* 之一，由 AppNav 导航过去 */
+        /** 通知点击的深链目标 extra：值为 ROUTE_* 之一（或 ROUTE_ENTRY_PREFIX + entryId），由 AppNav 导航过去 */
         const val EXTRA_OPEN_ROUTE = "com.betterlife.app.extra.OPEN_ROUTE"
         const val ROUTE_TODO = "todo"
         const val ROUTE_TODAY = "today"
 
         /** N4 周报通知深链：统计页（非 tab，navigate 不带 tabOptions） */
         const val ROUTE_STATS = "stats"
+
+        /** N5 每日一条深链："entry/<entryId>" → 条目详情页（entryId 是 sha1 hex，不含斜杠） */
+        const val ROUTE_ENTRY_PREFIX = "entry/"
     }
 }

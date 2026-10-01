@@ -35,6 +35,8 @@ data class AppSettings(
     val reengageEnabled: Boolean = true,
     /** N4：每周日晚是否发周报通知，默认开 */
     val weeklyReportEnabled: Boolean = true,
+    /** N5：每天早 8 点档是否推一条内容，默认关（唯一默认关的推送：每日触达翻倍是打扰红线） */
+    val dailyContentEnabled: Boolean = false,
     val onboardingDone: Boolean = false,
     val themeMode: String = SettingsStore.DEFAULT_THEME_MODE,
     val motionLevel: String = SettingsStore.DEFAULT_MOTION_LEVEL,
@@ -85,6 +87,10 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
         // N4:周报开关(默认开)与同周频控标记(已发周报所属的周一日期,yyyy-MM-dd,空串 = 从未发过)
         val WEEKLY_REPORT_ENABLED = booleanPreferencesKey("weekly_report_enabled")
         val WEEKLY_REPORT_SENT_WEEK = stringPreferencesKey("weekly_report_sent_week")
+
+        // N5:每日一条开关(默认关)与已推记录(每行 "entryId,yyyy-MM-dd",30 天滚动窗口去重)
+        val DAILY_CONTENT_ENABLED = booleanPreferencesKey("daily_content_enabled")
+        val DAILY_CONTENT_PUSHED = stringPreferencesKey("daily_content_pushed")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val MOTION_LEVEL = stringPreferencesKey("motion_level")
@@ -134,6 +140,7 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
             hcPraiseEnabled = p[Keys.HC_PRAISE_ENABLED] ?: true,
             reengageEnabled = p[Keys.REENGAGE_ENABLED] ?: true,
             weeklyReportEnabled = p[Keys.WEEKLY_REPORT_ENABLED] ?: true,
+            dailyContentEnabled = p[Keys.DAILY_CONTENT_ENABLED] ?: false,
             onboardingDone = p[Keys.ONBOARDING_DONE] ?: false,
             themeMode = p[Keys.THEME_MODE] ?: DEFAULT_THEME_MODE,
             motionLevel = p[Keys.MOTION_LEVEL] ?: DEFAULT_MOTION_LEVEL,
@@ -267,6 +274,25 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
 
     suspend fun setWeeklyReportSentWeek(weekStart: String) {
         context.dataStore.edit { it[Keys.WEEKLY_REPORT_SENT_WEEK] = weekStart }
+    }
+
+    /** N5：「每日一条」开关；只门控发不发，周期 work 不动（DailyContentWorker 里读） */
+    suspend fun setDailyContentEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.DAILY_CONTENT_ENABLED] = enabled }
+    }
+
+    /**
+     * N5 每日一条的已推记录：每行 "entryId,yyyy-MM-dd"，30 天滚动窗口裁剪是纯函数
+     * 做的事（DailyContentWorker 经 prunePushedLines 剪完后整表替换写回）。
+     * 与 hcPraiseSentDate 同理不进 AppSettings —— 它是推送去重的局部状态，只需读一次。
+     */
+    suspend fun dailyContentPushedLines(): List<String> =
+        context.dataStore.data.first()[Keys.DAILY_CONTENT_PUSHED].orEmpty()
+            .split("\n")
+            .filter { it.isNotBlank() }
+
+    suspend fun setDailyContentPushed(lines: List<String>) {
+        context.dataStore.edit { it[Keys.DAILY_CONTENT_PUSHED] = lines.joinToString("\n") }
     }
 
     override suspend fun setOnboardingDone(done: Boolean) {

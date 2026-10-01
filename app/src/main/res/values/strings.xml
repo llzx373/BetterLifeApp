@@ -417,6 +417,8 @@
     <string name="settings_reengage_sub">几天没打开时发一条通知,提醒你回来补卡;每 7 天最多一条</string>
     <string name="settings_weekly_report">每周总结</string>
     <string name="settings_weekly_report_sub">每周日晚发一条本周打卡小结;没有打卡的周不打扰</string>
+    <string name="settings_daily_content">每日一条</string>
+    <string name="settings_daily_content_sub">每天早 8 点档推一条精选内容,30 天内不重样;没有合适的内容就不发</string>
     <string name="action_open_settings">去开启</string>
     <string name="settings_section_theme">主题</string>
     <string name="settings_section_motion">动效</string>

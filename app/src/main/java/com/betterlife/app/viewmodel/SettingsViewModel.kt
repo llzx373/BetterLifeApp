@@ -289,6 +289,13 @@ class SettingsViewModel(
         }
     }
 
+    /** N5：「每日一条」开关（默认关） */
+    fun setDailyContentEnabled(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            settingsStore.setDailyContentEnabled(enabled)
+        }
+    }
+
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch(Dispatchers.IO) {
             settingsStore.setThemeMode(mode.key)
