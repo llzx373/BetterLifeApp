@@ -4,6 +4,7 @@ import com.betterlife.app.ai.AiAdvisor
 import com.betterlife.app.ai.ChatMessage
 import com.betterlife.app.ai.EntryRetriever
 import com.betterlife.app.ai.LlmClient
+import com.betterlife.app.ai.SampleQuestions
 import com.betterlife.app.ai.WebSearchItem
 import com.betterlife.app.ai.WebSearcher
 import com.betterlife.app.data.AiProvider
@@ -16,13 +17,16 @@ import com.betterlife.app.data.Profile
 import com.betterlife.app.data.ProfileRepo
 import com.betterlife.app.data.RulesFile
 import com.betterlife.app.data.SEED_PROVIDERS
+import com.betterlife.app.data.Smoking
 import com.betterlife.app.data.db.ChatMessageDao
 import com.betterlife.app.data.db.ChatMessageEntity
+import com.betterlife.app.tasks.ChatPlanGateway
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -37,9 +41,23 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModelTest {
 
-    private class FakeProfileRepo : ProfileRepo {
-        override val profileFlow: Flow<Profile?> = MutableStateFlow(null)
+    private class FakeProfileRepo(profile: Profile? = null) : ProfileRepo {
+        override val profileFlow: Flow<Profile?> = MutableStateFlow(profile)
         override suspend fun save(profile: Profile) = Unit
+    }
+
+    /** N3a 任务网关 fake：记录加入动作，planned 集合可直接推 */
+    private class FakeChatPlanGateway : ChatPlanGateway {
+        val planned = MutableStateFlow<Set<String>>(emptySet())
+        val todoAdded = mutableListOf<String>()
+        val dailyAdded = mutableListOf<String>()
+        override fun plannedEntryIdsFlow(): Flow<Set<String>> = planned
+        override suspend fun addToTodo(entryId: String) {
+            todoAdded += entryId
+        }
+        override suspend fun addDailyHabit(entryId: String) {
+            dailyAdded += entryId
+        }
     }
 
     private class FakeChatSettings(settings: AppSettings) : ChatSettingsGateway {
@@ -93,11 +111,16 @@ class ChatViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newViewModel(settings: AppSettings, dao: FakeChatMessageDao): ChatViewModel {
+    private fun newViewModel(
+        settings: AppSettings,
+        dao: FakeChatMessageDao,
+        plan: FakeChatPlanGateway = FakeChatPlanGateway(),
+        profile: Profile? = null,
+    ): ChatViewModel {
         val chatSettings = FakeChatSettings(settings)
         val advisor = AiAdvisor(LlmClient(chatSettings), EntryRetriever(), chatSettings, FakeWebSearcher())
         val data = EntriesData(EntriesFile(entries = listOf(entry)), RulesFile())
-        return ChatViewModel(advisor, FakeProfileRepo(), { data }, chatSettings, dao)
+        return ChatViewModel(advisor, FakeProfileRepo(profile), { data }, chatSettings, dao, plan)
     }
 
     /** ask 内部走 Dispatchers.IO（真线程，不受测试调度器控制），轮询等思考态收起 */
@@ -153,5 +176,53 @@ class ChatViewModelTest {
 
         assertFalse(vm.uiState.value.asking)
         assertTrue(vm.uiState.value.messages.last().isError)
+    }
+
+    /** 加入动作走 Dispatchers.IO（真线程），轮询等 fake 记到 */
+    private fun awaitCalls(vararg lists: List<*>) {
+        val deadline = System.currentTimeMillis() + 5_000
+        while (lists.any { it.isEmpty() } && System.currentTimeMillis() < deadline) Thread.sleep(10)
+    }
+
+    @Test
+    fun `来源条目加入待办与每日习惯走任务网关`() = runTest {
+        val plan = FakeChatPlanGateway()
+        val vm = newViewModel(AppSettings(), FakeChatMessageDao(), plan)
+
+        vm.addSourceToTodo("02-01")
+        vm.addSourceToDaily("02-02")
+        awaitCalls(plan.todoAdded, plan.dailyAdded)
+
+        assertEquals(listOf("02-01"), plan.todoAdded)
+        assertEquals(listOf("02-02"), plan.dailyAdded)
+    }
+
+    @Test
+    fun `已在计划中的条目进入UiState供已加入态展示`() = runTest {
+        val plan = FakeChatPlanGateway()
+        val vm = newViewModel(AppSettings(), FakeChatMessageDao(), plan)
+        advanceUntilIdle()
+
+        plan.planned.value = setOf("02-01")
+        advanceUntilIdle()
+
+        assertEquals(setOf("02-01"), vm.uiState.value.plannedEntryIds)
+    }
+
+    @Test
+    fun `空态示例问题按档案出模板_无档案走通用兜底`() = runTest {
+        val noProfile = newViewModel(AppSettings(), FakeChatMessageDao())
+        val smoker = newViewModel(AppSettings(), FakeChatMessageDao(), profile = Profile(smoking = Smoking.YES))
+
+        val deadline = System.currentTimeMillis() + 5_000
+        while ((noProfile.uiState.value.sampleQuestions.isEmpty() ||
+                smoker.uiState.value.sampleQuestions.isEmpty()) &&
+            System.currentTimeMillis() < deadline
+        ) {
+            Thread.sleep(10)
+        }
+
+        assertEquals(SampleQuestions.GENERIC, noProfile.uiState.value.sampleQuestions)
+        assertEquals("想戒烟,第一步做什么?", smoker.uiState.value.sampleQuestions.first())
     }
 }

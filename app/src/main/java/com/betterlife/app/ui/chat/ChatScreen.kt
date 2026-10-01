@@ -2,6 +2,9 @@
 //
 // 安全提示不是模型回答,所以它不做成列表里的第一个气泡,而是固定的 Surface;
 // 无 Key 横幅走 secondaryContainer,避免和口径色里的「别踩线」撞色。
+//
+// N3 行动闭环:知识库答案的来源条目渲染成可点 chips(加入待办/设为每日/查看详情),
+// 已在计划中的条目显示「已加入」态并置灰加项;互联网来源(标题+链接)保持只读。
 package com.betterlife.app.ui.chat
 
 import androidx.compose.animation.core.Animatable
@@ -11,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,13 +31,17 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -76,11 +84,6 @@ import kotlinx.coroutines.launch
 
 private val BubbleMaxWidth = 300.dp
 private val ThinkingIndicatorWidth = 40.dp
-private val SuggestionRes = listOf(
-    R.string.chat_suggestion_1,
-    R.string.chat_suggestion_2,
-    R.string.chat_suggestion_3,
-)
 
 /** 知识库来源最多直接列出的条数,超出的折叠成「等 N 条来源」 */
 private const val KB_SOURCES_SHOWN = 3
@@ -91,6 +94,7 @@ fun ChatScreen(
     entryId: String? = null,
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenEntry: (String) -> Unit,
     vm: ChatViewModel = viewModel(factory = ChatViewModel.Factory),
     settingsVm: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
 ) {
@@ -164,13 +168,20 @@ fun ChatScreen(
                 contentPadding = PaddingValues(Spacing.space4),
                 verticalArrangement = Arrangement.spacedBy(Spacing.space3),
             ) {
-                if (state.messages.isEmpty() && noApiKey) {
+                if (state.messages.isEmpty() && state.sampleQuestions.isNotEmpty()) {
                     item(key = "suggestions") {
-                        Suggestions(onPick = { vm.ask(it) })
+                        // 空态示例问题(N3b):点击只填入输入框,由用户确认再发
+                        Suggestions(questions = state.sampleQuestions, onPick = { input = it })
                     }
                 }
                 items(state.messages.size, key = { it }) { i ->
-                    Bubble(msg = state.messages[i])
+                    Bubble(
+                        msg = state.messages[i],
+                        plannedEntryIds = state.plannedEntryIds,
+                        onAddToTodo = vm::addSourceToTodo,
+                        onAddToDaily = vm::addSourceToDaily,
+                        onOpenEntry = onOpenEntry,
+                    )
                 }
                 if (state.asking) {
                     item(key = "asking") { ThinkingRow(entryCount = state.entryCount) }
@@ -330,17 +341,16 @@ private fun Banner(textRes: Int, onOpenSettings: () -> Unit) {
     }
 }
 
-/** 空状态:与其留白,不如给三个能直接点的问题 */
+/** 空状态:与其留白,不如给三个能直接点的问题(按档案出模板,点击只填入输入框) */
 @Composable
-private fun Suggestions(onPick: (String) -> Unit) {
+private fun Suggestions(questions: List<String>, onPick: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.space2)) {
         Text(
             text = stringResource(R.string.chat_suggestions_title),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        SuggestionRes.forEach { res ->
-            val question = stringResource(res)
+        questions.forEach { question ->
             SuggestionChip(
                 onClick = { onPick(question) },
                 label = { Text(question) },
@@ -376,7 +386,13 @@ private const val BUBBLE_POP_MILLIS = 250
 
 /** 气泡:用户侧大圆角右对齐,助手侧小圆角左对齐,方向感不靠颜色也能看出来 */
 @Composable
-private fun Bubble(msg: ChatViewModel.ChatUiMessage) {
+private fun Bubble(
+    msg: ChatViewModel.ChatUiMessage,
+    plannedEntryIds: Set<String>,
+    onAddToTodo: (String) -> Unit,
+    onAddToDaily: (String) -> Unit,
+    onOpenEntry: (String) -> Unit,
+) {
     val isUser = msg.role == ChatMessage.ROLE_USER
     val isError = msg.isError
     val container = when {
@@ -468,15 +484,27 @@ private fun Bubble(msg: ChatViewModel.ChatUiMessage) {
                 }
             }
             if (!isUser && !isError && msg.sources.isNotEmpty()) {
-                SourcesRow(sources = msg.sources)
+                SourcesRow(
+                    sources = msg.sources,
+                    plannedEntryIds = plannedEntryIds,
+                    onAddToTodo = onAddToTodo,
+                    onAddToDaily = onAddToDaily,
+                    onOpenEntry = onOpenEntry,
+                )
             }
         }
     }
 }
 
-/** 答案来源:知识库列「第X节第Y条」(超出折叠),互联网列可点的链接标题 */
+/** 答案来源:知识库条目是可点的行动 chips(加入计划/看详情),互联网是可点的只读链接 */
 @Composable
-private fun SourcesRow(sources: List<AiSource>) {
+private fun SourcesRow(
+    sources: List<AiSource>,
+    plannedEntryIds: Set<String>,
+    onAddToTodo: (String) -> Unit,
+    onAddToDaily: (String) -> Unit,
+    onOpenEntry: (String) -> Unit,
+) {
     val uriHandler = LocalUriHandler.current
     Column(modifier = Modifier.padding(top = Spacing.space1, start = Spacing.space2)) {
         Text(
@@ -495,12 +523,28 @@ private fun SourcesRow(sources: List<AiSource>) {
                 )
             }
         } else {
-            sources.take(KB_SOURCES_SHOWN).forEach { s ->
-                Text(
-                    text = s.label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.space2),
+            ) {
+                sources.take(KB_SOURCES_SHOWN).forEach { s ->
+                    val entryId = s.entryId
+                    if (entryId == null) {
+                        Text(
+                            text = s.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        SourceChip(
+                            label = s.label,
+                            planned = entryId in plannedEntryIds,
+                            onAddToTodo = { onAddToTodo(entryId) },
+                            onAddToDaily = { onAddToDaily(entryId) },
+                            onOpenDetail = { onOpenEntry(entryId) },
+                        )
+                    }
+                }
             }
             if (sources.size > KB_SOURCES_SHOWN) {
                 Text(
@@ -509,6 +553,70 @@ private fun SourcesRow(sources: List<AiSource>) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+    }
+}
+
+/**
+ * 知识库来源 chip:点开菜单给「加入待办 / 设为每日习惯 / 查看详情」三个动作。
+ * 已在计划中的条目带对勾尾标,两个加项置灰,只留「查看详情」可点。
+ */
+@Composable
+private fun SourceChip(
+    label: String,
+    planned: Boolean,
+    onAddToTodo: () -> Unit,
+    onAddToDaily: () -> Unit,
+    onOpenDetail: () -> Unit,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    Box {
+        AssistChip(
+            onClick = { menuOpen = true },
+            label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+            trailingIcon = if (planned) {
+                {
+                    Icon(
+                        Icons.Filled.Check,
+                        contentDescription = stringResource(R.string.chat_source_added),
+                        modifier = Modifier.size(Spacing.space4),
+                    )
+                }
+            } else {
+                null
+            },
+        )
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            if (planned) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.chat_source_added)) },
+                    enabled = false,
+                    onClick = {},
+                )
+            }
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.chat_source_add_todo)) },
+                enabled = !planned,
+                onClick = {
+                    menuOpen = false
+                    onAddToTodo()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.chat_source_add_daily)) },
+                enabled = !planned,
+                onClick = {
+                    menuOpen = false
+                    onAddToDaily()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.chat_source_view_detail)) },
+                onClick = {
+                    menuOpen = false
+                    onOpenDetail()
+                },
+            )
         }
     }
 }

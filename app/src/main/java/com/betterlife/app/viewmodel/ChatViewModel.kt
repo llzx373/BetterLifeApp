@@ -10,6 +10,7 @@ import com.betterlife.app.ai.AiAdvisor
 import com.betterlife.app.ai.AiSource
 import com.betterlife.app.ai.AiStreamEvent
 import com.betterlife.app.ai.ChatMessage
+import com.betterlife.app.ai.SampleQuestions
 import com.betterlife.app.data.AiProvider
 import com.betterlife.app.data.ChatSettingsGateway
 import com.betterlife.app.data.EntriesData
@@ -20,6 +21,7 @@ import com.betterlife.app.data.RulesFile
 import com.betterlife.app.data.db.ChatMessageDao
 import com.betterlife.app.data.db.ChatMessageEntity
 import com.betterlife.app.data.resolveChatProviders
+import com.betterlife.app.tasks.ChatPlanGateway
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +38,7 @@ class ChatViewModel(
     private val entriesData: suspend () -> EntriesData,
     private val settingsStore: ChatSettingsGateway,
     private val chatMessageDao: ChatMessageDao,
+    private val chatPlan: ChatPlanGateway,
 ) : ViewModel() {
 
     data class ChatUiMessage(
@@ -62,6 +65,10 @@ class ChatViewModel(
         val webSearch: Boolean = false,
         /** 搜索 key 是否已配置；没配时互联网开关降级为知识库 */
         val searchConfigured: Boolean = false,
+        /** 已加入任一计划（待办/每日/每周）的条目 id，来源 chips 的「已加入」态用（N3a） */
+        val plannedEntryIds: Set<String> = emptySet(),
+        /** 空态示例问题（N3b）：按档案字段出的静态模板，空档案走通用兜底 */
+        val sampleQuestions: List<String> = emptyList(),
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -79,6 +86,16 @@ class ChatViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             val count = entriesData().entries.size
             _uiState.update { it.copy(entryCount = count) }
+        }
+        // 示例问题取启动时的一帧档案即可：档案变化不频繁，空态也只出现一次
+        viewModelScope.launch(Dispatchers.IO) {
+            val profile = profileRepository.profileFlow.first() ?: Profile.EMPTY
+            _uiState.update { it.copy(sampleQuestions = SampleQuestions.forProfile(profile)) }
+        }
+        viewModelScope.launch {
+            chatPlan.plannedEntryIdsFlow().collect { ids ->
+                _uiState.update { it.copy(plannedEntryIds = ids) }
+            }
         }
         viewModelScope.launch {
             settingsStore.settingsFlow.collect { cfg ->
@@ -226,6 +243,16 @@ class ChatViewModel(
         }
     }
 
+    /** 来源条目加入一次性待办（N3a）；TaskManager 内部幂等，重复点不会重复建行 */
+    fun addSourceToTodo(entryId: String) {
+        viewModelScope.launch(Dispatchers.IO) { chatPlan.addToTodo(entryId) }
+    }
+
+    /** 来源条目设为每日习惯（N3a）：写 STATE_DAILY，今天已有安排则补一行 */
+    fun addSourceToDaily(entryId: String) {
+        viewModelScope.launch(Dispatchers.IO) { chatPlan.addDailyHabit(entryId) }
+    }
+
     /** 已触发过解读的条目：旋转重建 Composition 会重放 LaunchedEffect,不能重复发 */
     private val explainedEntryIds = mutableSetOf<String>()
 
@@ -276,6 +303,7 @@ class ChatViewModel(
                     c.entryRepository::entriesData,
                     c.settingsStore,
                     c.chatMessageDao,
+                    c.taskManager,
                 )
             }
         }

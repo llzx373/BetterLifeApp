@@ -336,6 +336,7 @@ private fun AppScaffold(startDestination: Any, navTarget: String?, onNavTargetCo
                     entryId = entry.toRoute<ChatRoute>().entryId,
                     onBack = { navController.popBackStack() },
                     onOpenSettings = { navController.navigate(SettingsRoute) },
+                    onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
                 )
             }
             composable<SettingsRoute> {

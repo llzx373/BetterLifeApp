@@ -152,6 +152,10 @@
     <string name="chat_web_not_configured">互联网回答需要先配置 AI 搜索的 API Key</string>
     <string name="chat_sources_label">来源</string>
     <string name="chat_sources_more">等 %1$d 条来源</string>
+    <string name="chat_source_add_todo">加入待办</string>
+    <string name="chat_source_add_daily">设为每日习惯</string>
+    <string name="chat_source_view_detail">查看详情</string>
+    <string name="chat_source_added">已加入</string>
 
     <!-- AI 搜索设置 -->
     <string name="settings_section_ai_search">AI 搜索</string>
@@ -242,9 +246,6 @@
     <string name="chat_thinking">正在检索 %1$d 条建议并请教模型</string>
     <string name="chat_thinking_plain">正在检索建议并请教模型</string>
     <string name="chat_suggestions_title">试着问一个:</string>
-    <string name="chat_suggestion_1">我抽烟,先看哪几条?</string>
-    <string name="chat_suggestion_2">每天久坐 10 小时,怎么办?</string>
-    <string name="chat_suggestion_3">体检该查哪些项目?</string>
     <string name="chat_error_generic">出了点问题,请稍后再试</string>
     <string name="chat_input_hint">问点什么,比如:我抽烟,先看哪几条?</string>
 

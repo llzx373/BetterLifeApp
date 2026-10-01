@@ -56,7 +56,7 @@ class TaskManager(
     // B1 自动核销依赖：默认 null，缺了任何一个都安静地不启用自动核销
     private val healthConnect: HealthConnectMetrics? = null,
     private val healthRulesRepository: HealthRulesRepository? = null,
-) : TimerTaskGateway {
+) : TimerTaskGateway, ChatPlanGateway {
 
     companion object {
         private const val CUSTOM_ID_PREFIX = "custom:"
@@ -280,6 +280,18 @@ class TaskManager(
         )
     }
 
+    /** 聊天页「加入待办」（N3a）：无截止日的复用上面的幂等逻辑 */
+    override suspend fun addToTodo(entryId: String) = addOneOffTodo(entryId)
+
+    /**
+     * 把条目设为每日习惯：写 STATE_DAILY，今天已有 DAILY 安排则直接补一行；
+     * 今天还没生成则留给 ensureTodayTasks 一并规划（幂等，次日自动落行）。
+     */
+    override suspend fun addDailyHabit(entryId: String) {
+        addEntryState(entryId, EntryStateEntity.STATE_DAILY)
+        ensureTodayDailyRow(entryId)
+    }
+
     /**
      * 设置/清除一次性待办的截止日（null = 清除）。
      * 已设独立提醒时间的任务按新截止日重排提醒 work；没设提醒时间的无需动 work。
@@ -392,7 +404,7 @@ class TaskManager(
      * 已加入任一计划（一次性待办 TODO / 每日习惯 DAILY / 每周习惯模板）的条目 id。
      * 推荐引擎据此把「已在计划里」的条目排除出推荐列表。
      */
-    fun plannedEntryIdsFlow(): Flow<Set<String>> =
+    override fun plannedEntryIdsFlow(): Flow<Set<String>> =
         combine(
             entryStateDao.entryIdsByStateFlow(EntryStateEntity.STATE_TODO),
             entryStateDao.entryIdsByStateFlow(EntryStateEntity.STATE_DAILY),
@@ -526,11 +538,7 @@ class TaskManager(
         addOneOffTodo(newCustomEntry(title), dueDate)
 
     /** 自定义每日习惯：写 STATE_DAILY，今天已有安排则补一行 */
-    suspend fun addCustomDaily(title: String) {
-        val id = newCustomEntry(title)
-        addEntryState(id, EntryStateEntity.STATE_DAILY)
-        ensureTodayDailyRow(id)
-    }
+    suspend fun addCustomDaily(title: String) = addDailyHabit(newCustomEntry(title))
 
     /** 自定义每周习惯：一周 [timesPerWeek] 次 */
     suspend fun addCustomWeekly(title: String, timesPerWeek: Int) =
