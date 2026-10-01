@@ -61,11 +61,26 @@ private const val STALE_FILE_AGE_MS = 24L * 60 * 60 * 1000
  * 必须在主线程调用(离屏渲染依赖视图树与首帧回调)。
  */
 suspend fun shareEntryImage(context: Context, host: View, entry: EntryDto) {
-    val bitmap = renderShareCard(host, entry)
+    shareCardImage(context, host, "entry-${entry.id}", entry.shareText()) { ShareCardContent(entry) }
+}
+
+/**
+ * 通用分享卡管线(N6 起条目分享卡与里程碑日签共用):离屏渲染 [content] → 写 PNG →
+ * FileProvider 分享。任何一步失败都抛异常,由调用方回退到纯文本分享([fallbackText] 是给
+ * 不认图片的目标 App 的兜底文案)。必须在主线程调用。
+ */
+suspend fun shareCardImage(
+    context: Context,
+    host: View,
+    fileName: String,
+    fallbackText: String,
+    content: @Composable () -> Unit,
+) {
+    val bitmap = renderCardBitmap(host, content)
     val file = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "share").apply { mkdirs() }
         cleanupStaleShareFiles(dir)
-        File(dir, "entry-${entry.id}.png").also { f ->
+        File(dir, "$fileName.png").also { f ->
             FileOutputStream(f).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
         }
     }
@@ -74,14 +89,14 @@ suspend fun shareEntryImage(context: Context, host: View, entry: EntryDto) {
         type = "image/png"
         putExtra(Intent.EXTRA_STREAM, uri)
         // 目标 App 不认图片时还有纯文本兜底
-        putExtra(Intent.EXTRA_TEXT, entry.shareText())
+        putExtra(Intent.EXTRA_TEXT, fallbackText)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     context.startActivity(Intent.createChooser(intent, null))
 }
 
 /** 离屏渲染:挂到 content 视图(平移出屏)等首帧,再画进 Bitmap */
-private suspend fun renderShareCard(host: View, entry: EntryDto): Bitmap =
+private suspend fun renderCardBitmap(host: View, content: @Composable () -> Unit): Bitmap =
     suspendCancellableCoroutine { cont ->
         val root = host.rootView.findViewById<ViewGroup>(android.R.id.content)
         if (root == null) {
@@ -90,7 +105,7 @@ private suspend fun renderShareCard(host: View, entry: EntryDto): Bitmap =
         }
         val view = ComposeView(host.context)
         // 关闭动效:入场动画的中间态会被截图拍成空白(同预览的处理)
-        view.setContent { BetterLifeTheme(motionLevel = MotionLevel.OFF) { ShareCardContent(entry) } }
+        view.setContent { BetterLifeTheme(motionLevel = MotionLevel.OFF) { content() } }
         root.addView(view, ViewGroup.LayoutParams(CARD_WIDTH_PX, ViewGroup.LayoutParams.WRAP_CONTENT))
         // 移出屏幕,渲染那一帧用户看不到;手动 draw 不经过父视图,不受平移影响
         view.translationX = -CARD_WIDTH_PX.toFloat()

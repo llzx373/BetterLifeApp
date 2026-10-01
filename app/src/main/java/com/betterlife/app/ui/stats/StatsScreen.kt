@@ -1,8 +1,10 @@
 // 数据统计页（B6/B7/C5③）：回顾与成就、连续天数、近 8 周完成率趋势、周期报告 + AI 解读。
 // 基调是「回顾」而不是「激励」（§1 规则 4）：没有徽章墙与排行榜，空态不施压，
-// 新达成的里程碑只做一次性低调高亮。
+// 新达成的里程碑只做一次性低调高亮。N6:连签里程碑行尾有「分享日签」入口(唯一入口)。
 package com.betterlife.app.ui.stats
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,7 +45,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -52,6 +58,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -69,6 +77,7 @@ import com.betterlife.app.stats.CheckinNote
 import com.betterlife.app.stats.PeriodReport
 import com.betterlife.app.stats.StatsPeriod
 import com.betterlife.app.stats.WeeklyCompletion
+import com.betterlife.app.stats.isStreakMilestone
 import com.betterlife.app.ui.common.MotionEntrance
 import com.betterlife.app.ui.common.lensGroupTitle
 import com.betterlife.app.ui.theme.LocalLensColors
@@ -78,7 +87,9 @@ import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.ui.theme.lensIcon
 import com.betterlife.app.viewmodel.StatsViewModel
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun StatsScreen(
@@ -87,13 +98,47 @@ fun StatsScreen(
     vm: StatsViewModel = viewModel(factory = StatsViewModel.Factory),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val view = LocalView.current
+    val scope = rememberCoroutineScope()
+    /** 日签渲染/写盘期间挡掉重复点击 */
+    var sharing by remember { mutableStateOf(false) }
     StatsContent(
         state = state,
         onBack = onBack,
         onOpenSettings = onOpenSettings,
         onSelectPeriod = vm::selectPeriod,
         onInterpret = { label -> vm.interpretPeriod(label) },
+        onShareMilestone = { achievement ->
+            if (sharing) return@StatsContent
+            sharing = true
+            scope.launch {
+                try {
+                    val data = vm.milestoneShareData(achievement.key)
+                    if (data != null) {
+                        try {
+                            shareMilestoneCard(context, view, data)
+                        } catch (t: Throwable) {
+                            if (t is CancellationException) throw t
+                            // 卡片渲染/写盘/授权任何一步失败,回退到纯文本分享
+                            sharePlainText(context, milestoneShareText(context, data))
+                        }
+                    }
+                } finally {
+                    sharing = false
+                }
+            }
+        },
     )
+}
+
+/** 日签分享失败时的兜底:纯文本系统分享(与详情页分享回退同款) */
+private fun sharePlainText(context: Context, text: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    context.startActivity(Intent.createChooser(intent, null))
 }
 
 /** 无状态内容：截图测试直接喂假状态渲染它，不需要 ViewModel / Room */
@@ -105,6 +150,7 @@ internal fun StatsContent(
     onOpenSettings: () -> Unit,
     onSelectPeriod: (StatsPeriod) -> Unit,
     onInterpret: (String) -> Unit,
+    onShareMilestone: (Achievement) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -161,7 +207,7 @@ internal fun StatsContent(
             verticalArrangement = Arrangement.spacedBy(Spacing.space4),
         ) {
             MotionEntrance(visibleState = staggeredCardVisible(0), slideFromBottom = true) {
-                AchievementsCard(state.achievements, state.newAchievementKeys)
+                AchievementsCard(state.achievements, state.newAchievementKeys, onShareMilestone)
             }
             MotionEntrance(visibleState = staggeredCardVisible(1), slideFromBottom = true) {
                 StreakCard(state)
@@ -234,7 +280,11 @@ private fun achievementIcon(key: String): ImageVector = when {
 }
 
 @Composable
-private fun AchievementsCard(achievements: List<Achievement>, newKeys: Set<String>) {
+private fun AchievementsCard(
+    achievements: List<Achievement>,
+    newKeys: Set<String>,
+    onShareMilestone: (Achievement) -> Unit,
+) {
     StatsCard(R.string.stats_section_achievements) {
         if (achievements.isEmpty()) {
             Text(
@@ -278,6 +328,17 @@ private fun AchievementsCard(achievements: List<Achievement>, newKeys: Set<Strin
                                 stringResource(R.string.stats_new_badge),
                                 style = MaterialTheme.typography.labelSmall,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+                    // N6:连签里程碑给「分享日签」入口,唯一入口、不弹窗不红点;
+                    // 累计/完美周不是连签内容,不出日签
+                    if (isStreakMilestone(ach.key)) {
+                        IconButton(onClick = { onShareMilestone(ach) }) {
+                            Icon(
+                                Icons.Filled.Share,
+                                contentDescription = stringResource(R.string.stats_milestone_share),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }

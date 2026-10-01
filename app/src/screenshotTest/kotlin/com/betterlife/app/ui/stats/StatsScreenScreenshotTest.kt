@@ -99,6 +99,7 @@ fun StatsLoading() {
             onOpenSettings = {},
             onSelectPeriod = {},
             onInterpret = {},
+            onShareMilestone = {},
         )
     }
 }
@@ -114,6 +115,7 @@ fun StatsEmpty() {
             onOpenSettings = {},
             onSelectPeriod = {},
             onInterpret = {},
+            onShareMilestone = {},
         )
     }
 }
@@ -129,6 +131,7 @@ fun StatsPopulated() {
             onOpenSettings = {},
             onSelectPeriod = {},
             onInterpret = {},
+            onShareMilestone = {},
         )
     }
 }
@@ -156,6 +159,7 @@ fun StatsStreakFreshStart() {
             onOpenSettings = {},
             onSelectPeriod = {},
             onInterpret = {},
+            onShareMilestone = {},
         )
     }
 }

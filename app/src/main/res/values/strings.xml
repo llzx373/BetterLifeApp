@@ -549,4 +549,9 @@
     <string name="filter_chip_active">%1$s·%2$d</string>
     <string name="filter_empty">没有符合当前筛选的条目</string>
     <string name="share_card_source_label">出处</string>
+
+    <!-- 里程碑日签分享(N6) -->
+    <string name="stats_milestone_share">分享日签</string>
+    <string name="milestone_card_streak">已连续打卡 %1$d 天</string>
+    <string name="milestone_share_text">%1$s,连续打卡 %2$d 天</string>
 </resources>

@@ -26,6 +26,7 @@ import com.betterlife.app.recommend.computeEntryStats
 import com.betterlife.app.stats.Achievement
 import com.betterlife.app.stats.AchievementInput
 import com.betterlife.app.stats.DailyStreak
+import com.betterlife.app.stats.MilestoneShareData
 import com.betterlife.app.stats.PeriodReport
 import com.betterlife.app.stats.StatsEntry
 import com.betterlife.app.stats.StatsPeriod
@@ -35,7 +36,9 @@ import com.betterlife.app.stats.WeeklyCompletion
 import com.betterlife.app.stats.buildPeriodInterpretPrompt
 import com.betterlife.app.stats.computeStats
 import com.betterlife.app.stats.evaluateAchievements
+import com.betterlife.app.stats.isStreakMilestone
 import com.betterlife.app.stats.periodReport
+import com.betterlife.app.stats.pickMilestoneQuote
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -193,6 +196,27 @@ class StatsViewModel(
 
     fun selectPeriod(period: StatsPeriod) {
         _uiState.update { it.copy(selectedPeriod = period, report = reportFor(period), insight = InsightState()) }
+    }
+
+    /**
+     * N6:日签分享数据,点连签里程碑行的「分享」时现取(不常驻 UiState)。
+     * 非连签里程碑或成就列表里找不到时返回 null。书摘优先取已 DONE 的库内条目,
+     * 没 DONE 过用种子池兜底(挑选规则见 stats/MilestoneShare.kt)。
+     */
+    suspend fun milestoneShareData(key: String): MilestoneShareData? {
+        if (!isStreakMilestone(key)) return null
+        val achievement = _uiState.value.achievements.firstOrNull { it.key == key } ?: return null
+        val entriesData = withContext(Dispatchers.IO) { entryRepository.entriesData() }
+        val doneIds = lastRows.filter { it.done }.map { it.entryId }
+            .filter { it in entriesData.byId }.toSet()
+        val quoteId = pickMilestoneQuote(doneIds, entriesData.seedEntryIds, lastToday)
+        val quote = quoteId?.let { entriesData.byId[it] }
+        return MilestoneShareData(
+            streakDays = achievement.value,
+            date = lastToday,
+            quoteTitle = quote?.title,
+            quoteHuman = quote?.human,
+        )
     }
 
     private fun reportFor(period: StatsPeriod): PeriodReport {
