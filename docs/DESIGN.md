@@ -106,6 +106,7 @@ onboarding 填档案 → ProfileEntity(N1:可「先随便看看」跳过,空档�
   → 待办转换 → STATE_DAILY 进每日 / weekly_habits + WEEKLY 打卡行进每周
   → 自定义任务 → custom_entries 存标题(id 为 "custom:<UUID>"),三种类型复用同一套打卡/提醒逻辑
 ReminderScheduler:WorkManager 每天 ensureTodayTasks + 通知未完成数 + autoCompleteByHealth(+ N2c 挽回通知判断)
+WeeklyReportWorker(N4):独立 7 天周期 work,锚定周日 20:07,汇总本周打卡发周报(0 打卡周不发)
 「今天」是 TaskManager 里的 StateFlow,MainActivity.onResume 时 refreshToday() 并写 DataStore `last_active_date`(N2c);
 进程跨夜存活时任务查询随之切到新日期(此前 LocalDate.now() 在 Flow 创建时固化,跨天不刷新)
 小组件:TodayTasksWidget 渲染前幂等 ensureTodayTasks,打卡走同一个 TaskManager;
@@ -133,11 +134,11 @@ ReminderScheduler:WorkManager 每天 ensureTodayTasks + 通知未完成数 + aut
 
 ```bash
 python tools/build_content.py      # 内容变更后重跑,看自检统计
-./gradlew testDebugUnitTest        # 301 例(47 类):引擎/播种挑选/检索器/档案映射/排序/规则一致性/提醒继承与重排/备份/统计/聊天/示例问题/内容包完整性/同步逻辑等
+./gradlew testDebugUnitTest        # 316 例(48 类):引擎/播种挑选/检索器/档案映射/排序/规则一致性/提醒继承与重排/备份/统计/周报决策与文案/聊天/示例问题/内容包完整性/同步逻辑等
 ./gradlew assembleDebug
 ```
 
-冒烟路径(新机器或改动后必走):onboarding → 今日页出任务和推荐 → 打卡出 streak → 待办页三分区(每日/每周/一次性) → 条目库搜索 → (配 Key)AI 问答 → 设置开提醒;N1:跳过向导直入今日页(有推荐 + 3 条示例习惯 + 问题卡片)、答一题推荐变化;N3:聊天空态出 3 个示例问题(点击填入输入框不自动发送)、答案来源 chip 加入待办 → 待办页出现,再点显示「已加入」。
+冒烟路径(新机器或改动后必走):onboarding → 今日页出任务和推荐 → 打卡出 streak → 待办页三分区(每日/每周/一次性) → 条目库搜索 → (配 Key)AI 问答 → 设置开提醒;N1:跳过向导直入今日页(有推荐 + 3 条示例习惯 + 问题卡片)、答一题推荐变化;N3:聊天空态出 3 个示例问题(点击填入输入框不自动发送)、答案来源 chip 加入待办 → 待办页出现,再点显示「已加入」;N4:设置页「每周总结」开关默认开。
 
 ## 8. 已知取舍与路线
 
@@ -153,6 +154,7 @@ python tools/build_content.py      # 内容变更后重跑,看自检统计
 - **HC 达标报喜通知(N2b,2026-10-01)**:核销结果(`AutoCompleteResult`:条数 + 证据文案)交给纯函数 `tasks/NotifyDecision.kt` 的 `decideAutoNotify` 决策——全部完成且当天没报喜过 → 只发一条报喜(证据进文案,复用 "daily" 渠道,通知 id 1002);还有未完成 → 证据合并进每日汇总(「…已自动打卡;今天还有 N 条任务未完成」);同日同事件不重复发(DataStore `hc_praise_sent_date` 记当日已发);报喜开关 `hc_praise_enabled` 默认开,设置页「每日提醒」分组。两个触发点(今日页授权后由 TodayViewModel 发、DailyReminderWorker 由 worker 发)共用同一决策与频控标记
 - **3 日未打开挽回通知(N2c,2026-10-01)**:`MainActivity.onResume` 顺手写 DataStore `last_active_date`(打开即重置计时);`DailyReminderWorker` 每天交给纯函数 `decideReengageNotify` 决策——满 3 天未打开且距上次发送满 7 天才发(`reengage_sent_date` 记上次发送;`last_active_date` 为空=老用户升级后还没打开过新版,不发等首次打开),文案「回来补个卡?昨天的还能补」,复用 "daily" 渠道,通知 id 1003,点击经 `MainActivity.EXTRA_OPEN_ROUTE` 深链到待办页(AppNav 消费一次即置空);开关 `reengage_enabled`(「久未打开提醒」)默认开,与报喜开关同组
 - **AI 问答行动闭环与示例问题(N3,2026-10-01)**:知识库答案的来源条目渲染为可点 chips(DropdownMenu:加入待办/设为每日习惯/查看详情),`ChatViewModel` 经窄接口 `ChatPlanGateway`(TaskManager 实现,照 TimerTaskGateway 先例,测试喂 fake)调用 `addToTodo`/`addDailyHabit`;已在计划中的条目按 `plannedEntryIdsFlow` 显示「已加入」对勾、加项置灰,互联网来源保持只读链接。空态示例问题改由纯函数 `ai/SampleQuestions.kt` 按档案字段出静态模板(吸烟/慢病/饮酒/睡眠等),点击只填入输入框不自动发送;空档案(knownFields=空集)/无命中走 3 条通用兜底,knownFields 不参与判定(档案经 Room 往返后不保留已知性,默认值档案=老用户已填完,照出对应模板)
+- **每周日晚周报推送(N4,2026-10-01)**:独立周期 work `tasks/WeeklyReportWorker.kt`(7 天 + 6h flex,首次延迟锚定到最近的周日 20:07,`stats/WeeklyReport.kt` 的 `nextWeeklyReportMillis` 纯函数计算;App 启动 KEEP 注册,开关只做 doWork 内门控不增删 work)。决策与文案均为纯函数(`decideWeeklyReport`/`weeklyReportText`):仅周日触发、**0 打卡周不发**、同周不重复发(DataStore `weekly_report_sent_week` 记已发周的周一);文案 = 本周打卡次数 + 环比上周(下滑不报数字,保持正向)+ 当前最长连签,统计口径与统计页一致(`periodReport`/`computeStats`,复用 `weekRange()`)。通知复用 "daily" 渠道,id 1004,点击经 `EXTRA_OPEN_ROUTE` + `ROUTE_STATS` 深链统计页;开关 `weekly_report_enabled`(「每周总结」)默认开,与报喜/挽回开关同组
 - **数据导出/导入(B2)**:`data/backup/` 本地 JSON(format `version = 6`),覆盖 7 张持久表(profile/tasks/entry_states/weekly_habits/custom_entries/entry_notes/streak_leaves);chat_messages 不备份,DataStore 里的 API Key 等敏感配置不出设备。导入先完整解析+校验版本,全部通过才在单事务里清写(失败回滚,现有数据不变);taskId 原样保留,导入后重排未完成 ONCE 任务的提醒 work
 - **聊天持久化与流式(C5)**:对话落 `chat_messages` 表,封顶保留最新 200 条(ChatViewModel.trimToLatest);`LlmClient.chatStream` 按 SSE 逐行读增量,`AiAdvisor.askStream`/`interpretStatsStream` 流式失败时保留已收残缺内容、一条没收到则回退单发。统计页 AI 解读用 STATS_INTERPRET 提示词(不检索不搜网,统计摘要直接进 prompt)
 - **统计与成就(B6/B7)**:`stats/` 是纯 Kotlin(StatsCalculator 出连续天数/近 8 周趋势/周期报告,Achievements 出里程碑判定),ViewModel 把 TaskEntity 折成 StatsTaskRow 喂进去,趋势数学与成就判定都能脱机单测。UI 手写 Canvas 柱状图(§10 禁图表库),带 TalkBack 逐周摘要;成就定位**回顾**而非竞争——无徽章墙/排行榜,新达成只在统计页一次性低调「新」徽标(已庆祝集合存 DataStore)

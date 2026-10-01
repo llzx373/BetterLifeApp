@@ -355,7 +355,7 @@ fun SettingsScreen(
                     }
                     enableReminder(want)
                 },
-                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 4),
+                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 5),
             ) {
                 Text(stringResource(R.string.settings_reminder_enable))
             }
@@ -363,7 +363,7 @@ fun SettingsScreen(
                 onClick = {
                     showTimePicker = true
                 },
-                shapes = ListItemDefaults.segmentedShapes(index = 1, count = 4),
+                shapes = ListItemDefaults.segmentedShapes(index = 1, count = 5),
                 trailingContent = {
                     Text("%02d:%02d".format(settings.reminderHour, settings.reminderMinute))
                 },
@@ -374,7 +374,7 @@ fun SettingsScreen(
             SegmentedListItem(
                 checked = settings.hcPraiseEnabled,
                 onCheckedChange = { vm.setHcPraiseEnabled(it) },
-                shapes = ListItemDefaults.segmentedShapes(index = 2, count = 4),
+                shapes = ListItemDefaults.segmentedShapes(index = 2, count = 5),
                 supportingContent = { Text(stringResource(R.string.settings_hc_praise_sub)) },
             ) {
                 Text(stringResource(R.string.settings_hc_praise))
@@ -383,10 +383,19 @@ fun SettingsScreen(
             SegmentedListItem(
                 checked = settings.reengageEnabled,
                 onCheckedChange = { vm.setReengageEnabled(it) },
-                shapes = ListItemDefaults.segmentedShapes(index = 3, count = 4),
+                shapes = ListItemDefaults.segmentedShapes(index = 3, count = 5),
                 supportingContent = { Text(stringResource(R.string.settings_reengage_sub)) },
             ) {
                 Text(stringResource(R.string.settings_reengage))
+            }
+            // N4：每周日晚的周报开关,默认开;0 打卡周不发的判断在决策纯函数里,开关只管发不发
+            SegmentedListItem(
+                checked = settings.weeklyReportEnabled,
+                onCheckedChange = { vm.setWeeklyReportEnabled(it) },
+                shapes = ListItemDefaults.segmentedShapes(index = 4, count = 5),
+                supportingContent = { Text(stringResource(R.string.settings_weekly_report_sub)) },
+            ) {
+                Text(stringResource(R.string.settings_weekly_report))
             }
 
             // 开关还开着、权限却没了:静默失效比关开关更糟,给一行明说 + 出口

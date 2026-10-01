@@ -48,6 +48,9 @@ class ReminderScheduler(private val context: Context) {
         /** N2c 挽回通知的 id，与汇总（1001）/报喜（1002）互不覆盖 */
         const val REENGAGE_NOTIFICATION_ID = 1003
 
+        /** N4 周报的 id，与汇总（1001）/报喜（1002）/挽回（1003）互不覆盖 */
+        const val WEEKLY_REPORT_NOTIFICATION_ID = 1004
+
         /** 单任务提醒的 unique work 名前缀，按 taskId 一一对应 */
         const val TASK_WORK_PREFIX = "remind_task_"
 
@@ -126,6 +129,28 @@ class ReminderScheduler(private val context: Context) {
             .build()
         try {
             NotificationManagerCompat.from(context).notify(REENGAGE_NOTIFICATION_ID, notification)
+        } catch (_: SecurityException) {
+            // 权限被收回等情况，忽略
+        }
+    }
+
+    /**
+     * N4 每周日晚周报：一句话总结本周打卡（文案由 stats/WeeklyReport.kt 的纯函数生成）。
+     * 复用 "daily" 渠道，点击深链到统计页；触发时机与 0 打卡/同周频控由
+     * WeeklyReportWorker + decideWeeklyReport 负责，这里只管发。
+     */
+    fun notifyWeeklyReport(text: String) {
+        if (!hasNotificationPermission(context)) return
+        ensureChannel(context)
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.notification_weekly_title))
+            .setContentText(text)
+            .setContentIntent(reminderContentIntent(context, MainActivity.ROUTE_STATS))
+            .setAutoCancel(true)
+            .build()
+        try {
+            NotificationManagerCompat.from(context).notify(WEEKLY_REPORT_NOTIFICATION_ID, notification)
         } catch (_: SecurityException) {
             // 权限被收回等情况，忽略
         }

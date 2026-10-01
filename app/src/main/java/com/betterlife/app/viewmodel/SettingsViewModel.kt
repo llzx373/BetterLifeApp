@@ -282,6 +282,13 @@ class SettingsViewModel(
         }
     }
 
+    /** N4：「每周总结」开关 */
+    fun setWeeklyReportEnabled(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            settingsStore.setWeeklyReportEnabled(enabled)
+        }
+    }
+
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch(Dispatchers.IO) {
             settingsStore.setThemeMode(mode.key)

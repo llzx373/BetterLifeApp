@@ -20,6 +20,9 @@
     <string name="notification_reengage_title">回来补个卡?</string>
     <string name="notification_reengage_body">昨天的还能补</string>
 
+    <!-- N4：每周日晚周报通知，正文由 stats/WeeklyReport.kt 的纯函数生成，点击深链到统计页 -->
+    <string name="notification_weekly_title">每周总结</string>
+
     <!-- 单任务提醒通知 -->
     <string name="notification_task_title">任务提醒</string>
     <string name="notification_task_body">别忘了：%1$s</string>
@@ -412,6 +415,8 @@
     <string name="settings_hc_praise_sub">健康数据达标自动打卡后,发一条通知报喜</string>
     <string name="settings_reengage">久未打开提醒</string>
     <string name="settings_reengage_sub">几天没打开时发一条通知,提醒你回来补卡;每 7 天最多一条</string>
+    <string name="settings_weekly_report">每周总结</string>
+    <string name="settings_weekly_report_sub">每周日晚发一条本周打卡小结;没有打卡的周不打扰</string>
     <string name="action_open_settings">去开启</string>
     <string name="settings_section_theme">主题</string>
     <string name="settings_section_motion">动效</string>

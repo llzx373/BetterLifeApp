@@ -80,5 +80,8 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_OPEN_ROUTE = "com.betterlife.app.extra.OPEN_ROUTE"
         const val ROUTE_TODO = "todo"
         const val ROUTE_TODAY = "today"
+
+        /** N4 周报通知深链：统计页（非 tab，navigate 不带 tabOptions） */
+        const val ROUTE_STATS = "stats"
     }
 }

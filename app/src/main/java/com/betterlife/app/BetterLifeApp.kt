@@ -25,6 +25,7 @@ import com.betterlife.app.recommend.RecommendationEngine
 import com.betterlife.app.tasks.ContentSyncWorker
 import com.betterlife.app.tasks.ReminderScheduler
 import com.betterlife.app.tasks.TaskManager
+import com.betterlife.app.tasks.WeeklyReportWorker
 
 class BetterLifeApp : Application() {
 
@@ -36,6 +37,8 @@ class BetterLifeApp : Application() {
         container = AppContainer(this)
         // 内容库周期同步（每天一次、联网才跑）；KEEP 语义，重复注册不会重置已排队的任务
         ContentSyncWorker.enqueuePeriodic(this)
+        // N4：每周日晚周报（7 天周期，锚定周日 20:07）；KEEP 语义，重复注册不重置锚点
+        WeeklyReportWorker.enqueuePeriodic(this)
     }
 }
 

@@ -33,6 +33,8 @@ data class AppSettings(
     val hcPraiseEnabled: Boolean = true,
     /** N2c：3 日未打开时是否发挽回通知，默认开 */
     val reengageEnabled: Boolean = true,
+    /** N4：每周日晚是否发周报通知，默认开 */
+    val weeklyReportEnabled: Boolean = true,
     val onboardingDone: Boolean = false,
     val themeMode: String = SettingsStore.DEFAULT_THEME_MODE,
     val motionLevel: String = SettingsStore.DEFAULT_MOTION_LEVEL,
@@ -79,6 +81,10 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
         val REENGAGE_ENABLED = booleanPreferencesKey("reengage_enabled")
         val LAST_ACTIVE_DATE = stringPreferencesKey("last_active_date")
         val REENGAGE_SENT_DATE = stringPreferencesKey("reengage_sent_date")
+
+        // N4:周报开关(默认开)与同周频控标记(已发周报所属的周一日期,yyyy-MM-dd,空串 = 从未发过)
+        val WEEKLY_REPORT_ENABLED = booleanPreferencesKey("weekly_report_enabled")
+        val WEEKLY_REPORT_SENT_WEEK = stringPreferencesKey("weekly_report_sent_week")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val MOTION_LEVEL = stringPreferencesKey("motion_level")
@@ -127,6 +133,7 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
             reminderEnabled = p[Keys.REMINDER_ENABLED] ?: false,
             hcPraiseEnabled = p[Keys.HC_PRAISE_ENABLED] ?: true,
             reengageEnabled = p[Keys.REENGAGE_ENABLED] ?: true,
+            weeklyReportEnabled = p[Keys.WEEKLY_REPORT_ENABLED] ?: true,
             onboardingDone = p[Keys.ONBOARDING_DONE] ?: false,
             themeMode = p[Keys.THEME_MODE] ?: DEFAULT_THEME_MODE,
             motionLevel = p[Keys.MOTION_LEVEL] ?: DEFAULT_MOTION_LEVEL,
@@ -244,6 +251,22 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
 
     suspend fun setReengageSentDate(date: String) {
         context.dataStore.edit { it[Keys.REENGAGE_SENT_DATE] = date }
+    }
+
+    /** N4：「每周总结」开关；只门控发不发，周期 work 不动（WeeklyReportWorker 里读） */
+    suspend fun setWeeklyReportEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.WEEKLY_REPORT_ENABLED] = enabled }
+    }
+
+    /**
+     * N4 已发周报所属的周一日期（yyyy-MM-dd），空串 = 从未发过；同周频控依据。
+     * 与 hcPraiseSentDate 同理不进 AppSettings —— 它是通知频控的局部状态，只需读一次。
+     */
+    suspend fun weeklyReportSentWeek(): String =
+        context.dataStore.data.first()[Keys.WEEKLY_REPORT_SENT_WEEK].orEmpty()
+
+    suspend fun setWeeklyReportSentWeek(weekStart: String) {
+        context.dataStore.edit { it[Keys.WEEKLY_REPORT_SENT_WEEK] = weekStart }
     }
 
     override suspend fun setOnboardingDone(done: Boolean) {
