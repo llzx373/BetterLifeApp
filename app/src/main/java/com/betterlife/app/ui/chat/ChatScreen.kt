@@ -7,6 +7,10 @@
 // 已在计划中的条目显示「已加入」态并置灰加项;互联网来源(标题+链接)保持只读。
 package com.betterlife.app.ui.chat
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.foundation.clickable
@@ -35,6 +39,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -55,6 +60,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,9 +70,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
@@ -128,6 +139,39 @@ fun ChatScreen(
             listState.animateScrollToItem(last)
         } else {
             listState.scrollToItem(last)
+        }
+    }
+
+    // N8 语音输入:识别文本接在按下麦克风那一刻已有的输入之后,partial 与最终结果同路上屏
+    val context = LocalContext.current
+    var voiceBase by remember { mutableStateOf("") }
+    val voice = remember {
+        VoiceInputController(context) { recognized -> input = mergeVoiceText(voiceBase, recognized) }
+    }
+    // 识别服务不可用或用户拒绝过麦克风权限,麦克风按钮就安静消失,不弹窗
+    var micPermissionDenied by rememberSaveable { mutableStateOf(false) }
+    val recognitionAvailable = remember { isVoiceRecognitionAvailable(context) }
+    val showMic = shouldShowVoiceButton(recognitionAvailable, micPermissionDenied)
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            voiceBase = input
+            voice.start()
+        } else {
+            micPermissionDenied = true
+        }
+    }
+    // 页面离开(含切走 tab、返回)停止识别并释放;App 退到后台只停不释放,回来还能再按
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, voice) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) voice.stop()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            voice.release()
         }
     }
 
@@ -219,10 +263,39 @@ fun ChatScreen(
                     placeholder = { Text(stringResource(R.string.chat_input_hint)) },
                     maxLines = 4,
                 )
+                // N8:点击开始/再点结束;识别中按钮点亮为 primary,与来源切换的激活态同款
+                if (showMic) {
+                    IconButton(onClick = {
+                        if (voice.listening) {
+                            voice.stop()
+                        } else {
+                            val granted = ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.RECORD_AUDIO,
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (granted) {
+                                voiceBase = input
+                                voice.start()
+                            } else {
+                                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.Filled.Mic,
+                            contentDescription = stringResource(
+                                if (voice.listening) R.string.chat_voice_stop else R.string.chat_voice_input,
+                            ),
+                            tint = if (voice.listening) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 IconButton(
                     onClick = {
                         val q = input.trim()
                         if (q.isNotEmpty()) {
+                            // 识别中点发送:已上屏的文字照常发,识别会话静音收尾,迟到的结果不回灌输入框
+                            if (voice.listening) voice.stopQuietly()
                             vm.ask(q)
                             input = ""
                         }

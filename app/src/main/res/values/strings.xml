@@ -251,6 +251,9 @@
     <string name="chat_suggestions_title">试着问一个:</string>
     <string name="chat_error_generic">出了点问题,请稍后再试</string>
     <string name="chat_input_hint">问点什么,比如:我抽烟,先看哪几条?</string>
+    <!-- N8 语音输入:点击开始/再点结束,识别结果只填入输入框由用户确认再发 -->
+    <string name="chat_voice_input">语音输入</string>
+    <string name="chat_voice_stop">停止语音输入</string>
 
     <!-- 我的收藏 -->
     <string name="favorites_title">我的收藏</string>
