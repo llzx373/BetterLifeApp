@@ -133,6 +133,33 @@ fun StatsPopulated() {
     }
 }
 
+/**
+ * N2a:断签后当前连签为 0 —— 不说「当前 0 天」也不说「最长连续 0 天」,
+ * 头部与每行都落中性的「随时重新开始」。
+ */
+@PreviewTest
+@FourFoldScreenPreview
+@Composable
+fun StatsStreakFreshStart() {
+    PreviewScreen {
+        StatsContent(
+            state = populatedState.copy(
+                achievements = emptyList(),
+                newAchievementKeys = emptySet(),
+                streaks = listOf(
+                    DailyStreak("02-01", "把家里的食盐换成低钠盐", current = 0, max = 0),
+                    DailyStreak("11-03", "晚饭后走 20 分钟", current = 0, max = 0),
+                ),
+                bestStreak = 0,
+            ),
+            onBack = {},
+            onOpenSettings = {},
+            onSelectPeriod = {},
+            onInterpret = {},
+        )
+    }
+}
+
 // 条目完成度卡是 StatsContent 的第 5 张卡,整屏基线拍不到它(在首屏之外),单独给一张
 @PreviewTest
 @FourFoldScreenPreview

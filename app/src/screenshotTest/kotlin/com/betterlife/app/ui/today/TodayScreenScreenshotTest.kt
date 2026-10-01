@@ -183,6 +183,41 @@ fun TodayAllDone() {
 }
 
 /**
+ * N2a:断签/未开始时连签为 0 —— 问候区胶囊不示众「0 天」,落中性的「随时重新开始」。
+ */
+@PreviewTest
+@FourFoldScreenPreview
+@Composable
+fun TodayStreakZero() {
+    PreviewScreen {
+        TodayContent(
+            state = TodayViewModel.UiState.Ready(
+                todayTasks(allDone = false).map { it.copy(streak = 0) },
+            ),
+            libraryState = libraryState,
+            stepsState = StepsState.Unavailable,
+            now = FIXED_NOW,
+            onCheckIn = { _, _ -> },
+            onUndo = {},
+            onDrop = {},
+            onTakeLeave = {},
+            onCancelLeave = {},
+            onBackfill = {},
+            onOpenEntry = {},
+            onAddTodo = {},
+            onDismissEntry = {},
+            onMarkDoneBefore = {},
+            onReshuffle = {},
+            onAuthorizeSteps = {},
+            onStartTimer = {},
+            onOpenLibrary = {},
+            onEditProfile = {},
+            contentPadding = PaddingValues(Spacing.space4),
+        )
+    }
+}
+
+/**
  * 加载中的骨架屏:占位结构必须和 Ready 布局对得上（问候两行、一张卡、三条行）,
  * 否则加载→就绪的瞬间整页会跳。
  */

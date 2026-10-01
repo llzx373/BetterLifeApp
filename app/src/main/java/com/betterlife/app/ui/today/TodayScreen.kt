@@ -617,11 +617,12 @@ private fun GreetingHeader(streak: Int, now: LocalDateTime, modifier: Modifier =
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (streak > 0) StreakPill(streak)
+        // N2a:连签为 0 也渲染胶囊,但落中性文案(StreakPill 内部区分),不示众「0 天」
+        StreakPill(streak)
     }
 }
 
-/** 连续天数胶囊:数字用等宽数字,否则天数跳动时整行会横移 */
+/** 连续天数胶囊:数字用等宽数字,否则天数跳动时整行会横移;0 天(N2a)不清零示众,给中性的「随时重新开始」 */
 @Composable
 private fun StreakPill(days: Int) {
     val strong = days >= STREAK_STRONG_DAYS
@@ -631,7 +632,11 @@ private fun StreakPill(days: Int) {
         shape = MaterialTheme.shapes.extraLarge,
     ) {
         Text(
-            text = stringResource(R.string.today_streak_pill, days),
+            text = if (days > 0) {
+                stringResource(R.string.today_streak_pill, days)
+            } else {
+                stringResource(R.string.streak_fresh_start)
+            },
             style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
             modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space2),
         )

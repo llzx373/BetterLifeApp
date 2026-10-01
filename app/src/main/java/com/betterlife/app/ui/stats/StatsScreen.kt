@@ -299,10 +299,19 @@ private fun StreakCard(state: StatsViewModel.UiState) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            Text(
-                text = stringResource(R.string.stats_streak_best, state.bestStreak),
-                style = MaterialTheme.typography.headlineSmall,
-            )
+            // N2a:最长连签为 0(从未完成过)时不写「最长连续 0 天」,落中性文案
+            if (state.bestStreak > 0) {
+                Text(
+                    text = stringResource(R.string.stats_streak_best, state.bestStreak),
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+            } else {
+                Text(
+                    text = stringResource(R.string.streak_fresh_start),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             state.streaks.forEach { streak ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -315,7 +324,12 @@ private fun StreakCard(state: StatsViewModel.UiState) {
                         modifier = Modifier.weight(1f),
                     )
                     Text(
-                        text = stringResource(R.string.stats_streak_current, streak.current),
+                        // N2a:当前连签为 0(断签)不示众「当前 0 天」,次日打卡按新连签安静起步
+                        text = if (streak.current > 0) {
+                            stringResource(R.string.stats_streak_current, streak.current)
+                        } else {
+                            stringResource(R.string.streak_fresh_start)
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
