@@ -40,6 +40,10 @@ class ProfileViewModelTest {
         override suspend fun setOnboardingDone(done: Boolean) {
             onboardingDoneCalls += done
         }
+        val markedAllAnswered = mutableListOf<Set<String>>()
+        override suspend fun markAllProfileQuestionsAnswered(fields: Set<String>) {
+            markedAllAnswered += fields
+        }
         override suspend fun current(): AppSettings = AppSettings()
     }
 
@@ -105,6 +109,8 @@ class ProfileViewModelTest {
 
         assertEquals(ProfileViewModel.SaveState.Success, vm.saveState.value)
         assertEquals(listOf(true), gateway.onboardingDoneCalls)
+        // N1:完整向导保存 = 全部字段已填,每日一问就此终止
+        assertEquals(1, gateway.markedAllAnswered.size)
     }
 
     @Test
@@ -122,5 +128,25 @@ class ProfileViewModelTest {
 
         assertEquals(ProfileViewModel.SaveState.Failed, vm.saveState.value)
         assertTrue(gateway.onboardingDoneCalls.isEmpty())
+        assertTrue(gateway.markedAllAnswered.isEmpty())
+    }
+
+    @Test
+    fun `先随便看看只标记onboardingDone不写档案`() = runTest {
+        val repo = FakeProfileRepo()
+        val gateway = FakeSettingsGateway()
+        val vm = ProfileViewModel(repo, gateway)
+
+        vm.skipOnboarding()
+
+        val deadline = System.currentTimeMillis() + 5_000
+        while (vm.saveState.value !is ProfileViewModel.SaveState.Success &&
+            System.currentTimeMillis() < deadline
+        ) Thread.sleep(10)
+
+        assertEquals(ProfileViewModel.SaveState.Success, vm.saveState.value)
+        assertEquals(listOf(true), gateway.onboardingDoneCalls)
+        assertTrue("跳过引导不写档案", repo.saved.isEmpty())
+        assertTrue("跳过引导不算填完档案", gateway.markedAllAnswered.isEmpty())
     }
 }

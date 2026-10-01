@@ -87,10 +87,43 @@ class DailySeedPickerTest {
     }
 
     @Test
-    fun `weight 为 0 的规则不算入选依据`() {
-        // 普惠规则 weight=0 且只 boost 节1 → 所有候选都没有正权重 boost
+    fun `weight 为 0 的规则不算入选依据,命中为空时落回种子池硬排`() {
+        // 普惠规则 weight=0 且只 boost 节1 → 没有正权重 boost,触发空命中兜底:
+        // 种子池按 ratio/grade/cs 稳定排序取前 3(01-03 已下架、02-02 todo 仍被剔除)
         val result = picker.pickSeeds(profile, entries, rules(boostSecs = listOf("s1"), weight = 0), emptySet())
-        assertTrue(result.isEmpty())
+        assertEquals(listOf("01-01", "01-02", "02-01"), result.map { it.id })
+    }
+
+    @Test
+    fun `空档案命中普惠规则时正常按命中挑选`() {
+        // when = {} 的普惠规则天然命中空档案,不触发兜底
+        val ids = picker.pickSeeds(Profile.EMPTY, entries, rules(), emptySet()).map { it.id }
+        assertEquals(listOf("01-01", "01-02", "02-01"), ids)
+    }
+
+    @Test
+    fun `空档案无普惠 boost 时落回种子池硬排取前 3`() {
+        // 规则带字段条件,空档案一律不命中 → 种子池 ∩ 档案命中为空 → 兜底硬排
+        val fieldRules = RulesFile(
+            seedEntryIds = listOf("01-01", "01-02", "01-03", "02-01", "02-02", "03-01"),
+            rules = listOf(
+                RuleDto(mapOf("smoking" to listOf("yes")), emptyList(), listOf("s1", "s2"), emptyList(), 10, "r"),
+            ),
+        )
+        val ids = picker.pickSeeds(Profile.EMPTY, entries, fieldRules, emptySet()).map { it.id }
+        assertEquals(listOf("01-01", "01-02", "02-01"), ids)
+    }
+
+    @Test
+    fun `兜底仍遵守 excludedIds`() {
+        val fieldRules = RulesFile(
+            seedEntryIds = listOf("01-01", "01-02", "02-01"),
+            rules = listOf(
+                RuleDto(mapOf("smoking" to listOf("yes")), emptyList(), listOf("s1", "s2"), emptyList(), 10, "r"),
+            ),
+        )
+        val ids = picker.pickSeeds(Profile.EMPTY, entries, fieldRules, setOf("01-01")).map { it.id }
+        assertEquals(listOf("01-02", "02-01"), ids)
     }
 
     @Test

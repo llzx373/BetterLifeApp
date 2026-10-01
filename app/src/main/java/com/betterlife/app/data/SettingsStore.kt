@@ -38,6 +38,8 @@ data class AppSettings(
 interface SettingsGateway {
     val settingsFlow: Flow<AppSettings>
     suspend fun setOnboardingDone(done: Boolean)
+    /** 完整档案向导保存 = 全部字段已填，每日一问就此终止（N1） */
+    suspend fun markAllProfileQuestionsAnswered(fields: Set<String>)
     suspend fun current(): AppSettings
 }
 
@@ -85,6 +87,13 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
 
         // 已提示过「已养成」的每周习惯条目 id,逗号分隔;无顺序要求
         val GRADUATION_PROMPTED = stringPreferencesKey("graduation_prompted")
+
+        // 每日一问（N1 渐进式档案收集）:已答字段 / 「暂不回答」暂缓字段(逗号分隔) /
+        // 当日已问日期(yyyy-MM-dd,空串 = 今天还没问) / 老用户一次性迁移标记
+        val PROFILE_QUESTIONS_ANSWERED = stringPreferencesKey("profile_questions_answered")
+        val PROFILE_QUESTIONS_DEFERRED = stringPreferencesKey("profile_questions_deferred")
+        val PROFILE_QUESTION_ASKED_DATE = stringPreferencesKey("profile_question_asked_date")
+        val PROFILE_QUESTIONS_MIGRATED = booleanPreferencesKey("profile_questions_migrated")
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -290,6 +299,66 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
             p[Keys.GRADUATION_PROMPTED] = (old + entryId).joinToString(",")
         }
     }
+
+    // ---------- 每日一问（N1 渐进式档案收集） ----------
+    // 与 searchHistory 同理不进 AppSettings：是今日页问题卡片的局部状态。
+
+    /** 已答过的档案字段（Profile.fieldValues 的字段名） */
+    val profileQuestionsAnsweredFlow: Flow<Set<String>> = context.dataStore.data.map { p ->
+        p[Keys.PROFILE_QUESTIONS_ANSWERED].toFieldSet()
+    }
+
+    /** 「暂不回答」暂缓的字段：当天不再出现，次日起排在未问过的字段之后 */
+    val profileQuestionsDeferredFlow: Flow<Set<String>> = context.dataStore.data.map { p ->
+        p[Keys.PROFILE_QUESTIONS_DEFERRED].toFieldSet()
+    }
+
+    /** 最近一次问问题的日期（yyyy-MM-dd），空串 = 还没问过；一天最多问一条 */
+    val profileQuestionAskedDateFlow: Flow<String> = context.dataStore.data.map { p ->
+        p[Keys.PROFILE_QUESTION_ASKED_DATE].orEmpty()
+    }
+
+    /** 答完一题：记入已答、移出暂缓、记下当日日期 */
+    suspend fun answerProfileQuestion(field: String, date: String) {
+        context.dataStore.edit { p ->
+            p[Keys.PROFILE_QUESTIONS_ANSWERED] = (p[Keys.PROFILE_QUESTIONS_ANSWERED].toFieldSet() + field)
+                .joinToString(",")
+            p[Keys.PROFILE_QUESTIONS_DEFERRED] = (p[Keys.PROFILE_QUESTIONS_DEFERRED].toFieldSet() - field)
+                .joinToString(",")
+            p[Keys.PROFILE_QUESTION_ASKED_DATE] = date
+        }
+    }
+
+    /** 暂不回答：当天不再出现，次日换下一题（该字段排到队尾） */
+    suspend fun deferProfileQuestion(field: String, date: String) {
+        context.dataStore.edit { p ->
+            p[Keys.PROFILE_QUESTIONS_DEFERRED] = (p[Keys.PROFILE_QUESTIONS_DEFERRED].toFieldSet() + field)
+                .joinToString(",")
+            p[Keys.PROFILE_QUESTION_ASKED_DATE] = date
+        }
+    }
+
+    /** 完整档案向导保存（含编辑）= 全部字段已填：问题卡片就此消失 */
+    override suspend fun markAllProfileQuestionsAnswered(fields: Set<String>) {
+        context.dataStore.edit { p ->
+            p[Keys.PROFILE_QUESTIONS_ANSWERED] = fields.joinToString(",")
+            p[Keys.PROFILE_QUESTIONS_DEFERRED] = ""
+        }
+    }
+
+    /**
+     * 老用户迁移标记：N1 之前已有档案的用户不补问——首启时若档案存在就把全部字段
+     * 标为已答。只需读一次，不进 AppSettings。
+     */
+    suspend fun isProfileQuestionsMigrated(): Boolean =
+        context.dataStore.data.first()[Keys.PROFILE_QUESTIONS_MIGRATED] ?: false
+
+    suspend fun setProfileQuestionsMigrated() {
+        context.dataStore.edit { it[Keys.PROFILE_QUESTIONS_MIGRATED] = true }
+    }
+
+    private fun String?.toFieldSet(): Set<String> =
+        orEmpty().split(",").filter { it.isNotBlank() }.toSet()
 
     /**
      * 否则播种 Kimi/DeepSeek 两张预设卡;首次写供应商时迁移结果随之落盘

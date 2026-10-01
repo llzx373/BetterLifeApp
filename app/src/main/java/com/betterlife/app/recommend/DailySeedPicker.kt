@@ -18,6 +18,10 @@ import com.betterlife.app.data.RulesFile
  *   （when = {} 的普惠规则天然命中所有人，无需特判）。
  *
  * 排序稳定（ratio → grade → cs → id），取前 [count] 条；候选不足时有多少挑多少。
+ *
+ * 空档案兜底（N1）：空档案只命中 when = {} 的普惠规则，「种子池 ∩ 档案命中 boost」
+ * 可能为空；此时落回种子池按同一套稳定排序硬排取前 [count] 条，
+ * 保证空档案用户首日也有习惯可打。
  */
 class DailySeedPicker {
 
@@ -41,11 +45,13 @@ class DailySeedPicker {
             }
         }
 
-        return rules.seedEntryIds
+        val candidates = rules.seedEntryIds
             .mapNotNull { byId[it] }
             .filter { !it.todo && !it.removed }
             .filter { it.id !in excludedIds && it.id !in excludedByRule }
-            .filter { it.id in boosted }
+        val hit = candidates.filter { it.id in boosted }
+        // 档案命中为空（典型：空档案没有命中的 boost 规则）时落回种子池硬排
+        return (if (hit.isNotEmpty()) hit else candidates)
             .sortedWith(RecommendationEngine.ENTRY_COMPARATOR)
             .take(count)
     }

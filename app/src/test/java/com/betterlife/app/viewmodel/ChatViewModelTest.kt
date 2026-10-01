@@ -45,6 +45,7 @@ class ChatViewModelTest {
     private class FakeChatSettings(settings: AppSettings) : ChatSettingsGateway {
         override val settingsFlow = MutableStateFlow(settings)
         override suspend fun setOnboardingDone(done: Boolean) = Unit
+        override suspend fun markAllProfileQuestionsAnswered(fields: Set<String>) = Unit
         override suspend fun current(): AppSettings = settingsFlow.value
         override suspend fun setChatProviderIds(ids: List<String>) {
             settingsFlow.value = settingsFlow.value.copy(chatProviderIds = ids)

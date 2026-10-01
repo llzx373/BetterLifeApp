@@ -1,4 +1,6 @@
-// 引导页:四步分步向导采集档案,完成后保存并进入今日页;已建档时作为编辑页复用
+// 引导页:四步分步向导采集档案,完成后保存并进入今日页;已建档时作为编辑页复用。
+// N1 起可跳过:第一步「先随便看看」只标记看过引导、不写档案,空档案照样出推荐,
+// 档案由今日页的「每日一问」渐进补齐。
 //
 // 流动进度条 + 可滑动翻页 + 固定高度的底部动作栏(三种状态共用一套 Row,按钮位置不跳),
 // 每一步顶部有一行「为什么问这个」,敏感问题不至于让人以为被审问。
@@ -138,7 +140,8 @@ fun OnboardingScreen(
                 }
             }
 
-            // 三种状态共用一套布局:左「上一步」、右「跳过本步 + 下一步」,最后一步主按钮占满余下宽度
+            // 三种状态共用一套布局:左「先随便看看(仅首步)/上一步」、右「跳过本步 + 下一步」,
+            // 最后一步主按钮占满余下宽度
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -146,6 +149,13 @@ fun OnboardingScreen(
                     .padding(vertical = Spacing.space3),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // N1:首次引导第一步可「先随便看看」——只标记看过引导,不写档案
+                if (!editMode && page == 0) {
+                    TextButton(
+                        onClick = { vm.skipOnboarding() },
+                        enabled = saveState !is ProfileViewModel.SaveState.Saving,
+                    ) { Text(stringResource(R.string.onboarding_skip_all)) }
+                }
                 if (page > 0) {
                     TextButton(onClick = { goToPage(page - 1) }) { Text(stringResource(R.string.onboarding_prev)) }
                 }

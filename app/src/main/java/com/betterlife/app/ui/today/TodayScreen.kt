@@ -27,6 +27,8 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -70,6 +72,7 @@ import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -89,7 +92,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -98,12 +100,24 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
+import com.betterlife.app.data.AgeRange
+import com.betterlife.app.data.Alcohol
+import com.betterlife.app.data.Children
+import com.betterlife.app.data.Chronic
 import com.betterlife.app.data.EntryDto
+import com.betterlife.app.data.Exercise
+import com.betterlife.app.data.Gender
+import com.betterlife.app.data.Goal
+import com.betterlife.app.data.Housing
+import com.betterlife.app.data.Occupation
+import com.betterlife.app.data.Smoking
+import com.betterlife.app.data.SugaryDrinks
 import com.betterlife.app.data.db.TaskEntity
 import com.betterlife.app.data.health.HealthConnectRepository
 import com.betterlife.app.data.health.StepsSource
 import com.betterlife.app.data.health.StepsState
 import com.betterlife.app.recommend.EntryStats
+import com.betterlife.app.recommend.ProfileQuestions
 import com.betterlife.app.recommend.ScoredEntry
 import com.betterlife.app.tasks.TaskManager
 import com.betterlife.app.ui.common.CostMeter
@@ -152,6 +166,7 @@ fun TodayScreen(
     val todayState by todayVm.uiState.collectAsStateWithLifecycle()
     val libraryState by libraryVm.uiState.collectAsStateWithLifecycle()
     val stepsState by stepsVm.uiState.collectAsStateWithLifecycle()
+    val recommendUpdated by todayVm.recommendUpdated.collectAsStateWithLifecycle()
 
     // 「不再推荐」/「我做过了」/「补卡」的结果反馈走这个宿主:撤销类动作即回滚对应状态
     val snackbar = remember { SnackbarHostState() }
@@ -204,11 +219,6 @@ fun TodayScreen(
                 }
             }
 
-            TodayViewModel.UiState.Empty -> NoProfileState(
-                onEditProfile = onEditProfile,
-                modifier = Modifier.fillMaxSize().padding(padding),
-            )
-
             TodayViewModel.UiState.Error -> ErrorState(
                 onRetry = todayVm::retry,
                 modifier = Modifier.fillMaxSize().padding(padding),
@@ -223,6 +233,7 @@ fun TodayScreen(
                         libraryState = libraryState,
                         stepsState = stepsState,
                         now = LocalDateTime.now(),
+                        recommendUpdated = recommendUpdated,
                         onCheckIn = todayVm::checkIn,
                         onUndo = todayVm::undoCheckIn,
                         onDrop = todayVm::dropTask,
@@ -235,6 +246,8 @@ fun TodayScreen(
                                 }
                             }
                         },
+                        onAnswerQuestion = todayVm::answerQuestion,
+                        onSkipQuestion = todayVm::skipQuestion,
                         onOpenEntry = onOpenEntry,
                         onAddTodo = libraryVm::addToTodo,
                         onReshuffle = libraryVm::reshuffleRecommendations,
@@ -287,6 +300,10 @@ internal fun TodayContent(
     onOpenLibrary: () -> Unit,
     onEditProfile: () -> Unit,
     contentPadding: PaddingValues,
+    /** 答完每日一问的轻反馈：推荐区标题短暂显示「推荐已更新」（N1） */
+    recommendUpdated: Boolean = false,
+    onAnswerQuestion: (String, Set<String>) -> Unit = { _, _ -> },
+    onSkipQuestion: (String) -> Unit = {},
 ) {
     // 打卡/撤销后让卡片先停在原位 300ms:形变和位移动画同时发生会互相打架。
     // pinnedDone 记下动作瞬间的分组:Room 状态还没回来的间隙里,卡片也不许先动
@@ -328,6 +345,28 @@ internal fun TodayContent(
                 now = now,
                 modifier = Modifier.padding(horizontal = Spacing.space4),
             )
+        }
+
+        // N1 渐进式档案收集:今天有题可问时出问题卡片;答过/暂缓过、但档案还没填完时,
+        // 兜底为常驻的「完善档案」Banner(点了进档案编辑)
+        val questionField = state.questionField
+        if (questionField != null) {
+            item(key = "profile-question") {
+                ProfileQuestionCard(
+                    field = questionField,
+                    onAnswer = { onAnswerQuestion(questionField, it) },
+                    onSkip = { onSkipQuestion(questionField) },
+                    onFillAll = onEditProfile,
+                    modifier = Modifier.padding(horizontal = Spacing.space4),
+                )
+            }
+        } else if (state.profileIncomplete) {
+            item(key = "profile-banner") {
+                ProfileNudgeBanner(
+                    onEditProfile = onEditProfile,
+                    modifier = Modifier.padding(horizontal = Spacing.space4),
+                )
+            }
         }
 
         // 步数卡片只在有数据或待授权时出现;Loading / Unavailable 不渲染(模拟器上就是没有卡片)
@@ -406,8 +445,17 @@ internal fun TodayContent(
                 Text(
                     text = stringResource(R.string.today_recommend_title),
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
                 )
+                // N1:答完每日一问的轻反馈,短暂显示后由 ViewModel 复位
+                if (recommendUpdated) {
+                    Spacer(Modifier.width(Spacing.space2))
+                    Text(
+                        text = stringResource(R.string.today_recommend_updated),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Spacer(Modifier.weight(1f))
                 TextButton(onClick = onReshuffle) { Text(stringResource(R.string.today_reshuffle)) }
                 TextButton(onClick = onOpenLibrary) { Text(stringResource(R.string.today_all_entries)) }
             }
@@ -1084,22 +1132,173 @@ private fun EmptyCard(
     }
 }
 
-/** 没档案:整页只做一件事 —— 说清填档案的收益,给一个入口 */
+/** N1:档案未填完时的常驻兜底入口,点了进档案编辑 */
 @Composable
-private fun NoProfileState(onEditProfile: () -> Unit, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.padding(Spacing.space6),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+private fun ProfileNudgeBanner(onEditProfile: () -> Unit, modifier: Modifier = Modifier) {
+    Card(
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        modifier = modifier.fillMaxWidth(),
     ) {
-        Text(
-            text = stringResource(R.string.today_empty_profile),
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(Spacing.space4))
-        Button(onClick = onEditProfile) { Text(stringResource(R.string.today_action_go_profile)) }
+        Row(
+            modifier = Modifier.padding(Spacing.space4),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.today_profile_banner),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onEditProfile) { Text(stringResource(R.string.today_action_go_profile)) }
+        }
     }
+}
+
+/**
+ * N1 每日一问卡片:一天只问一个未填的档案字段。
+ * 单选/布尔字段点了即答;多选字段（chronic/goals）用「确定」确认,空选 = 都没有。
+ * 「暂不回答」当天不再出现,次日换下一题。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ProfileQuestionCard(
+    field: String,
+    onAnswer: (Set<String>) -> Unit,
+    onSkip: () -> Unit,
+    onFillAll: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val titleRes = questionTitleRes(field) ?: return
+    val options = questionOptions(field)
+    val multi = field in ProfileQuestions.MULTI_FIELDS
+    var selected by remember(field) { mutableStateOf(setOf<String>()) }
+    Card(
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(Spacing.space4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.space3),
+        ) {
+            Text(stringResource(titleRes), style = MaterialTheme.typography.titleSmall)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.space2)) {
+                options.forEach { (key, label) ->
+                    ToggleButton(
+                        checked = key in selected,
+                        onCheckedChange = {
+                            if (multi) {
+                                selected = if (key in selected) selected - key else selected + key
+                            } else {
+                                onAnswer(setOf(key))
+                            }
+                        },
+                    ) { Text(label) }
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (multi) {
+                    TextButton(onClick = { onAnswer(selected) }) {
+                        Text(stringResource(R.string.action_confirm))
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onSkip) { Text(stringResource(R.string.today_question_skip)) }
+                TextButton(onClick = onFillAll) { Text(stringResource(R.string.today_question_fill_all)) }
+            }
+        }
+    }
+}
+
+/** 每日一问的问题文案;字段不在提问序列里（不该发生）返回 null,卡片不渲染 */
+private fun questionTitleRes(field: String): Int? = when (field) {
+    "ageRange" -> R.string.question_age_range
+    "smoking" -> R.string.question_smoking
+    "alcohol" -> R.string.question_alcohol
+    "exercise" -> R.string.question_exercise
+    "sleepShort" -> R.string.question_sleep_short
+    "chronic" -> R.string.question_chronic
+    "goals" -> R.string.question_goals
+    "children" -> R.string.question_children
+    "pregnant" -> R.string.question_pregnant
+    "hasElderly" -> R.string.question_has_elderly
+    "betelNut" -> R.string.question_betel_nut
+    "sugaryDrinks" -> R.string.question_sugary
+    "occupation" -> R.string.question_occupation
+    "housing" -> R.string.question_housing
+    "gender" -> R.string.question_gender
+    "secondhandSmoke" -> R.string.question_secondhand
+    "financialStress" -> R.string.question_financial_stress
+    "planningAbroad" -> R.string.question_planning_abroad
+    else -> null
+}
+
+/** 每日一问的选项:取值 key（与规则 when 的取值一致）到展示文案;布尔字段统一 是/否 */
+@Composable
+private fun questionOptions(field: String): List<Pair<String, String>> = when (field) {
+    "ageRange" -> AgeRange.entries.map { it.key to it.key }
+    "smoking" -> listOf(
+        Smoking.YES.key to stringResource(R.string.option_smoking_yes),
+        Smoking.QUIT.key to stringResource(R.string.option_smoking_quit),
+        Smoking.NO.key to stringResource(R.string.option_smoking_no),
+    )
+    "alcohol" -> listOf(
+        Alcohol.OFTEN.key to stringResource(R.string.option_alcohol_often),
+        Alcohol.SOMETIMES.key to stringResource(R.string.option_sometimes),
+        Alcohol.NO.key to stringResource(R.string.option_no_drink),
+    )
+    "exercise" -> listOf(
+        Exercise.NONE.key to stringResource(R.string.option_exercise_none),
+        Exercise.LOW.key to stringResource(R.string.option_exercise_low),
+        Exercise.OK.key to stringResource(R.string.option_exercise_ok),
+    )
+    "sugaryDrinks" -> listOf(
+        SugaryDrinks.DAILY.key to stringResource(R.string.option_drinks_daily),
+        SugaryDrinks.SOMETIMES.key to stringResource(R.string.option_sometimes),
+        SugaryDrinks.NO.key to stringResource(R.string.option_no_drink),
+    )
+    "chronic" -> listOf(
+        Chronic.HYPERTENSION.key to stringResource(R.string.option_chronic_hypertension),
+        Chronic.DIABETES.key to stringResource(R.string.option_chronic_diabetes),
+        Chronic.KIDNEY.key to stringResource(R.string.option_chronic_kidney),
+        Chronic.HEART.key to stringResource(R.string.option_chronic_heart),
+        Chronic.OTHER.key to stringResource(R.string.option_other),
+    )
+    "goals" -> listOf(
+        Goal.HEALTH.key to stringResource(R.string.goal_health),
+        Goal.MONEY.key to stringResource(R.string.goal_money),
+        Goal.TIME.key to stringResource(R.string.goal_time),
+        Goal.CAREER.key to stringResource(R.string.goal_career),
+        Goal.FAMILY.key to stringResource(R.string.goal_family),
+        Goal.RELAX.key to stringResource(R.string.goal_relax),
+    )
+    "children" -> listOf(
+        Children.NONE.key to stringResource(R.string.option_children_none),
+        Children.BABY.key to stringResource(R.string.option_children_baby),
+        Children.SCHOOL.key to stringResource(R.string.option_children_school),
+    )
+    "occupation" -> listOf(
+        Occupation.PROGRAMMER.key to stringResource(R.string.option_programmer),
+        Occupation.STUDENT.key to stringResource(R.string.option_student),
+        Occupation.OTHER.key to stringResource(R.string.option_other),
+    )
+    "housing" -> listOf(
+        Housing.RENT.key to stringResource(R.string.option_rent),
+        Housing.OWN.key to stringResource(R.string.option_own),
+        Housing.FAMILY.key to stringResource(R.string.option_live_family),
+    )
+    "gender" -> listOf(
+        Gender.MALE.key to stringResource(R.string.option_male),
+        Gender.FEMALE.key to stringResource(R.string.option_female),
+        Gender.OTHER.key to stringResource(R.string.option_other),
+    )
+    else -> listOf(
+        "true" to stringResource(R.string.option_yes),
+        "false" to stringResource(R.string.option_no),
+    )
 }
 
 @Composable

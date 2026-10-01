@@ -1,4 +1,6 @@
 // 主页壳:起始路由来自 SettingsViewModel(唯一读过 onboardingDone 的地方),
+// onboardingDone 的语义是「看过引导」而非「填完档案」(N1:可「先随便看看」跳过,
+// 空档案直入今日页,档案由每日一问渐进补齐)。
 // 导航用 NavigationSuiteScaffold —— compact 出 ShortNavigationBar,
 // medium/expanded 自动换成 WideNavigationRail,大屏适配不再需要手写宽度分支。
 //

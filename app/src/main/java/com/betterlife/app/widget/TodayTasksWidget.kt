@@ -39,6 +39,7 @@ import androidx.glance.text.TextStyle
 import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.MainActivity
 import com.betterlife.app.R
+import com.betterlife.app.recommend.ProfileQuestions
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 
@@ -62,10 +63,16 @@ class TodayTasksWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val container = (context.applicationContext as BetterLifeApp).container
         val date = LocalDate.now()
-        // 新的一天先按档案规划今日任务（幂等）；还没档案就保持空态，引导打开应用
-        val profile = container.profileRepository.getProfile()
-        if (profile != null) {
-            runCatching { container.taskManager.ensureTodayTasks(profile, date) }
+        // 新的一天先按档案规划今日任务（幂等）。N1：没档案用空档案也能规划；
+        // 还没看过引导（装完未打开）就保持空态，引导打开应用
+        if (runCatching { container.settingsStore.current().onboardingDone }.getOrDefault(false)) {
+            val profile = container.profileRepository.getProfile()
+            val answered = runCatching {
+                container.settingsStore.profileQuestionsAnsweredFlow.first()
+            }.getOrDefault(emptySet())
+            runCatching {
+                container.taskManager.ensureTodayTasks(ProfileQuestions.effectiveProfile(profile, answered), date)
+            }
         }
         val tasks = runCatching {
             container.taskManager.todayTasksFlow(date).first()

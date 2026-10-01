@@ -24,6 +24,7 @@ class AiAdvisorFallbackTest {
     private class FakeSettingsGateway : SettingsGateway {
         override val settingsFlow: Flow<AppSettings> = MutableStateFlow(AppSettings())
         override suspend fun setOnboardingDone(done: Boolean) = Unit
+        override suspend fun markAllProfileQuestionsAnswered(fields: Set<String>) = Unit
         override suspend fun current(): AppSettings = AppSettings()
     }
 

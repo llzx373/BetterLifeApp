@@ -9,14 +9,19 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.data.EntryDto
 import com.betterlife.app.data.EntryRepository
+import com.betterlife.app.data.Profile
 import com.betterlife.app.data.ProfileRepository
+import com.betterlife.app.data.SettingsStore
 import com.betterlife.app.data.db.TaskEntity
+import com.betterlife.app.data.withAnswer
+import com.betterlife.app.recommend.ProfileQuestions
 import com.betterlife.app.tasks.TaskManager
 import com.betterlife.app.widget.WidgetUpdater
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,6 +38,7 @@ class TodayViewModel(
     private val taskManager: TaskManager,
     private val profileRepository: ProfileRepository,
     private val entryRepository: EntryRepository,
+    private val settingsStore: SettingsStore,
     /** 任务数据变化后刷新桌面小部件；默认空实现，单元测试/预览不用碰 Context */
     private val refreshWidgets: suspend () -> Unit = {},
 ) : ViewModel() {
@@ -57,13 +63,18 @@ class TodayViewModel(
     /**
      * 今日页状态。资产/数据库读取失败不再让协程直接崩溃，而是落到 [Error] 并允许重试。
      *
-     * [Empty] 专指「还没有档案」——这时推荐质量无从谈起，整页应该引导去填档案，
-     * 而不是显示一个空的今日任务区。有档案但当天没任务是 [Ready] 且 items 为空。
+     * N1 起没有档案也进 [Ready]：空档案（[Profile.EMPTY]）照常出推荐与示例习惯，
+     * 由 [Ready.profileIncomplete] / [Ready.questionField] 驱动顶部的渐进收集 UI。
      */
     sealed interface UiState {
         data object Loading : UiState
-        data object Empty : UiState
-        data class Ready(val items: List<TaskItem>) : UiState {
+        data class Ready(
+            val items: List<TaskItem>,
+            /** 档案未填完（每日一问还有题可问）：顶部显示「完善档案」Banner 或问题卡片 */
+            val profileIncomplete: Boolean = false,
+            /** 今天该问的档案字段（Profile.fieldValues 的字段名）；null = 今天不问 */
+            val questionField: String? = null,
+        ) : UiState {
             val undoneCount: Int get() = items.count { !it.task.done }
             val allDone: Boolean get() = items.isNotEmpty() && items.all { it.task.done }
         }
@@ -77,73 +88,111 @@ class TodayViewModel(
         val dailyHabitIds: Set<String>,
     )
 
+    /** 档案与每日一问（N1）状态的上游快照 */
+    private data class ProfileSnapshot(
+        val profile: Profile?,
+        val answered: Set<String>,
+        val deferred: Set<String>,
+        val askedDate: String,
+    )
+
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    /** 答完每日一问后的轻反馈：推荐区标题短暂显示「推荐已更新」 */
+    private val _recommendUpdated = MutableStateFlow(false)
+    val recommendUpdated: StateFlow<Boolean> = _recommendUpdated.asStateFlow()
 
     private var observeJob: Job? = null
 
     init {
+        migrateProfileQuestions()
         observe()
     }
 
     /**
-     * 档案 → 今天 → 今日任务 → 条目内容 的单向数据流。
-     * 档案为 null 时直接进 [UiState.Empty] 且不生成任务；档案或日期变化都会重启下游订阅，
-     * 跨天后自动为新日期规划任务并切换查询（进程跨夜存活时日期由 TaskManager.refreshToday 推进）。
+     * N1 老用户迁移：N1 之前完成过引导的用户已有完整档案，不补问——
+     * 首启时档案存在就把全部字段标为已答，问题卡片对老用户永不出现。
+     */
+    private fun migrateProfileQuestions() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                if (!settingsStore.isProfileQuestionsMigrated()) {
+                    if (profileRepository.getProfile() != null) {
+                        settingsStore.markAllProfileQuestionsAnswered(ProfileQuestions.ORDER.toSet())
+                    }
+                    settingsStore.setProfileQuestionsMigrated()
+                }
+            }
+        }
+    }
+
+    /**
+     * 档案与每日一问状态 → 今天 → 今日任务 → 条目内容 的单向数据流。
+     * 没有档案时用空档案（[Profile.EMPTY]）照常出任务与推荐；档案、问题状态或日期变化
+     * 都会重启下游订阅，跨天后自动为新日期规划任务并切换查询
+     * （进程跨夜存活时日期由 TaskManager.refreshToday 推进）。
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun observe() {
         observeJob?.cancel()
         observeJob = viewModelScope.launch(Dispatchers.IO) {
             try {
-                profileRepository.profileFlow.collectLatest { p ->
-                    if (p == null) {
-                        _uiState.value = UiState.Empty
-                        return@collectLatest
-                    }
-                    taskManager.todayFlow().collectLatest { date ->
-                        taskManager.ensureTodayTasks(p, date)
-                        combine(
-                            taskManager.todayTasksFlow(date),
-                            taskManager.customEntriesFlow(),
-                            taskManager.userDailyIdsFlow(),
-                        ) { tasks, customEntries, dailyIds ->
-                            TasksSnapshot(
-                                tasks,
-                                customEntries.associate { it.entryId to it.title },
-                                dailyIds.toSet(),
-                            )
-                        }.flatMapLatest { snapshot ->
-                            // 请假状态是独立表：逐任务挂日期流，请假/取消请假才能即时反映到卡片
-                            if (snapshot.tasks.isEmpty()) {
-                                flowOf(snapshot to emptyList<Set<String>>())
-                            } else {
-                                combine(
-                                    snapshot.tasks.map { t ->
-                                        taskManager.streakLeaveDatesFlow(t.entryId).map { it.toSet() }
+                combine(
+                    profileRepository.profileFlow,
+                    settingsStore.profileQuestionsAnsweredFlow,
+                    settingsStore.profileQuestionsDeferredFlow,
+                    settingsStore.profileQuestionAskedDateFlow,
+                ) { p, answered, deferred, askedDate -> ProfileSnapshot(p, answered, deferred, askedDate) }
+                    .collectLatest { snap ->
+                        val effective = ProfileQuestions.effectiveProfile(snap.profile, snap.answered)
+                        taskManager.todayFlow().collectLatest { date ->
+                            taskManager.ensureTodayTasks(effective, date)
+                            combine(
+                                taskManager.todayTasksFlow(date),
+                                taskManager.customEntriesFlow(),
+                                taskManager.userDailyIdsFlow(),
+                            ) { tasks, customEntries, dailyIds ->
+                                TasksSnapshot(
+                                    tasks,
+                                    customEntries.associate { it.entryId to it.title },
+                                    dailyIds.toSet(),
+                                )
+                            }.flatMapLatest { snapshot ->
+                                // 请假状态是独立表：逐任务挂日期流，请假/取消请假才能即时反映到卡片
+                                if (snapshot.tasks.isEmpty()) {
+                                    flowOf(snapshot to emptyList<Set<String>>())
+                                } else {
+                                    combine(
+                                        snapshot.tasks.map { t ->
+                                            taskManager.streakLeaveDatesFlow(t.entryId).map { it.toSet() }
+                                        },
+                                    ) { leaves -> snapshot to leaves.toList() }
+                                }
+                            }.collect { (snapshot, leavesPerTask) ->
+                                val todayStr = date.toString()
+                                val data = entryRepository.entriesData()
+                                _uiState.value = UiState.Ready(
+                                    items = snapshot.tasks.mapIndexed { i, t ->
+                                        TaskItem(
+                                            task = t,
+                                            entry = data.byId[t.entryId],
+                                            streak = taskManager.streak(t.entryId),
+                                            customTitle = snapshot.customTitles[t.entryId],
+                                            isDailyHabit = t.entryId in snapshot.dailyHabitIds,
+                                            onLeaveToday = leavesPerTask
+                                                .getOrElse(i) { emptySet() }
+                                                .contains(todayStr),
+                                        )
                                     },
-                                ) { leaves -> snapshot to leaves.toList() }
+                                    profileIncomplete = !ProfileQuestions.isComplete(snap.answered),
+                                    questionField = ProfileQuestions.nextField(
+                                        snap.answered, snap.deferred, snap.askedDate == todayStr,
+                                    ),
+                                )
                             }
-                        }.collect { (snapshot, leavesPerTask) ->
-                            val todayStr = date.toString()
-                            val data = entryRepository.entriesData()
-                            _uiState.value = UiState.Ready(
-                                snapshot.tasks.mapIndexed { i, t ->
-                                    TaskItem(
-                                        task = t,
-                                        entry = data.byId[t.entryId],
-                                        streak = taskManager.streak(t.entryId),
-                                        customTitle = snapshot.customTitles[t.entryId],
-                                        isDailyHabit = t.entryId in snapshot.dailyHabitIds,
-                                        onLeaveToday = leavesPerTask
-                                            .getOrElse(i) { emptySet() }
-                                            .contains(todayStr),
-                                    )
-                                },
-                            )
                         }
                     }
-                }
             } catch (c: CancellationException) {
                 throw c
             } catch (t: Throwable) {
@@ -158,9 +207,32 @@ class TodayViewModel(
         observe()
     }
 
-    /** 打卡（C2）：[note] 为可选的随手记，空白按 null 存 */
-    fun checkIn(task: TaskEntity, note: String? = null) {
+    /**
+     * 每日一问（N1）作答：答案并入档案（未保存过档案则从默认值起步）并落库、
+     * 记入已答集合；档案流变化会让推荐当页自动重算，同时给一次「推荐已更新」轻反馈。
+     */
+    fun answerQuestion(field: String, values: Set<String>) {
         viewModelScope.launch(Dispatchers.IO) {
+            val base = profileRepository.getProfile() ?: Profile()
+            profileRepository.save(base.withAnswer(field, values))
+            settingsStore.answerProfileQuestion(field, LocalDate.now().toString())
+            _recommendUpdated.value = true
+            launch {
+                delay(RECOMMEND_UPDATED_MILLIS)
+                _recommendUpdated.value = false
+            }
+        }
+    }
+
+    /** 每日一问「暂不回答」：当天不再出现，次日换下一题 */
+    fun skipQuestion(field: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            settingsStore.deferProfileQuestion(field, LocalDate.now().toString())
+        }
+    }
+
+    /** 打卡（C2）：[note] 为可选的随手记，空白按 null 存 */
+    fun checkIn(task: TaskEntity, note: String? = null) {        viewModelScope.launch(Dispatchers.IO) {
             taskManager.completeTask(task.taskId, note?.ifBlank { null })
             refreshWidgets()
         }
@@ -230,11 +302,14 @@ class TodayViewModel(
     companion object {
         private const val TAG = "TodayViewModel"
 
+        /** 「推荐已更新」轻反馈的展示时长 */
+        private const val RECOMMEND_UPDATED_MILLIS = 2_500L
+
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as BetterLifeApp
                 val c = app.container
-                TodayViewModel(c.taskManager, c.profileRepository, c.entryRepository) {
+                TodayViewModel(c.taskManager, c.profileRepository, c.entryRepository, c.settingsStore) {
                     WidgetUpdater.refresh(app.applicationContext)
                 }
             }

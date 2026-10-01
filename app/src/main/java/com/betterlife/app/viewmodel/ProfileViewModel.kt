@@ -9,6 +9,7 @@ import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.data.Profile
 import com.betterlife.app.data.ProfileRepo
 import com.betterlife.app.data.SettingsGateway
+import com.betterlife.app.recommend.ProfileQuestions
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,6 +64,23 @@ class ProfileViewModel(
             try {
                 profileRepository.save(snapshot)
                 if (markOnboardingDone) settingsStore.setOnboardingDone(true)
+                // 完整向导保存 = 全部字段已填（N1）：每日一问就此终止
+                settingsStore.markAllProfileQuestionsAnswered(ProfileQuestions.ORDER.toSet())
+                _saveState.value = SaveState.Success
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _saveState.value = SaveState.Failed
+            }
+        }
+    }
+
+    /** 「先随便看看」（N1）：只标记看过引导，不写档案——空档案照样出推荐 */
+    fun skipOnboarding() {
+        _saveState.value = SaveState.Saving
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                settingsStore.setOnboardingDone(true)
                 _saveState.value = SaveState.Success
             } catch (e: CancellationException) {
                 throw e

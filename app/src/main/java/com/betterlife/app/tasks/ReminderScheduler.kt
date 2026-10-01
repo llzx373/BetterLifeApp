@@ -23,7 +23,9 @@ import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.MainActivity
 import com.betterlife.app.R
 import com.betterlife.app.data.db.TaskEntity
+import com.betterlife.app.recommend.ProfileQuestions
 import com.betterlife.app.widget.WidgetUpdater
+import kotlinx.coroutines.flow.first
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -109,9 +111,12 @@ class DailyReminderWorker(
 
     override suspend fun doWork(): Result {
         val container = (applicationContext as BetterLifeApp).container
-        val profile = container.profileRepository.getProfile()
-        if (profile != null) {
-            container.taskManager.ensureTodayTasks(profile)
+        // N1：没档案也能规划（空档案走普惠推荐 + 种子池兜底），门槛改为「看过引导」——
+        // 装完从未打开过的用户不应被静默播种和提醒
+        if (container.settingsStore.current().onboardingDone) {
+            val profile = container.profileRepository.getProfile()
+            val answered = container.settingsStore.profileQuestionsAnsweredFlow.first()
+            container.taskManager.ensureTodayTasks(ProfileQuestions.effectiveProfile(profile, answered))
         }
         // B1：先用 Health Connect 数据自动核销达标的每日任务，再统计未完成数发通知；
         // 尽力而为——HC 不可用/没权限/出异常都安静跳过

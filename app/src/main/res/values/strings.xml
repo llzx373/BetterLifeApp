@@ -80,12 +80,15 @@
     <string name="today_all_entries">全部条目</string>
     <string name="today_recommend_empty">填一份档案,推荐会更准;也可以先随便看看。</string>
     <string name="today_action_go_profile">去填档案</string>
+    <string name="today_profile_banner">完善档案,推荐更准</string>
+    <string name="today_recommend_updated">推荐已更新</string>
+    <string name="today_question_skip">暂不回答</string>
+    <string name="today_question_fill_all">去完整填写</string>
     <string name="today_greeting_morning">早上好</string>
     <string name="today_greeting_noon">中午好</string>
     <string name="today_greeting_afternoon">下午好</string>
     <string name="today_greeting_evening">晚上好</string>
     <string name="today_streak_pill">连续 %1$d 天</string>
-    <string name="today_empty_profile">填 3 个问题,推荐立刻变准</string>
     <string name="today_all_done">今天的 %1$d 件小事都做完了</string>
     <string name="today_all_done_review">看看今天做了什么</string>
     <string name="today_task_check">打卡</string>
@@ -290,6 +293,7 @@
     <string name="onboarding_next">下一步</string>
     <string name="onboarding_save">保存</string>
     <string name="onboarding_generate">生成我的建议</string>
+    <string name="onboarding_skip_all">先随便看看</string>
     <string name="onboarding_save_failed">保存失败，请检查存储空间后重试，已填内容不会丢失</string>
 
     <!-- 引导页字段 -->
@@ -315,6 +319,8 @@
 
     <!-- 引导页选项 -->
     <string name="option_other">其他</string>
+    <string name="option_yes">是</string>
+    <string name="option_no">否</string>
     <string name="option_sometimes">偶尔</string>
     <string name="option_no_drink">不喝</string>
     <string name="option_male">男</string>
@@ -339,6 +345,26 @@
     <string name="option_children_none">没有</string>
     <string name="option_children_baby">婴幼儿</string>
     <string name="option_children_school">学龄</string>
+
+    <!-- 每日一问（N1 渐进式档案收集）：问题文案，字段名与 Profile.fieldValues 一一对应 -->
+    <string name="question_age_range">你的年龄段是?</string>
+    <string name="question_smoking">你吸烟吗?</string>
+    <string name="question_alcohol">你平时喝酒吗?</string>
+    <string name="question_exercise">你的运动量大概在哪一档?</string>
+    <string name="question_sleep_short">你经常睡不够 7 小时吗?</string>
+    <string name="question_chronic">你有这些慢性病吗?（可多选,没有就直接点确定）</string>
+    <string name="question_goals">你最想改善什么?（可多选）</string>
+    <string name="question_children">你有孩子吗?</string>
+    <string name="question_pregnant">你或配偶在怀孕或备孕吗?</string>
+    <string name="question_has_elderly">家里有老人吗?</string>
+    <string name="question_betel_nut">你嚼槟榔吗?</string>
+    <string name="question_sugary">你喝含糖饮料吗?</string>
+    <string name="question_occupation">你的职业是?</string>
+    <string name="question_housing">你的居住情况是?</string>
+    <string name="question_gender">你的性别是?</string>
+    <string name="question_secondhand">家里或车里有人抽烟吗?</string>
+    <string name="question_financial_stress">目前经济压力大吗?</string>
+    <string name="question_planning_abroad">你有出国计划吗?</string>
 
     <!-- 设置页 -->
     <string name="settings_section_ai">AI 问答</string>

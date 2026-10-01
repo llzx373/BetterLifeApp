@@ -25,14 +25,15 @@ data/        内容与持久层
   db/                   Room v7(11 表):profile、tasks、entry_states、weekly_habits、
                         custom_entries、entry_notes、streak_leaves、chat_messages、
                         content_sections、content_entries、content_meta
-  SettingsStore.kt      DataStore:API 配置、提醒时间、onboardingDone、搜索历史、已庆祝里程碑
+  SettingsStore.kt      DataStore:API 配置、提醒时间、onboardingDone、搜索历史、已庆祝里程碑、每日一问进度(N1)
   NetworkMonitor.kt     连通性监听(壳层离线横幅的数据源)
-  ProfileRepository.kt  Profile 领域模型 ↔ ProfileEntity;Profile.matches() 规则匹配
+  ProfileRepository.kt  Profile 领域模型 ↔ ProfileEntity;Profile.matches() 规则匹配;Profile.EMPTY 空档案、knownFields 部分已知、withAnswer 每日一问写档案(N1)
   health/               Health Connect:步数/睡眠读取、health_rules.json 自动核销规则
   backup/               本地 JSON 导出/导入(BackupManager + BackupCodec)
 recommend/   纯 Kotlin,不依赖 Android,全部可单测
   RecommendationEngine.kt  规则打分 + 按口径分组排序
-  DailySeedPicker.kt       每日习惯首次播种的示例挑选(种子池 ∩ 档案命中)
+  DailySeedPicker.kt       每日习惯首次播种的示例挑选(种子池 ∩ 档案命中,空档案命中为空时落回种子池硬排取前 3)
+  ProfileQuestions.kt      每日一问(N1):提问顺序、挑题(去重/暂缓/轮回)、有效档案重建
   EntryFilter.kt           条目库筛选(性价比档/证据等级/口径)
 tasks/
   TaskManager.kt           任务读写、打卡、streak、加待办、HC 自动核销
@@ -95,7 +96,7 @@ HC 自动核销只核销当天有 DAILY 行的条目:想让计步/睡眠每天�
 ## 5. 数据流
 
 ```
-onboarding 填档案 → ProfileEntity
+onboarding 填档案 → ProfileEntity(N1:可「先随便看看」跳过,空档案 Profile.EMPTY 直入,只有 {} 普惠规则生效)
   → TodayViewModel:TaskManager.ensureTodayTasks(profile)(幂等,按日期)
                    RecommendationEngine 出分组推荐
   → 打卡 → TaskEntity.done + note(随手记)+ doneBy(manual/auto:hc/widget)→ streak 从昨天往前数(今天未打卡不清零,请假日搭桥)
@@ -133,12 +134,13 @@ python tools/build_content.py      # 内容变更后重跑,看自检统计
 ./gradlew assembleDebug
 ```
 
-冒烟路径(新机器或改动后必走):onboarding → 今日页出任务和推荐 → 打卡出 streak → 待办页三分区(每日/每周/一次性) → 条目库搜索 → (配 Key)AI 问答 → 设置开提醒。
+冒烟路径(新机器或改动后必走):onboarding → 今日页出任务和推荐 → 打卡出 streak → 待办页三分区(每日/每周/一次性) → 条目库搜索 → (配 Key)AI 问答 → 设置开提醒;N1:跳过向导直入今日页(有推荐 + 3 条示例习惯 + 问题卡片)、答一题推荐变化。
 
 ## 8. 已知取舍与路线
 
 - `collectAsStateWithLifecycle` 已改用官方 `androidx.lifecycle.compose` 实现(此前是本仓库 `ui/util/StateFlowExt.kt` 的本地替代品,引入 `lifecycle-runtime-compose` 后已删除)
-- 今日页 `TodayViewModel.UiState` 是 sealed:`Loading` / `Empty` / `Ready(items)` / `Error`。数据流由档案驱动(档案为 null 直接进 `Empty`,整页引导去填档案),资产与数据库读取包了 try/catch,失败不再崩溃而是出「内容加载失败」+ 重试
+- 今日页 `TodayViewModel.UiState` 是 sealed:`Loading` / `Ready(items, profileIncomplete, questionField)` / `Error`(N1 起移除了 `Empty`:没有档案也进 `Ready`,空档案照常出推荐与示例习惯)。资产与数据库读取包了 try/catch,失败不再崩溃而是出「内容加载失败」+ 重试
+- **N1 冷启动直入与渐进档案(2026-10-01)**:空档案 `Profile.EMPTY`(knownFields=空集)只命中 {} 普惠规则,`matches()` 对未知字段一律不命中;knownFields 不落库(`toEntity` 拒绝),已答集合存 SettingsStore(`profile_questions_answered` 等),读取侧由 `ProfileQuestions.effectiveProfile` 重建。onboarding 第一步可「先随便看看」(只写 onboardingDone 不写档案);完整向导保存 = 全部字段已答,每日一问终止。今日页顶部:有题问问题卡片(一天一题、「暂不回答」次日换下一题、暂缓字段轮回),没题但档案未填完时兜底「完善档案」Banner;答完落库、推荐当页重算并短暂显示「推荐已更新」。老用户迁移:首启时已有档案则全部字段标为已答,不补问。DailyReminderWorker/小组件的规划门槛从「有档案」改为「看过引导」(装完未打开不静默播种)
 - `EntryDetailScreen` 改用 `AppContainer` 的单例 `EntryRepository`,不再 `remember { EntryRepository(context) }` 每次进详情重解析 601 条 JSON
 - 条目状态 `entry_states` 用 `(entryId, state)` 复合主键:加入待办、已完成、不再推荐、已收藏、自选每日(STATE_DAILY)彼此正交,不会互相覆盖。**数据库 v7,真实迁移 + `exportSchema = true`**(v4 加 `weekly_habits`,v5 加 `custom_entries`,v6 给 tasks 加 note/doneBy/dueDate 并新增 entry_notes、streak_leaves、chat_messages 三表,v7 加 content_sections/content_entries/content_meta 三张内容表;schema JSON 在 `app/schemas/`,androidTest `MigrationTest` 用 `MigrationTestHelper` 校验,destructive fallback 已移除)。迁移链只保证 v5→v7;数据库版本 ≤4 的设备(均为未发布的开发构建)升级需卸载重装,不为 pre-release 版本补迁移链
 - **内容入 Room 与上游同步(2026-09-28)**:条目内容从 assets 只读改为 Room 内容表驱动(见 §3);`EntryRepository.entriesData()` 变为 suspend(先经 ContentBootstrap 幂等播种),全量调用点已改;老用户五张用户表的 `SS-NN` entryId 首启时一次性改写为稳定 key(DataStore 标记 `content_id_migrated`);旧备份导入时按同一份捆绑映射改写(BackupManager,备份 format 仍 6 不 bump——格式没变只是 id 语义变了)。「第X节第Y条」标签仍由 sec/n 在展示层现算,条号顺延不影响用户数据

@@ -21,6 +21,7 @@ import com.betterlife.app.data.db.EntryStateDao
 import com.betterlife.app.data.db.EntryStateEntity
 import com.betterlife.app.recommend.EntryFilter
 import com.betterlife.app.recommend.EntryStats
+import com.betterlife.app.recommend.ProfileQuestions
 import com.betterlife.app.recommend.RecommendationEngine
 import com.betterlife.app.recommend.ScoredEntry
 import com.betterlife.app.recommend.applyFilter
@@ -96,13 +97,17 @@ class LibraryViewModel(
             // 档案、条目状态或计划成员变化时重算推荐与统计
             // 推荐排除:做过(DONE)、不再推荐(DISMISSED)、已加入任一计划(TODO/DAILY/每周习惯)
             // recommendOffset:「换一批」的轮次,组内候选按它轮转
+            // N1:没有档案也能出推荐——空档案只命中 {} 普惠规则;部分档案只认已答字段
             kotlinx.coroutines.flow.combine(
                 profileRepository.profileFlow,
                 entryStateDao.allStatesFlow(),
                 taskManager.plannedEntryIdsFlow(),
                 settingsStore.recommendOffsetFlow,
-            ) { profile, states, planned, offset -> RecommendInput(profile, states, planned, offset) }
-                .collect { (profile, states, planned, offset) ->
+                settingsStore.profileQuestionsAnsweredFlow,
+            ) { profile, states, planned, offset, answered ->
+                RecommendInput(profile, states, planned, offset, answered)
+            }
+                .collect { (profile, states, planned, offset, answered) ->
                     val doneIds = states.filter { it.state == EntryStateEntity.STATE_DONE }
                         .mapTo(HashSet()) { it.entryId }
                     val dismissedIds = states.filter { it.state == EntryStateEntity.STATE_DISMISSED }
@@ -110,9 +115,10 @@ class LibraryViewModel(
                     val excluded = HashSet<String>(doneIds.size + dismissedIds.size + planned.size).apply {
                         addAll(doneIds); addAll(dismissedIds); addAll(planned)
                     }
-                    val recommended = profile?.let {
-                        recommendationEngine.recommend(it, data.entries, data.rules, excluded, offset = offset)
-                    } ?: LinkedHashMap()
+                    val recommended = recommendationEngine.recommend(
+                        ProfileQuestions.effectiveProfile(profile, answered),
+                        data.entries, data.rules, excluded, offset = offset,
+                    )
                     val statesByEntry = states.groupBy({ it.entryId }, { it.state })
                         .mapValues { it.value.toSet() }
                     val sectionStats = data.sections.associate { section ->
@@ -287,12 +293,14 @@ class LibraryViewModel(
     }
 }
 
-/** 推荐重算的输入打包:四路 combine 的超长 lambda 参数不好读,收成一个元组类 */
+/** 推荐重算的输入打包:五路 combine 的超长 lambda 参数不好读,收成一个元组类 */
 private data class RecommendInput(
     val profile: Profile?,
     val states: List<EntryStateEntity>,
     val planned: Set<String>,
     val offset: Int,
+    /** 每日一问已答的档案字段（N1）：重建部分档案的已知字段用 */
+    val answered: Set<String>,
 )
 
 /** 章内条目排序方式 */
