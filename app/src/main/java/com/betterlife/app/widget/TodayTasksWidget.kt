@@ -236,6 +236,12 @@ class CheckInAction : ActionCallback {
         val taskId = parameters[TaskIdKey] ?: return
         val container = (context.applicationContext as BetterLifeApp).container
         val task = container.taskManager.getTask(taskId) ?: return
+        // 跨午夜后小部件可能还渲染着昨日任务行（点击参数还是当时的 taskId）：日期对不上
+        // 就不打卡——打了等于静默补昨天的卡；只刷新，让 provideGlance 拉今日数据
+        if (task.date != LocalDate.now().toString()) {
+            TodayTasksWidget().update(context, glanceId)
+            return
+        }
         if (task.done) {
             container.taskManager.uncompleteTask(taskId)
         } else {
