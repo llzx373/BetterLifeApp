@@ -121,6 +121,7 @@ import com.betterlife.app.recommend.EntryStats
 import com.betterlife.app.recommend.ProfileQuestions
 import com.betterlife.app.recommend.ScoredEntry
 import com.betterlife.app.tasks.TaskManager
+import com.betterlife.app.ui.common.AddPlanDialog
 import com.betterlife.app.ui.common.CostMeter
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.EntryStatsLine
@@ -257,6 +258,8 @@ fun TodayScreen(
                         onSkipQuestion = todayVm::skipQuestion,
                         onOpenEntry = onOpenEntry,
                         onAddTodo = libraryVm::addToTodo,
+                        onAddDaily = libraryVm::addDaily,
+                        onAddWeekly = libraryVm::addWeekly,
                         onReshuffle = libraryVm::reshuffleRecommendations,
                         onDismissEntry = { entryId ->
                             libraryVm.dismissEntry(entryId)
@@ -308,6 +311,9 @@ internal fun TodayContent(
     onOpenLibrary: () -> Unit,
     onEditProfile: () -> Unit,
     contentPadding: PaddingValues,
+    /** 推荐行「加入待办」先问计划类型:每日/每周走这两个回调(截图测试喂默认空实现) */
+    onAddDaily: (String) -> Unit = {},
+    onAddWeekly: (String, Int) -> Unit = { _, _ -> },
     /** N7:长辈模式问候区右侧的「我的」入口 */
     onOpenMine: () -> Unit = {},
     /** 答完每日一问的轻反馈：推荐区标题短暂显示「推荐已更新」（N1） */
@@ -328,6 +334,8 @@ internal fun TodayContent(
     var noteDialogTask by remember { mutableStateOf<TaskEntity?>(null) }
     var leaveDialogTask by remember { mutableStateOf<TaskEntity?>(null) }
     var backfillDialogTask by remember { mutableStateOf<TaskEntity?>(null) }
+    // 推荐行「加入待办」先问计划类型:非 null 时弹 AddPlanDialog
+    var addPlanTarget by remember { mutableStateOf<String?>(null) }
     // settlingId 期间把任务钉在动作前的分组:打卡的留在未完成组,撤销的留在已完成组,
     // 等 300ms 沉降延迟结束、勾选形变做完,再统一重排
     val tasks = remember(state.items, settlingId, settlingPinnedDone) {
@@ -523,7 +531,7 @@ internal fun TodayContent(
                         RecommendedRow(
                             scored = scored,
                             onClick = { onOpenEntry(scored.entry.id) },
-                            onAddTodo = { onAddTodo(scored.entry.id) },
+                            onAddTodo = { addPlanTarget = scored.entry.id },
                             onDismiss = { onDismissEntry(scored.entry.id) },
                             onMarkDoneBefore = { onMarkDoneBefore(scored.entry.id) },
                         )
@@ -572,6 +580,25 @@ internal fun TodayContent(
                 backfillDialogTask = null
             },
             onDismiss = { backfillDialogTask = null },
+        )
+    }
+
+    // 推荐行「加入待办」:先选计划类型(一次性/每日/每周),不再静默加成一次性
+    addPlanTarget?.let { entryId ->
+        AddPlanDialog(
+            onAddOnce = {
+                addPlanTarget = null
+                onAddTodo(entryId)
+            },
+            onAddDaily = {
+                addPlanTarget = null
+                onAddDaily(entryId)
+            },
+            onAddWeekly = { times ->
+                addPlanTarget = null
+                onAddWeekly(entryId, times)
+            },
+            onDismiss = { addPlanTarget = null },
         )
     }
 }

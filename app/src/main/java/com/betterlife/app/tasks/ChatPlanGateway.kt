@@ -13,6 +13,6 @@ interface ChatPlanGateway {
     /** 加入一次性待办（幂等：已有未完成待办时不重复建行） */
     suspend fun addToTodo(entryId: String)
 
-    /** 设为每日习惯：写 STATE_DAILY，今天已有每日安排则补一行，次日由 ensureTodayTasks 幂等落行 */
+    /** 设为每日习惯：写 STATE_DAILY 并立即为今天补一行（唯一习惯时不再等次日落行） */
     suspend fun addDailyHabit(entryId: String)
 }

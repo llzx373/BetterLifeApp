@@ -128,6 +128,9 @@
     <string name="todo_deleted">已删除「%1$s」</string>
     <string name="todo_convert_daily">转为每日习惯</string>
     <string name="todo_convert_weekly">转为每周习惯</string>
+    <!-- 转换成功的轻反馈:条目换到了上方分区,没有提示会像「消失」 -->
+    <string name="todo_converted_daily">已转为每日习惯「%1$s」,见上方分区</string>
+    <string name="todo_converted_weekly">已转为每周习惯「%1$s」,见上方分区</string>
     <string name="todo_remove_daily">取消每日习惯</string>
     <string name="todo_weekly_title">每周习惯</string>
     <string name="todo_weekly_empty">没有每周习惯。把一次性待办转为每周,就能按「一周几次」来安排。</string>
@@ -228,6 +231,10 @@
     <string name="detail_section_note">备注</string>
     <string name="detail_add_todo">加入待办</string>
     <string name="detail_added_todo">已加入待办</string>
+    <!-- 「加入待办」先问加入哪种计划：一次性待办/每日习惯/每周习惯(选项文案复用待办页分区名) -->
+    <string name="detail_add_plan_title">加入哪种计划</string>
+    <string name="detail_added_daily">已加入每日习惯</string>
+    <string name="detail_added_weekly">已加入每周习惯</string>
     <string name="detail_favorite">收藏</string>
     <string name="detail_unfavorite">取消收藏</string>
     <string name="detail_copy">复制文本</string>

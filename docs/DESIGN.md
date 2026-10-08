@@ -84,7 +84,7 @@ entries.json 单条字段:`key/secKey/hash`(稳定标识与内容哈希)、`id`(
 
 ### 每日任务
 
-每日任务是**纯用户自选**机制:`entry_states` 的 `STATE_DAILY` 集合即每日习惯清单,每天由 `TaskManager.ensureTodayTasks` 落成当天的任务行(幂等,靠 `countDailyByDate > 0` 判重)。自选习惯只按 DISMISSED 过滤、不按 DONE——打卡完成会写 DONE,按 DONE 过滤的话习惯打一次卡就会从每日任务里消失(2026-09-28 修)。
+每日任务是**纯用户自选**机制:`entry_states` 的 `STATE_DAILY` 集合即每日习惯清单,每天由 `TaskManager.ensureTodayTasks` 落成当天的任务行(幂等,靠 `countDailyByDate > 0` 判重)。自选习惯只按 DISMISSED 过滤、不按 DONE——打卡完成会写 DONE,按 DONE 过滤的话习惯打一次卡就会从每日任务里消失(2026-09-28 修)。设为/转为每日习惯时 `ensureTodayDailyRow` 立即为今天补行:今天已规划过(有 DAILY 行)直接补;今天没规划但该条目是唯一习惯也补——不补就要等下次 `ensureTodayTasks`(重启/次日),看起来像「消失」(2026-10-08 修);只有「今天没规划且还有其他习惯」才留给 `ensureTodayTasks` 统一落行,避免抢先插行触发它的判重早退而漏掉其他习惯(判断是纯函数 `tasks/DailyRowMaterialization.kt`)。
 
 用户一条习惯都没有且从未播种过时(新用户,或老用户升级到自选机制后的第一天),`DailySeedPicker` 从 `seedEntryIds` 种子池(17 条,全是「今天做一次、明天还要做」的习惯)里按档案命中挑 3 条示例写入 STATE_DAILY——种子池 ∩ 档案命中 boost ∩ 非 todo/removed ∩ 非 exclude,按 ratio/grade/cs 稳定排序取前 3。示例可删可改;DataStore 标记 `daily_habits_seeded` 无论挑到几条只播一次,用户主动删光习惯后不会再被塞回来(空态引导去条目库自选)。早期的「系统每天从白名单轮换塞 3 条 + 换一条补位」已随这次改动移除(2026-09-28)。
 
@@ -102,8 +102,8 @@ onboarding 填档案 → ProfileEntity(N1:可「先随便看看」跳过,空档�
                    RecommendationEngine 出分组推荐
   → 打卡 → TaskEntity.done + note(随手记)+ doneBy(manual/auto:hc/widget)→ streak 从昨天往前数(今天未打卡不清零,请假日搭桥)
   → 任何打卡完成顺手写 entry_states 的 DONE(推荐排除「做过」的);撤销打卡不清
-  → 加入待办 → TaskEntity(ONCE,可带 dueDate)+ EntryStateEntity(TODO)
-  → 待办转换 → STATE_DAILY 进每日 / weekly_habits + WEEKLY 打卡行进每周
+  → 加入计划 → `AddPlanDialog` 先问节奏(一次性/每日/每周,2026-10-08 起;详情页工具栏与今日页推荐行共用):一次性 → TaskEntity(ONCE,可带 dueDate)+ EntryStateEntity(TODO);每日 → STATE_DAILY + 当天补行;每周 → weekly_habits 模板(选一周 1-7 次)
+  → 待办转换 → STATE_DAILY 进每日 / weekly_habits + WEEKLY 打卡行进每周(转换成功弹 Snackbar 指明去向分区)
   → 自定义任务 → custom_entries 存标题(id 为 "custom:<UUID>"),三种类型复用同一套打卡/提醒逻辑
 ReminderScheduler:WorkManager 每天 ensureTodayTasks + 通知未完成数 + autoCompleteByHealth(+ N2c 挽回通知判断)
 WeeklyReportWorker(N4):独立 7 天周期 work,锚定周日 20:07,汇总本周打卡发周报(0 打卡周不发)
@@ -128,17 +128,17 @@ WeeklyReportWorker(N4):独立 7 天周期 work,锚定周日 20:07,汇总本周�
 
 **AI 搜索(互联网模式)**:聊天页输入栏可切「知识库 / 互联网」。互联网走博查 web-search(`BochaWebSearcher`,实现参考 HeartKindle 但只取 web-search;不做 tool calling——本项目是单发非流式,采用「先搜后问」):搜索结果按编号注入 prompt,要求模型用【N】标注来源。key/端点存设置(`search_api_key/search_endpoint`,空端点 = 博查默认)。回答带结构化来源(AiAnswer.sources:知识库 = top 条目「第X节第Y条」,互联网 = 标题+链接可点开),来源以注入 prompt 的资料为准,不解析模型文本。
 
-**行动闭环与示例问题(N3)**:知识库来源在气泡下方渲染为可点 chips,点开菜单给「加入待办 / 设为每日习惯 / 查看详情」——分别走 `ChatPlanGateway.addToTodo`(幂等,复用 addOneOffTodo)、`addDailyHabit`(写 STATE_DAILY,今天已有安排则补一行)、条目详情路由;已在计划中的条目按 `plannedEntryIdsFlow` 显示「已加入」对勾并置灰加项。互联网来源(标题+链接)保持只读,不给行动按钮。聊天页空态给 3 个示例问题,点击只填入输入框不自动发送;生成逻辑是纯函数 `ai/SampleQuestions.kt`(静态模板按档案字段命中,空档案/无命中走通用兜底,不调模型)。
+**行动闭环与示例问题(N3)**:知识库来源在气泡下方渲染为可点 chips,点开菜单给「加入待办 / 设为每日习惯 / 查看详情」——分别走 `ChatPlanGateway.addToTodo`(幂等,复用 addOneOffTodo)、`addDailyHabit`(写 STATE_DAILY 并立即为今天补行,规则见 §4 每日任务)、条目详情路由;已在计划中的条目按 `plannedEntryIdsFlow` 显示「已加入」对勾并置灰加项。互联网来源(标题+链接)保持只读,不给行动按钮。聊天页空态给 3 个示例问题,点击只填入输入框不自动发送;生成逻辑是纯函数 `ai/SampleQuestions.kt`(静态模板按档案字段命中,空档案/无命中走通用兜底,不调模型)。
 
 ## 7. 构建与验证
 
 ```bash
 python tools/build_content.py      # 内容变更后重跑,看自检统计
-./gradlew testDebugUnitTest        # 326 例(49 类):引擎/播种挑选/每日一条选条/检索器/档案映射/排序/规则一致性/提醒继承与重排/备份/统计/周报决策与文案/聊天/示例问题/内容包完整性/同步逻辑等
+./gradlew testDebugUnitTest        # 356 例(55 类):引擎/播种挑选/每日一条选条/检索器/档案映射/排序/规则一致性/提醒继承与重排/每日补行判断/备份/统计/周报决策与文案/聊天/示例问题/内容包完整性/同步逻辑等
 ./gradlew assembleDebug
 ```
 
-冒烟路径(新机器或改动后必走):onboarding → 今日页出任务和推荐 → 打卡出 streak → 待办页三分区(每日/每周/一次性) → 条目库搜索 → (配 Key)AI 问答 → 设置开提醒;N1:跳过向导直入今日页(有推荐 + 3 条示例习惯 + 问题卡片)、答一题推荐变化;N3:聊天空态出 3 个示例问题(点击填入输入框不自动发送)、答案来源 chip 加入待办 → 待办页出现,再点显示「已加入」;N4:设置页「每周总结」开关默认开;N5:设置页「每日一条」开关默认关,手动触发 DailyContentWorker 验证通知与深链条目详情;N7:onboarding 完成后弹一次性长辈模式询问(可跳过,只问一次),设置页「长辈模式」开关切换即时生效——双 tab(今日 + AI 问答)、今日页只剩打卡 + 步数卡、「我的」页含条目库/待办入口;N8:聊天页输入栏麦克风点击开始/再点结束,识别文本实时填入输入框由用户确认再发,拒绝权限或无识别服务时按钮安静隐藏;N9:设置页一级只剩常用开关,底部「高级」进二级页(AI 供应商/搜索/动效/主题),系统返回键回一级设置。
+冒烟路径(新机器或改动后必走):onboarding → 今日页出任务和推荐 → 打卡出 streak → 待办页三分区(每日/每周/一次性) → 条目库搜索 → (配 Key)AI 问答 → 设置开提醒;详情页/推荐行「加入待办」先弹计划类型选择,选每日立即出现在每日分区;N1:跳过向导直入今日页(有推荐 + 3 条示例习惯 + 问题卡片)、答一题推荐变化;N3:聊天空态出 3 个示例问题(点击填入输入框不自动发送)、答案来源 chip 加入待办 → 待办页出现,再点显示「已加入」;N4:设置页「每周总结」开关默认开;N5:设置页「每日一条」开关默认关,手动触发 DailyContentWorker 验证通知与深链条目详情;N7:onboarding 完成后弹一次性长辈模式询问(可跳过,只问一次),设置页「长辈模式」开关切换即时生效——双 tab(今日 + AI 问答)、今日页只剩打卡 + 步数卡、「我的」页含条目库/待办入口;N8:聊天页输入栏麦克风点击开始/再点结束,识别文本实时填入输入框由用户确认再发,拒绝权限或无识别服务时按钮安静隐藏;N9:设置页一级只剩常用开关,底部「高级」进二级页(AI 供应商/搜索/动效/主题),系统返回键回一级设置。
 
 ## 8. 已知取舍与路线
 
@@ -166,6 +166,7 @@ python tools/build_content.py      # 内容变更后重跑,看自检统计
 - **桌面小组件(B5)**:Glance 1.1.1,今日任务一览 + 一键打卡/撤销(doneBy="widget");数据直读 Room,渲染前幂等 ensureTodayTasks。刷新触发:小组件自身动作、TodayViewModel 改动成功后 `WidgetUpdater.refresh`、DailyReminderWorker 跑完后 updateAll
 - **宽屏分层断点(B4)**:条目库宽度分四档——<600dp 单栏 + 路由;600–839dp 双栏(目录 | 章内条目,`TWO_PANE_MIN_WIDTH = 600.dp`),详情走整屏路由;840–1199dp 双栏(章内条目 | 条目详情,`LIST_DETAIL_MIN_WIDTH = 840.dp`),目录收成列表栏底部的章节选择器(按钮 + DropdownMenu);≥1200dp 三栏(目录 | 章内条目 | 条目详情,`THREE_PANE_MIN_WIDTH = 1200.dp`,`LibraryScreen.LibraryThreePane` 用两个嵌套 `ListDetailPaneScaffold`)。840 直接上三栏会让手机横屏挤成窄竖条,所以三栏门槛提到 1200。常驻详情栏的两个档位点条目只更新 selectedEntryId 不跳路由;BackHandler 组合顺序保证详情独占一屏时系统返回先退回条目列表(返回行为留 A2① 真机复查);三个宽屏档位是裸 `ListDetailPaneScaffold`,已在 `LibraryScreen` 的 when 分支统一补 `statusBarsPadding`(此前顶部控件被系统状态栏压住、点击被拦截),条目库操作件(搜索/章节选择/排序/筛选)同步置底
 - 自定义任务(待办页「新增」入口,一次性/每日/每周)没有条目库条目:标题存 `custom_entries`,id 用 "custom:<UUID>" 前缀;打卡、计时、提醒、streak 全部复用现有逻辑,仅没有详情页/收藏/推荐入口
+- **加入计划先问节奏 + 转每日即落行(2026-10-08)**:详情页工具栏与今日页推荐行的「加入待办」不再静默加成一次性,统一弹 `ui/common/AddPlanDialog`(一次性待办/每日习惯/每周习惯,每周再选一周 1-7 次;待办页新建对话框本就有类型选择)。修复「一次性转每日后任务消失、重启才出现」:`ensureTodayDailyRow` 旧逻辑在今天没有 DAILY 行时一律跳过补行,转了就等于隐藏到下次 `ensureTodayTasks`;现在按纯函数 `shouldMaterializeDailyRow` 判断,唯一习惯时立即补行(见 §4 每日任务)。转换成功加 Snackbar 轻反馈(「已转为每日/每周习惯,见上方分区」)——分区在上方、无反馈时看起来像「消失」
 - 单任务可设独立提醒时间:`TaskEntity.remindAtMinutes`(null=跟随全局汇总),按 taskId 入队 unique OneTimeWorkRequest 到点触发,每日习惯次日重建时继承上次设置;TodoScreen 闹钟入口设置/清除,今日卡展示提醒时间。一次性待办另有 `dueDate` 截止日(C6):触发时刻由 `tasks/TaskReminderTiming.kt` 的 `nextTriggerMillis`(带可选日期参数的纯函数)算出,设了独立提醒的按截止日触发,新建自定义待办也可直接带日期
 - AI 配置改为多供应商卡片:DataStore 单 key `ai_providers_json` 存 `List<AiProvider>`(kotlinx.serialization),`active_provider_id` 记「当前使用」;生效卡 = active 且 enabled,否则回退第一个 enabled(`resolveActiveProvider`)。JSON 缺失时一次性内存迁移:旧 `api_base_url/api_key/api_model` 有值折成单张启用卡,否则播种 Kimi/DeepSeek 两张无 key、默认禁用的预设卡,首次写卡时落盘
 - 番茄钟结束提示音可自定义:`timer_ringtone_uri`(空串=系统默认通知音),设置页走系统 `ACTION_RINGTONE_PICKER`;响铃仍挂在 Composition 上,页面不在前台不响(前台服务是另一件事)

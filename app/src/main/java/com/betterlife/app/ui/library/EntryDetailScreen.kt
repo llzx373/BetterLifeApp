@@ -86,6 +86,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.R
 import com.betterlife.app.data.EntryDto
+import com.betterlife.app.ui.common.AddPlanDialog
 import com.betterlife.app.ui.common.AssetImageBanner
 import com.betterlife.app.ui.common.CostMeter
 import com.betterlife.app.ui.common.DisputeBadge
@@ -178,8 +179,12 @@ fun EntryDetailContent(
     val userNote by remember(entryId) { vm.noteFlow(entryId) }
         .collectAsStateWithLifecycle(initialValue = null)
     val addedTodoMessage = stringResource(R.string.detail_added_todo)
+    val addedDailyMessage = stringResource(R.string.detail_added_daily)
+    val addedWeeklyMessage = stringResource(R.string.detail_added_weekly)
     val copiedMessage = stringResource(R.string.detail_copied)
     var editingNote by rememberSaveable { mutableStateOf(false) }
+    // 「加入待办」先问加入哪种计划(一次性/每日/每周)
+    var showAddPlanDialog by rememberSaveable { mutableStateOf(false) }
     /** 分享卡片在渲染/写盘期间挡掉重复点击 */
     var sharing by remember { mutableStateOf(false) }
 
@@ -334,10 +339,7 @@ fun EntryDetailContent(
                     ToolbarAction(
                         icon = Icons.Filled.Add,
                         labelRes = R.string.detail_add_todo,
-                        onClick = {
-                            vm.addToTodo(e.id)
-                            scope.launch { snackbar.showSnackbar(addedTodoMessage) }
-                        },
+                        onClick = { showAddPlanDialog = true },
                     )
                     ToolbarAction(
                         icon = if (e.id in favorites) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
@@ -402,6 +404,28 @@ fun EntryDetailContent(
                     vm.deleteNote(e.id)
                     editingNote = false
                 },
+            )
+        }
+
+        // 「加入待办」先选计划类型:一次性 / 每日 / 每周(选每周再补一步次数)
+        if (showAddPlanDialog) {
+            AddPlanDialog(
+                onAddOnce = {
+                    showAddPlanDialog = false
+                    vm.addToTodo(e.id)
+                    scope.launch { snackbar.showSnackbar(addedTodoMessage) }
+                },
+                onAddDaily = {
+                    showAddPlanDialog = false
+                    vm.addDaily(e.id)
+                    scope.launch { snackbar.showSnackbar(addedDailyMessage) }
+                },
+                onAddWeekly = { times ->
+                    showAddPlanDialog = false
+                    vm.addWeekly(e.id, times)
+                    scope.launch { snackbar.showSnackbar(addedWeeklyMessage) }
+                },
+                onDismiss = { showAddPlanDialog = false },
             )
         }
     }

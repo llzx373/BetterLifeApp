@@ -126,8 +126,23 @@ fun TodoScreen(
             onSetReminder = { task, minutes -> vm.setTaskReminder(task.taskId, minutes) },
             onSetDueDate = { task, date -> vm.setOnceDueDate(task.taskId, date) },
             onStartTimer = { task -> onStartTimer(task.taskId) },
-            onConvertToDaily = vm::convertToDaily,
-            onConvertToWeekly = vm::convertToWeekly,
+            onConvertToDaily = { item ->
+                vm.convertToDaily(item)
+                // 转换后条目换到上方分区,给一句轻反馈,不然看起来像「消失」
+                scope.launch {
+                    snackbar.showSnackbar(
+                        resources.getString(R.string.todo_converted_daily, item.displayTitle)
+                    )
+                }
+            },
+            onConvertToWeekly = { item, times ->
+                vm.convertToWeekly(item, times)
+                scope.launch {
+                    snackbar.showSnackbar(
+                        resources.getString(R.string.todo_converted_weekly, item.displayTitle)
+                    )
+                }
+            },
             onRemoveDailyHabit = vm::removeDailyHabit,
             onToggleWeekly = vm::toggleWeekly,
             onDismissGraduation = vm::dismissGraduation,

@@ -284,8 +284,9 @@ class TaskManager(
     override suspend fun addToTodo(entryId: String) = addOneOffTodo(entryId)
 
     /**
-     * 把条目设为每日习惯：写 STATE_DAILY，今天已有 DAILY 安排则直接补一行；
-     * 今天还没生成则留给 ensureTodayTasks 一并规划（幂等，次日自动落行）。
+     * 把条目设为每日习惯：写 STATE_DAILY，并立即为今天补一行（该条目今天还没有行时）。
+     * 唯一不补的情形：今天尚未规划且还有其他每日习惯等着落行 —— 交给 ensureTodayTasks
+     * 一并生成，避免抢先插一行触发它「今天已规划」的早退，让其他习惯今天落空。
      */
     override suspend fun addDailyHabit(entryId: String) {
         addEntryState(entryId, EntryStateEntity.STATE_DAILY)
@@ -414,8 +415,8 @@ class TaskManager(
         }
 
     /**
-     * 把一次性待办转为每日习惯：删 ONCE 行、清 TODO、写 STATE_DAILY。
-     * 今天的 DAILY 任务已生成过就直接补一行；还没生成则留给 ensureTodayTasks 一并规划。
+     * 把一次性待办转为每日习惯：删 ONCE 行、清 TODO、写 STATE_DAILY，并立即为今天补一行
+     * （补行规则见 [ensureTodayDailyRow]），不再等下次规划，转完即在列表可见。
      */
     suspend fun convertToDaily(entryId: String, taskId: Long) {
         taskDao.delete(taskId)
@@ -424,12 +425,23 @@ class TaskManager(
         ensureTodayDailyRow(entryId)
     }
 
-    /** 今天已有 DAILY 安排时，为 [entryId] 补一行（提醒时间继承历史设置）；今天还没生成则跳过 */
+    /**
+     * 为 [entryId] 补今天的 DAILY 行（提醒时间继承历史设置）；今天已有该条目的行则跳过。
+     *
+     * 关键判断：今天一行 DAILY 都没有时不能一概跳过 —— 若该条目是唯一的每日习惯，
+     * 不补行它就要等到下次 ensureTodayTasks（重启/次日）才出现，看起来就像"消失"了。
+     * 只有「今天尚未规划且还有其他每日习惯」时才留给 ensureTodayTasks 统一落行，
+     * 免得抢先插入的一行让它误判「今天已规划」而漏掉其他习惯。
+     */
     private suspend fun ensureTodayDailyRow(entryId: String) {
         val dateStr = today.value.toString()
         val result = database.withTransaction {
-            if (taskDao.countDailyByDate(dateStr) == 0) return@withTransaction null
             if (taskDao.dailyTaskByEntry(entryId, dateStr) != null) return@withTransaction null
+            val otherDailyHabits = entryStateDao.entryIdsByState(EntryStateEntity.STATE_DAILY)
+                .count { it != entryId }
+            if (!shouldMaterializeDailyRow(taskDao.countDailyByDate(dateStr), otherDailyHabits)) {
+                return@withTransaction null
+            }
             val minutes = inheritedReminderMinutes(taskDao.dailyReminderHistory(entryId))
             val id = taskDao.insert(
                 TaskEntity(

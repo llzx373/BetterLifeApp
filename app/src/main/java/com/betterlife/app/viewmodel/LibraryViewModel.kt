@@ -236,6 +236,16 @@ class LibraryViewModel(
         viewModelScope.launch(Dispatchers.IO) { taskManager.addOneOffTodo(entryId) }
     }
 
+    /** 详情页「加入计划」选每日：写 STATE_DAILY 并立即为今天补一行 */
+    fun addDaily(entryId: String) {
+        viewModelScope.launch(Dispatchers.IO) { taskManager.addDailyHabit(entryId) }
+    }
+
+    /** 详情页「加入计划」选每周：建一周 [timesPerWeek] 次的每周习惯模板 */
+    fun addWeekly(entryId: String, timesPerWeek: Int) {
+        viewModelScope.launch(Dispatchers.IO) { taskManager.addWeeklyHabit(entryId, timesPerWeek) }
+    }
+
     /** 「换一批」:推荐组内候选按轮次轮转(持久化在 SettingsStore,重启不跳回第一批) */
     fun reshuffleRecommendations() {
         viewModelScope.launch(Dispatchers.IO) { settingsStore.bumpRecommendOffset() }
