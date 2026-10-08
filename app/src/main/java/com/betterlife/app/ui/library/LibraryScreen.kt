@@ -299,6 +299,7 @@ internal fun LibraryListDetail(
                         if (state.query.isNotBlank()) {
                             SearchResults(
                                 results = state.searchResults,
+                                totalHits = state.searchTotalHits,
                                 doneIds = state.doneIds,
                                 plannedIds = state.plannedIds,
                                 onOpenEntry = onSelectEntry,
@@ -475,6 +476,7 @@ internal fun LibraryCatalogContent(
             if (state.query.isNotBlank()) {
                 SearchResults(
                     results = state.searchResults,
+                    totalHits = state.searchTotalHits,
                     doneIds = state.doneIds,
                     plannedIds = state.plannedIds,
                     onOpenEntry = onOpenEntry,
@@ -670,6 +672,7 @@ private fun RecentSearches(history: List<String>, onPick: (String) -> Unit) {
 @Composable
 private fun SearchResults(
     results: List<RetrievedEntry>,
+    totalHits: Int,
     doneIds: Set<String>,
     plannedIds: Set<String>,
     onOpenEntry: (String) -> Unit,
@@ -684,6 +687,19 @@ private fun SearchResults(
         return
     }
     LazyColumn(contentPadding = PaddingValues(bottom = Spacing.space4)) {
+        // 命中数放结果顶部:topK 截断后「还有 N 条没显示」才有处得知
+        item(key = "hit-count") {
+            Text(
+                text = if (totalHits > results.size) {
+                    stringResource(R.string.library_search_hit_count_more, totalHits, results.size)
+                } else {
+                    stringResource(R.string.library_search_hit_count, totalHits)
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space2),
+            )
+        }
         items(results, key = { it.entry.id }) { scored ->
             val entry = scored.entry
             SafeListItem(

@@ -54,6 +54,7 @@ import com.betterlife.app.data.EntryDto
 import com.betterlife.app.data.EntryKeys
 import com.betterlife.app.data.SectionDto
 import com.betterlife.app.recommend.EntryFilter
+import com.betterlife.app.recommend.EntryStatusFilter
 import com.betterlife.app.ui.common.AssetImageBanner
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.DoneBadge
@@ -181,7 +182,7 @@ internal fun SectionListContent(
 }
 
 /**
- * 筛选行:性价比 / 证据 / 口径 三组下拉多选,横向滚动保持紧凑。
+ * 筛选行:状态(单选)/ 性价比 / 证据 / 口径 四组下拉,横向滚动保持紧凑。
  * 有激活条件时尾部出现「清空」;组标签上带已选数量。
  */
 @Composable
@@ -198,6 +199,19 @@ private fun FilterRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.space2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // 状态组放最前:「只看没看过的」是 614 条库里最自然的筛选诉求;单选,不设数量角标
+        FilterMenuChip(
+            label = stringResource(R.string.filter_status),
+            activeCount = if (filter.status == EntryStatusFilter.ALL) 0 else 1,
+        ) {
+            STATUS_OPTIONS.forEach { (status, labelRes) ->
+                CheckMenuItem(
+                    checked = filter.status == status,
+                    label = stringResource(labelRes),
+                    onClick = { onSetFilter(filter.withStatus(status)) },
+                )
+            }
+        }
         FilterMenuChip(
             label = stringResource(R.string.filter_ratio),
             activeCount = filter.ratios.size,
@@ -248,6 +262,14 @@ private val LENS_OPTIONS = listOf(
     EntryKeys.LENS_MONEY,
     EntryKeys.LENS_TIME,
     EntryKeys.LENS_FREEDOM,
+)
+
+/** 状态筛选的四个单选项(全部/待看/已完成/已加入计划) */
+private val STATUS_OPTIONS = listOf(
+    EntryStatusFilter.ALL to R.string.filter_status_all,
+    EntryStatusFilter.PENDING to R.string.filter_status_pending,
+    EntryStatusFilter.DONE to R.string.filter_status_done,
+    EntryStatusFilter.PLANNED to R.string.filter_status_planned,
 )
 
 private enum class RatioOption(val value: String, val labelRes: Int) {

@@ -25,8 +25,10 @@ import com.betterlife.app.recommend.ProfileQuestions
 import com.betterlife.app.recommend.RecommendationEngine
 import com.betterlife.app.recommend.ScoredEntry
 import com.betterlife.app.recommend.applyFilter
+import com.betterlife.app.recommend.applyStatusFilter
 import com.betterlife.app.recommend.computeEntryStats
 import com.betterlife.app.recommend.matchesFilter
+import com.betterlife.app.recommend.matchesStatus
 import com.betterlife.app.tasks.TaskManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -69,6 +71,8 @@ class LibraryViewModel(
         val lensStats: Map<String, EntryStats> = emptyMap(),
         val query: String = "",
         val searchResults: List<RetrievedEntry> = emptyList(),
+        /** 当前筛选下的总命中数（截断前）;超过 searchResults.size 说明只显示了前若干条 */
+        val searchTotalHits: Int = 0,
         /** 最近提交的搜索词,新词在前;输入框为空时展示 */
         val searchHistory: List<String> = emptyList(),
     )
@@ -155,22 +159,32 @@ class LibraryViewModel(
                 // 换章后右栏若还留着旧章的详情就串味了,一并清掉
                 selectedEntryId = null,
                 sectionEntries = sortedSectionEntries(data, n, _uiState.value.sort)
-                    .applyFilter(_uiState.value.filter),
+                    .applyFullFilter(_uiState.value.filter),
             )
         }
     }
 
+    /** 内容维度 + 状态维度的完整筛选;状态判定用当前快照里的 done/planned id 集合 */
+    private fun List<EntryDto>.applyFullFilter(filter: EntryFilter): List<EntryDto> =
+        applyFilter(filter).applyStatusFilter(filter.status, _uiState.value.doneIds, _uiState.value.plannedIds)
+
+    private fun RetrievedEntry.matchesFullFilter(filter: EntryFilter): Boolean =
+        entry.matchesFilter(filter) &&
+            entry.matchesStatus(filter.status, _uiState.value.doneIds, _uiState.value.plannedIds)
+
     /** 筛选条件切换:章内列表与搜索结果都跟着收缩;推荐不变 */
     fun setFilter(filter: EntryFilter) {
+        val hits = searchBaseline.filter { it.matchesFullFilter(filter) }
         _uiState.value = _uiState.value.copy(
             filter = filter,
-            searchResults = searchBaseline.filter { it.entry.matchesFilter(filter) },
+            searchResults = hits.take(SEARCH_TOP_K),
+            searchTotalHits = hits.size,
         )
         val section = _uiState.value.selectedSection ?: return
         viewModelScope.launch(Dispatchers.IO) {
             val data = entryRepository.entriesData()
             _uiState.value = _uiState.value.copy(
-                sectionEntries = sortedSectionEntries(data, section, _uiState.value.sort).applyFilter(filter),
+                sectionEntries = sortedSectionEntries(data, section, _uiState.value.sort).applyFullFilter(filter),
             )
         }
     }
@@ -219,16 +233,22 @@ class LibraryViewModel(
         _uiState.value = _uiState.value.copy(query = query)
         viewModelScope.launch(Dispatchers.IO) {
             val data = entryRepository.entriesData()
-            val results = if (query.isBlank()) {
+            if (query.isBlank()) {
                 searchBaseline = emptyList()
-                emptyList()
+                _uiState.value = _uiState.value.copy(searchResults = emptyList(), searchTotalHits = 0)
             } else {
-                // 搜索语料同样剔除下架条目（与 bySection 的浏览过滤一致）
-                val baseline = retriever.search(query, data.entries.filter { !it.removed }, topK = 20)
+                // 搜索语料同样剔除下架条目（与 bySection 的浏览过滤一致）。
+                // 检索器本来就对全库打分排序,topK 放开了拿全量,命中数与「前 N 条」才说得清
+                val baseline = retriever.search(
+                    query, data.entries.filter { !it.removed }, topK = Int.MAX_VALUE,
+                )
                 searchBaseline = baseline
-                baseline.filter { it.entry.matchesFilter(_uiState.value.filter) }
+                val hits = baseline.filter { it.matchesFullFilter(_uiState.value.filter) }
+                _uiState.value = _uiState.value.copy(
+                    searchResults = hits.take(SEARCH_TOP_K),
+                    searchTotalHits = hits.size,
+                )
             }
-            _uiState.value = _uiState.value.copy(searchResults = results)
         }
     }
 
@@ -289,6 +309,9 @@ class LibraryViewModel(
     }
 
     companion object {
+        /** 搜索结果最多显示条数;总命中数(searchTotalHits)不受它限制 */
+        private const val SEARCH_TOP_K = 20
+
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as BetterLifeApp

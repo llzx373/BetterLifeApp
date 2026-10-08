@@ -203,6 +203,9 @@
     <string name="library_title">条目库</string>
     <string name="library_search_hint">搜条目,如:戒烟、体检、午睡</string>
     <string name="library_no_match">没有匹配的条目</string>
+    <!-- 搜索结果顶部的命中数;超过显示上限(前 20 条)时换带截断说明的版本 -->
+    <string name="library_search_hit_count">共命中 %1$d 条</string>
+    <string name="library_search_hit_count_more">共命中 %1$d 条,只显示前 %2$d 条</string>
     <string name="library_recent_searches">最近搜索</string>
     <string name="library_pick_chapter">从左边的目录挑一章</string>
     <string name="library_pick_entry">从中间的列表挑一条</string>
@@ -589,6 +592,12 @@
     <string name="filter_ratio">性价比</string>
     <string name="filter_grade">证据</string>
     <string name="filter_lens">口径</string>
+    <!-- 状态组(单选):待看的口径与统计一致——没完成就是待看 -->
+    <string name="filter_status">状态</string>
+    <string name="filter_status_all">全部</string>
+    <string name="filter_status_pending">待看</string>
+    <string name="filter_status_done">已完成</string>
+    <string name="filter_status_planned">已加入计划</string>
     <string name="filter_chip_active">%1$s·%2$d</string>
     <string name="filter_empty">没有符合当前筛选的条目</string>
     <string name="share_card_source_label">出处</string>

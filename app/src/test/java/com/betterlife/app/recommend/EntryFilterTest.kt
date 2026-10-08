@@ -92,4 +92,31 @@ class EntryFilterTest {
             assertEquals(e in entries.applyFilter(f), e.matchesFilter(f))
         }
     }
+
+    @Test
+    fun `状态维度按 id 集合判定`() {
+        val done = setOf("01-01", "01-03")
+        val planned = setOf("01-02")
+        assertEquals(
+            listOf("01-02", "01-04"),
+            entries.applyStatusFilter(EntryStatusFilter.PENDING, done, planned).map { it.id },
+        )
+        assertEquals(
+            listOf("01-01", "01-03"),
+            entries.applyStatusFilter(EntryStatusFilter.DONE, done, planned).map { it.id },
+        )
+        assertEquals(
+            listOf("01-02"),
+            entries.applyStatusFilter(EntryStatusFilter.PLANNED, done, planned).map { it.id },
+        )
+        assertEquals(entries, entries.applyStatusFilter(EntryStatusFilter.ALL, done, planned))
+    }
+
+    @Test
+    fun `非默认状态让筛选非空且计入激活数`() {
+        val f = EntryFilter().withStatus(EntryStatusFilter.PENDING)
+        assertFalse(f.isEmpty)
+        assertEquals(1, f.activeCount)
+        assertEquals(EntryStatusFilter.ALL, EntryFilter().status)
+    }
 }
