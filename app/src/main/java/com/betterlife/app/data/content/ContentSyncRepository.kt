@@ -85,8 +85,9 @@ internal fun contentMismatch(active: Map<String, String>, manifest: ContentManif
  * 运行时内容同步：从 GitHub Releases（滚动 tag content-latest）拉 manifest，
  * 版本相同即 UpToDate；本地版本等于 patchBase 走增量包，否则下全量 gzip 包。
  *
- * 写库一律在单事务里，收尾用 manifest.entries 对 content_entries 做 key→hash
- * 全量校验（600 条级别很便宜）：增量校验不过回滚后自动改走全量，
+ * 写库一律在单事务里（key 别名改写与内容应用同事务，校验不过整体回滚，
+ * 用户数据不会悬空指向不存在的新 key），收尾用 manifest.entries 对 content_entries
+ * 做 key→hash 全量校验（600 条级别很便宜）：增量校验不过回滚后自动改走全量，
  * 全量校验不过则整轮放弃（返回 Failed，WorkManager 指数退避重试）。
  * 下架条目里有用户数据的，先在事务内按标题相似度保守重挂（见 reattachUserData）。
  * 任何网络/解析失败都不写库，返回 [SyncResult.Failed]。
@@ -125,17 +126,17 @@ class ContentSyncRepository(
             if (path == SyncPath.UP_TO_DATE) {
                 return@withContext SyncResult.UpToDate
             }
-            applyKeyAliases(manifest.aliases)
+            val aliases = resolveKeyAliases(manifest.aliases)
             val now = System.currentTimeMillis()
             if (path == SyncPath.PATCH) {
                 try {
-                    applyPatch(manifest, manifest.patchUrl!!, now)
+                    applyPatch(manifest, manifest.patchUrl!!, now, aliases)
                 } catch (e: VerificationException) {
                     // 增量结果对不上清单：本地内容可能已偏离基线，回滚后改走全量
-                    applyFull(manifest, now)
+                    applyFull(manifest, now, aliases)
                 }
             } else {
-                applyFull(manifest, now)
+                applyFull(manifest, now, aliases)
             }
             entryRepository.invalidate()
             SyncResult.Updated(manifest.contentVersion)
@@ -148,29 +149,24 @@ class ContentSyncRepository(
      * key 别名改写必须在应用新内容之前做：旧 key 下架后用户数据会脱钩，
      * 先按别名表把五张用户表的 entryId 挂到新 key 上。
      * 别名有两个来源：manifest 在线下发（[remoteAliases]，老 APK 也能收到新别名）
-     * 和 assets 内置表（APK 断网首装时的兜底）；冲突时以在线表为准。两表皆空直接跳过。
+     * 和 assets 内置表（APK 断网首装时的兜底）；冲突时以在线表为准。两表皆空返回空表。
+     *
+     * 这里只做解析合并；改写发生在 applyPatch/applyFull 的事务内部（见两者的 aliases 参数）——
+     * 之前独立事务先落库，后续 apply 失败回滚会让用户数据悬空指向不存在的新 key。
      */
-    private suspend fun applyKeyAliases(remoteAliases: Map<String, String>) {
+    private fun resolveKeyAliases(remoteAliases: Map<String, String>): Map<String, String> {
         val assetAliases = runCatching {
             context.assets.open("key_aliases.json").bufferedReader().use {
                 json.decodeFromString(KeyAliases.serializer(), it.readText())
             }.aliases
         }.getOrDefault(emptyMap())
-        val aliases = assetAliases + remoteAliases
-        if (aliases.isEmpty()) return
-        database.withTransaction {
-            val db = database.openHelper.writableDatabase
-            for (table in ENTRY_ID_TABLES) {
-                for ((oldKey, newKey) in aliases) {
-                    db.execSQL("UPDATE $table SET entryId = ? WHERE entryId = ?", arrayOf(newKey, oldKey))
-                }
-            }
-        }
+        return assetAliases + remoteAliases
     }
 
-    private suspend fun applyPatch(manifest: ContentManifest, patchUrl: String, now: Long) {
+    private suspend fun applyPatch(manifest: ContentManifest, patchUrl: String, now: Long, aliases: Map<String, String>) {
         val patch = fetchJson(patchUrl, ContentPatch.serializer(), client)
         database.withTransaction {
+            applyAliases(aliases)
             val dao = database.contentDao()
             dao.upsertSections(patch.sections.map { it.toContentEntity() })
             dao.upsertEntries(patch.updated.map { it.toContentEntity(removed = false, updatedAt = now) })
@@ -189,9 +185,10 @@ class ContentSyncRepository(
         }
     }
 
-    private suspend fun applyFull(manifest: ContentManifest, now: Long) {
+    private suspend fun applyFull(manifest: ContentManifest, now: Long, aliases: Map<String, String>) {
         val file = fetchGzipJson(manifest.fullUrl, EntriesFile.serializer())
         database.withTransaction {
+            applyAliases(aliases)
             val dao = database.contentDao()
             dao.upsertSections(file.sections.map { it.toContentEntity() })
             dao.upsertEntries(file.entries.map { it.toContentEntity(removed = false, updatedAt = now) })
@@ -213,6 +210,19 @@ class ContentSyncRepository(
         }
     }
 
+    /**
+     * 事务内的别名改写：必须在 applyPatch/applyFull 的 withTransaction 里调用，
+     * 校验不过时随内容一起回滚。改写冲突安全（新旧 key 都有行时不抛约束异常）。
+     * 增量校验失败改走全量时会再次调用——幂等（旧 key 行已不存在，等于空转）。
+     */
+    private fun applyAliases(aliases: Map<String, String>) {
+        if (aliases.isEmpty()) return
+        val db = database.openHelper.writableDatabase
+        for ((oldKey, newKey) in aliases) {
+            rewriteEntryId(db, oldKey, newKey)
+        }
+    }
+
     /** 在架条目（removed=false）的 key→hash 必须与清单完全一致，否则抛 [VerificationException] 回滚 */
     private suspend fun verifyAgainst(manifest: ContentManifest) {
         val active = database.contentDao().allEntries()
@@ -225,8 +235,9 @@ class ContentSyncRepository(
      * 下架重挂（运行时兜底）：构建期的 0.8 阈值没接住、也没人登记别名时，
      * 被删条目若还挂着用户数据（任务/收藏/笔记等），在同节在架条目里按标题
      * bigram 相似度找唯一候选（阈值 0.85 + 分差 0.05，比构建期更保守），
-     * 命中就把五张用户表的 entryId 改写到新 key。被重挂的旧行保持 removed，
-     * 详情/历史仍读旧快照。必须在 markRemoved 之后、同一事务内调用。
+     * 命中就把五张用户表的 entryId 改写到新 key（冲突安全：目标 key 已有同主键行时
+     * 保留目标行）。被重挂的旧行保持 removed，详情/历史仍读旧快照。
+     * 必须在 markRemoved 之后、同一事务内调用。
      */
     private suspend fun reattachUserData(removedKeys: List<String>) {
         val dao = database.contentDao()
@@ -239,9 +250,7 @@ class ContentSyncRepository(
             val candidates = active.filter { it.secKey == row.secKey }.map { it.key to it.title }
             val target = TitleSimilarity.pickCandidate(row.title, candidates, REATTACH_THRESHOLD)
                 ?: continue
-            for (table in ENTRY_ID_TABLES) {
-                db.execSQL("UPDATE $table SET entryId = ? WHERE entryId = ?", arrayOf(target, row.key))
-            }
+            rewriteEntryId(db, row.key, target)
             Log.i(TAG, "下架条目重挂: ${row.key}《${row.title}》→ $target")
         }
     }

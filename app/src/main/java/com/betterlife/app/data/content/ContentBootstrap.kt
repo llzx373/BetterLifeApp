@@ -2,6 +2,7 @@ package com.betterlife.app.data.content
 
 import android.content.Context
 import androidx.room.withTransaction
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.betterlife.app.data.EntriesFile
 import com.betterlife.app.data.EntryDto
 import com.betterlife.app.data.SectionDto
@@ -36,6 +37,43 @@ internal object BundledContent {
 
 /** 存条目 id 的五张用户表：id 迁移与 key 别名改写共用同一份清单 */
 internal val ENTRY_ID_TABLES = listOf("tasks", "entry_states", "weekly_habits", "entry_notes", "streak_leaves")
+
+/**
+ * 冲突安全的 entryId 改写：先删掉会撞主键的旧 key 行，再 UPDATE 其余行。
+ *
+ * 直接 UPDATE 在主键含 entryId 的表上，当用户对新旧 key 都有数据时抛
+ * SQLiteConstraintException（entry_states 主键 (entryId,state)、entry_notes /
+ * weekly_habits 主键 entryId、streak_leaves 主键 (entryId,date)），同步/迁移路径
+ * 每次走到同一行都炸 → WorkManager 永久退避、首启 ensureReady 永久失败。
+ * 冲突语义：保留新 key 行（它属于当前在架 key），丢弃撞主键的旧 key 行。
+ * tasks 主键是自增 taskId，entryId 只是索引列，无冲突。
+ */
+internal fun rewriteEntryId(db: SupportSQLiteDatabase, oldKey: String, newKey: String) {
+    if (oldKey == newKey) return
+    for (table in ENTRY_ID_TABLES) {
+        when (table) {
+            "tasks" -> Unit
+            "entry_states" -> db.execSQL(
+                "DELETE FROM entry_states WHERE entryId = ? AND EXISTS (" +
+                    "SELECT 1 FROM entry_states n WHERE n.entryId = ? AND n.state = entry_states.state)",
+                arrayOf(oldKey, newKey),
+            )
+
+            "streak_leaves" -> db.execSQL(
+                "DELETE FROM streak_leaves WHERE entryId = ? AND EXISTS (" +
+                    "SELECT 1 FROM streak_leaves n WHERE n.entryId = ? AND n.date = streak_leaves.date)",
+                arrayOf(oldKey, newKey),
+            )
+
+            else -> db.execSQL(
+                "DELETE FROM $table WHERE entryId = ? AND EXISTS " +
+                    "(SELECT 1 FROM $table n WHERE n.entryId = ?)",
+                arrayOf(oldKey, newKey),
+            )
+        }
+        db.execSQL("UPDATE $table SET entryId = ? WHERE entryId = ?", arrayOf(newKey, oldKey))
+    }
+}
 
 /** 旧版位置序号 id（SS-NN）判定与改写：首启迁移与备份导入共用 */
 internal object LegacyEntryId {
@@ -108,7 +146,8 @@ class ContentBootstrap(
     /**
      * 旧版本地数据里的 entryId 是位置序号 "SS-NN"，上游插入条目后会顺延失配；
      * 用捆绑 entries.json 的 id→key 映射改写五张表。"custom:" 前缀的自定义任务
-     * 天然不会命中映射。UPDATE 走 SupportSQLiteDatabase，包在一个事务里。
+     * 天然不会命中映射。改写走冲突安全的 [rewriteEntryId]（新旧 key 都有行时不炸），
+     * 包在一个事务里。
      */
     private suspend fun migrateEntryIdsIfNeeded() {
         if (settingsStore.isContentIdMigrated()) return
@@ -116,10 +155,8 @@ class ContentBootstrap(
         if (idToKey.isNotEmpty()) {
             database.withTransaction {
                 val db = database.openHelper.writableDatabase
-                for (table in ENTRY_ID_TABLES) {
-                    for ((oldId, key) in idToKey) {
-                        db.execSQL("UPDATE $table SET entryId = ? WHERE entryId = ?", arrayOf(key, oldId))
-                    }
+                for ((oldId, key) in idToKey) {
+                    rewriteEntryId(db, oldId, key)
                 }
             }
         }
