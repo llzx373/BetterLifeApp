@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -225,6 +226,12 @@ fun ChatScreen(
                         onAddToTodo = vm::addSourceToTodo,
                         onAddToDaily = vm::addSourceToDaily,
                         onOpenEntry = onOpenEntry,
+                        // 只有最后一条是错误气泡时才给重试:中途的错误重试会截掉其后新对话
+                        onRetry = if (state.messages[i].isError && i == state.messages.lastIndex) {
+                            vm::retry
+                        } else {
+                            null
+                        },
                     )
                 }
                 if (state.asking) {
@@ -465,6 +472,7 @@ private fun Bubble(
     onAddToTodo: (String) -> Unit,
     onAddToDaily: (String) -> Unit,
     onOpenEntry: (String) -> Unit,
+    onRetry: (() -> Unit)? = null,
 ) {
     val isUser = msg.role == ChatMessage.ROLE_USER
     val isError = msg.isError
@@ -552,8 +560,21 @@ private fun Bubble(
                             Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(LocalSpacing.current.space4))
                             Spacer(Modifier.width(LocalSpacing.current.space2))
                         }
-                        Text(text = text, style = MaterialTheme.typography.bodyMedium)
+                        // AI 回答长按可选中复制(用户自己的问题就在输入框历史里,不给)
+                        if (isUser) {
+                            Text(text = text, style = MaterialTheme.typography.bodyMedium)
+                        } else {
+                            SelectionContainer {
+                                Text(text = text, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
                     }
+                }
+            }
+            // 失败不让用户重打问题:错误气泡下给「重试」,重发最后一条提问
+            if (isError && onRetry != null) {
+                TextButton(onClick = onRetry) {
+                    Text(stringResource(R.string.action_retry))
                 }
             }
             if (!isUser && !isError && msg.sources.isNotEmpty()) {

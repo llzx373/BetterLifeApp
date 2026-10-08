@@ -178,6 +178,27 @@ class ChatViewModelTest {
         assertTrue(vm.uiState.value.messages.last().isError)
     }
 
+    @Test
+    fun `重试重发最后一条提问且不留下重复气泡`() = runTest {
+        val dao = FakeChatMessageDao().apply { failOnInsert = true }
+        val noKeyProvider = AiProvider(id = "a", name = "A", baseUrl = "https://x", apiKey = "", model = "m")
+        val vm = newViewModel(AppSettings(aiProviders = listOf(noKeyProvider), activeProviderId = "a"), dao)
+
+        vm.ask("怎么戒烟")
+        awaitNotAsking(vm)
+        assertTrue(vm.uiState.value.messages.last().isError)
+
+        dao.failOnInsert = false
+        vm.retry()
+        awaitNotAsking(vm)
+
+        val messages = vm.uiState.value.messages
+        assertFalse(vm.uiState.value.asking)
+        assertTrue(messages.none { it.isError })
+        assertEquals(1, messages.count { it.role == ChatMessage.ROLE_USER })
+        assertEquals("怎么戒烟", messages.first { it.role == ChatMessage.ROLE_USER }.content)
+    }
+
     /** 加入动作走 Dispatchers.IO（真线程），轮询等 fake 记到 */
     private fun awaitCalls(vararg lists: List<*>) {
         val deadline = System.currentTimeMillis() + 5_000

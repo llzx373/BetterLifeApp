@@ -201,6 +201,22 @@ class ChatViewModel(
         _uiState.update { it.copy(messages = it.messages + msg) }
     }
 
+    /**
+     * 重试最近一次失败的提问:以最后一条用户消息为问题重走 ask。
+     * 该用户消息及其后的(错误)气泡先移除——ask 会重新追加,不留重复气泡;
+     * 重试成功后新回答照常落库,失败的问题本身此前已落库,不重复写。
+     */
+    fun retry() {
+        if (_uiState.value.asking) return
+        val messages = _uiState.value.messages
+        val lastUserIndex = messages.indexOfLast { it.role == ChatMessage.ROLE_USER }
+        if (lastUserIndex < 0) return
+        val question = messages[lastUserIndex].content
+        if (question.isBlank()) return
+        _uiState.update { it.copy(messages = messages.take(lastUserIndex)) }
+        ask(question)
+    }
+
     /** 就地替换气泡：流式更新靠对象身份定位，不给 ChatUiMessage 引入额外 id 字段 */
     private fun replaceMessage(old: ChatUiMessage, new: ChatUiMessage) {
         _uiState.update { s ->
