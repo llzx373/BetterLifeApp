@@ -62,7 +62,7 @@ interface SensorSteps {
     /** API 29+ 需要 ACTIVITY_RECOGNITION 运行时权限 */
     fun hasPermission(): Boolean
 
-    /** 今日步数实时流：传感器来一个新读数就算一次（含跨天基线重置） */
+    /** 今日步数实时流:先发一次持久化的初始快照,之后传感器每来一个新读数就算一次(含跨天基线重置) */
     fun todayStepsFlow(): Flow<Long>
 }
 

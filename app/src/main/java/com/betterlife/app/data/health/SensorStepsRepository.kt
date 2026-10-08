@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import java.time.LocalDate
 
 private val Context.stepsDataStore by preferencesDataStore(name = "steps")
@@ -62,6 +63,27 @@ class SensorStepsRepository(private val context: Context) : SensorSteps {
             it[Keys.LAST_COUNTER] = next.lastCounter
         }
         steps
+    }.onStart {
+        // TYPE_STEP_COUNTER 是 on-change 传感器,注册后不保证立刻回调(部分设备要等走出
+        // 一步或下次批量上报)。先用持久化的上次读数发一个初始快照,首开页面立即有值,
+        // 真实事件来了再覆盖 —— 否则卡片会一直停在 Loading 不渲染
+        emit(persistedTodaySteps())
+    }
+
+    /**
+     * 不写回 DataStore 的初始快照:有历史就按既有基线换算(含跨天归零),
+     * 没有任何历史则是 0 —— 基线留给首个真实传感器事件建立,
+     * 否则会把开机以来的累计值全算成今日步数
+     */
+    private suspend fun persistedTodaySteps(): Long {
+        val prefs = context.stepsDataStore.data.first()
+        if (!prefs.contains(Keys.BASELINE_DATE)) return 0L
+        val prev = StepsBaseline(
+            date = prefs[Keys.BASELINE_DATE].orEmpty(),
+            baseline = prefs[Keys.BASELINE_VALUE] ?: 0L,
+            lastCounter = prefs[Keys.LAST_COUNTER] ?: 0L,
+        )
+        return computeTodaySteps(prev, prev.lastCounter, LocalDate.now().toString()).second
     }
 
     /** 传感器原始读数流（开机累计值）；订阅即注册监听，取消即注销 */
