@@ -436,6 +436,8 @@
     <string name="settings_daily_content_sub">每天早 8 点档推一条精选内容,30 天内不重样;没有合适的内容就不发</string>
     <string name="action_open_settings">去开启</string>
     <string name="settings_section_theme">主题</string>
+    <!-- 桌面图标颜色：与主题色同口径的四色，切换经 activity-alias（IconColor） -->
+    <string name="settings_section_icon_color">图标颜色</string>
     <!-- N7 长辈模式:一级开关 + onboarding 完成后的一次性询问 -->
     <string name="settings_section_senior">长辈模式</string>
     <string name="settings_senior_mode">长辈模式</string>

@@ -163,50 +163,134 @@ def v8(img, d, bg):
     heart(d, 18, 50, 24)
 
 def v9(img, d, bg):
-    # V6 满版 + 拟脸化：横梁=眉，心/硬币=眼，立柱=鼻（缩短），新增横杠=嘴
+    # V6 满版 + 拟脸化，按三庭五眼校准：
+    # 眉(横梁) y32 -> 鼻底 y57 -> 下巴 ~y82 三段均分；嘴在鼻底下 1/3 处，浅弧微笑
     beam(d, 17, 30.5, 91, 34, 1.7)
-    pillar(d, 33.5, 59, 3.0)              # 鼻子，在嘴上方停住
-    rline(d, (43, 69), (65, 69), 3.5)     # 嘴
-    strings(d, 30, 34, [(21, 43), (39, 43)], 1.4)
-    strings(d, 78, 34, [(68.1, 41.1), (87.9, 41.1)], 1.4)
-    coin(img, d, bg, 78, 51, 14, 3.0, 2.8)
-    heart(d, 18, 42, 24)
+    pillar(d, 33.5, 57, 3.0)              # 鼻子，收短到鼻底 y57
+    # 嘴：基本平，带一点点微笑（极浅的弧，两端略微上扬）
+    d.arc([R(41), R(63.5), R(67), R(69.5)], 15, 165, fill=WHITE, width=int(R(3.2)))
+    strings(d, 30, 34, [(19.5, 44), (40.5, 44)], 1.4)
+    strings(d, 78, 34, [(68.8, 43.8), (87.2, 43.8)], 1.4)
+    coin(img, d, bg, 78, 53, 13, 3.0, 2.8)
+    heart(d, 18, 44, 24)   # 下移，质心 ≈ y52.8，与硬币中心 y53 对齐
+
+def heart_rt(d, x0, y0, w, tr):
+    # 方案1：心尖圆化——两腰在切点截断，底部用与两腰相切的圆弧过渡
+    x1 = x0 + w
+    cx = (x0 + x1) / 2
+    r = 0.3536 * w
+    k = tr / 1.41421356  # 切点到尖端的水平/垂直距离
+    d.polygon([(R(cx), R(y0)), (R(x1), R(y0 + 0.5 * w)),
+               (R(cx + k), R(y0 + w - k)), (R(cx - k), R(y0 + w - k)),
+               (R(x0), R(y0 + 0.5 * w))], fill=WHITE)
+    d.ellipse([R(cx - 0.25 * w - r), R(y0 + 0.25 * w - r),
+               R(cx - 0.25 * w + r), R(y0 + 0.25 * w + r)], fill=WHITE)
+    d.ellipse([R(cx + 0.25 * w - r), R(y0 + 0.25 * w - r),
+               R(cx + 0.25 * w + r), R(y0 + 0.25 * w + r)], fill=WHITE)
+    # 相切圆：圆心在中轴上，距两腰均为 tr
+    cyb = y0 + w - 2 * k
+    d.ellipse([R(cx - tr), R(cyb - tr), R(cx + tr), R(cyb + tr)], fill=WHITE)
+
+def heart_flat(img, x0, y0, w, squeeze=0.82):
+    # 方案2：整体压扁（画到临时层再纵向压缩）
+    layer = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+    ld = ImageDraw.Draw(layer)
+    heart(ld, x0, y0, w)
+    bbox = layer.getbbox()
+    crop = layer.crop(bbox)
+    crop = crop.resize((crop.width, int(crop.height * squeeze)), Image.LANCZOS)
+    img.paste(crop, (bbox[0], bbox[1]), crop)
+
+def face_base(d):
+    # V9 定稿的五官框架：眉/鼻/嘴
+    beam(d, 17, 30.5, 91, 34, 1.7)
+    pillar(d, 33.5, 57, 3.0)
+    d.arc([R(41), R(63.5), R(67), R(69.5)], 15, 165, fill=WHITE, width=int(R(3.2)))
+
+def v10(img, d, bg):
+    # 方案1+4：圆化心尖 + 上移补偿（心尖落在硬币底缘稍上方）
+    face_base(d)
+    strings(d, 30, 34, [(19.5, 42.5), (40.5, 42.5)], 1.4)
+    strings(d, 78, 34, [(68.8, 43.8), (87.2, 43.8)], 1.4)
+    coin(img, d, bg, 78, 53, 13, 3.0, 2.8)
+    heart_rt(d, 18, 42, 24, 2.2)
+
+def v11(img, d, bg):
+    # 方案2：心形压扁，底缘与硬币齐平
+    face_base(d)
+    strings(d, 30, 34, [(19.5, 46.5), (40.5, 46.5)], 1.4)
+    strings(d, 78, 34, [(68.8, 43.8), (87.2, 43.8)], 1.4)
+    coin(img, d, bg, 78, 53, 13, 3.0, 2.8)
+    heart_flat(img, 18, 46, 24)
+
+def v12(img, d, bg):
+    # 方案3：硬币放大下移，底缘对齐心尖 y68
+    face_base(d)
+    strings(d, 30, 34, [(19.5, 44), (40.5, 44)], 1.4)
+    strings(d, 78, 34, [(68.1, 44.1), (87.9, 44.1)], 1.4)
+    coin(img, d, bg, 78, 54, 14, 3.0, 2.8)
+    heart(d, 18, 44, 24)
+
+def v13(img, d, bg):
+    # 方案5：加托盘接住心尖和硬币
+    face_base(d)
+    strings(d, 30, 34, [(19.5, 44), (40.5, 44)], 1.4)
+    strings(d, 78, 34, [(68.8, 43.8), (87.2, 43.8)], 1.4)
+    coin(img, d, bg, 78, 53, 13, 3.0, 2.8)
+    heart(d, 18, 44, 24)
+    pan(d, 16, 62, 44, 72, 2.2)
+    pan(d, 64, 60, 92, 70, 2.2)
+
+def v14(img, d, bg):
+    # 方案4 单独：心脏上移，心尖略高于硬币底缘（overshoot 补偿）
+    face_base(d)
+    strings(d, 30, 34, [(19.5, 42), (40.5, 42)], 1.4)
+    strings(d, 78, 34, [(68.8, 43.8), (87.2, 43.8)], 1.4)
+    coin(img, d, bg, 78, 53, 13, 3.0, 2.8)
+    heart(d, 18, 41.5, 24)
 
 VARIANTS = [("V1", v1), ("V2", v2), ("V3", v3), ("V4", v4), ("V5", v5), ("V6", v6),
             ("V7", v7), ("V8", v8), ("V9", v9)]
+VARIANTS2 = [("V10", v10), ("V11", v11), ("V12", v12), ("V13", v13), ("V14", v14)]
 
 def main():
     bg = make_background()
-    icons = []
-    for name, fn in VARIANTS:
-        icon = bg.copy()
-        d = ImageDraw.Draw(icon)
-        fn(icon, d, bg)
-        icon = icon.resize((SIZE, SIZE), Image.LANCZOS)
-        icon.save(f"icon_preview/icon_{name.lower()}.png")
-        icons.append((name, icon))
-        if name in ("V5", "V6", "V7", "V8", "V9"):
-            m = Image.new("L", (SIZE, SIZE), 0)
-            ImageDraw.Draw(m).ellipse([0, 0, SIZE, SIZE], fill=255)
-            rd = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-            rd.paste(icon, (0, 0), m)
-            rd.save(f"icon_preview/icon_{name.lower()}_round.png")
 
-    # 横向并排对比图
-    cell = 300
-    pad = 16
-    label_h = 36
-    n = len(VARIANTS)
-    canvas = Image.new("RGB", (cell * n + pad * (n + 1), cell + label_h + pad * 2), (238, 238, 238))
-    font = ImageFont.load_default(size=24)
-    cd = ImageDraw.Draw(canvas)
-    for i, (name, icon) in enumerate(icons):
-        x = pad + i * (cell + pad)
-        canvas.paste(icon.resize((cell, cell), Image.LANCZOS), (x, pad))
-        tb = cd.textbbox((0, 0), name, font=font)
-        cd.text((x + cell / 2 - (tb[2] - tb[0]) / 2, cell + pad + 6), name, fill=(60, 60, 60), font=font)
-    canvas.save("icon_preview/icon_compare.png")
-    print("done -> icon_preview/ (icon_v1..v5.png, icon_compare.png)")
+    def render(variants):
+        icons = []
+        for name, fn in variants:
+            icon = bg.copy()
+            d = ImageDraw.Draw(icon)
+            fn(icon, d, bg)
+            icon = icon.resize((SIZE, SIZE), Image.LANCZOS)
+            icon.save(f"icon_preview/icon_{name.lower()}.png")
+            icons.append((name, icon))
+            if name in ("V9", "V10", "V11", "V12", "V13", "V14"):
+                m = Image.new("L", (SIZE, SIZE), 0)
+                ImageDraw.Draw(m).ellipse([0, 0, SIZE, SIZE], fill=255)
+                rd = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+                rd.paste(icon, (0, 0), m)
+                rd.save(f"icon_preview/icon_{name.lower()}_round.png")
+        return icons
+
+    def compare(icons, path):
+        cell = 300
+        pad = 16
+        label_h = 36
+        n = len(icons)
+        canvas = Image.new("RGB", (cell * n + pad * (n + 1), cell + label_h + pad * 2), (238, 238, 238))
+        font = ImageFont.load_default(size=24)
+        cd = ImageDraw.Draw(canvas)
+        for i, (name, icon) in enumerate(icons):
+            x = pad + i * (cell + pad)
+            canvas.paste(icon.resize((cell, cell), Image.LANCZOS), (x, pad))
+            tb = cd.textbbox((0, 0), name, font=font)
+            cd.text((x + cell / 2 - (tb[2] - tb[0]) / 2, cell + pad + 6), name, fill=(60, 60, 60), font=font)
+        canvas.save(path)
+
+    compare(render(VARIANTS), "icon_preview/icon_compare.png")
+    compare(render(VARIANTS2), "icon_preview/icon_compare2.png")
+    print("done -> icon_preview/")
 
 if __name__ == "__main__":
     main()

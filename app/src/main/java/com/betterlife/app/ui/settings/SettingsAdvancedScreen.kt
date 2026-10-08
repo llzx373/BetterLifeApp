@@ -2,6 +2,7 @@
 // 主题色与动效档位。平庸用户永远不需要打开这里;返回键回一级设置页(AppNav 路由惯例)。
 package com.betterlife.app.ui.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -52,6 +54,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -60,6 +64,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
 import com.betterlife.app.data.AiProvider
+import com.betterlife.app.ui.theme.IconColor
 import com.betterlife.app.ui.theme.MotionLevel
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.ui.theme.ThemeMode
@@ -170,6 +175,33 @@ fun SettingsAdvancedScreen(
                     shapes = ListItemDefaults.segmentedShapes(index = index, count = themeModes.size),
                 ) {
                     Text(themeModeLabel(mode))
+                }
+            }
+
+            SectionTitle(stringResource(R.string.settings_section_icon_color))
+
+            // 换图标颜色 = 启停 manifest 里一一对应的 activity-alias，桌面图标稍后由 launcher 刷新
+            val currentIconColor = IconColor.fromKey(settings.iconColor)
+            val iconColors = IconColor.entries
+            iconColors.forEachIndexed { index, color ->
+                SegmentedListItem(
+                    selected = currentIconColor == color,
+                    onClick = { vm.setIconColor(color) },
+                    shapes = ListItemDefaults.segmentedShapes(index = index, count = iconColors.size),
+                    leadingContent = {
+                        Box(
+                            Modifier
+                                .size(20.dp)
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(Color(color.previewLight), Color(color.previewDeep)),
+                                    ),
+                                    CircleShape,
+                                ),
+                        )
+                    },
+                ) {
+                    Text(iconColorLabel(color))
                 }
             }
 
@@ -508,6 +540,16 @@ private fun themeModeLabel(mode: ThemeMode): String = stringResource(
         ThemeMode.BRAND_TEAL -> R.string.theme_brand_teal
         ThemeMode.MATERIAL_YOU -> R.string.theme_material_you
         ThemeMode.DARK -> R.string.theme_dark
+    },
+)
+
+@Composable
+private fun iconColorLabel(color: IconColor): String = stringResource(
+    when (color) {
+        IconColor.BLUE_PURPLE -> R.string.theme_brand_blue_purple
+        IconColor.GREEN -> R.string.theme_brand_green
+        IconColor.ORANGE -> R.string.theme_brand_orange
+        IconColor.TEAL -> R.string.theme_brand_teal
     },
 )
 

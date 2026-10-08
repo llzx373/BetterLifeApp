@@ -44,6 +44,8 @@ data class AppSettings(
     val seniorModeAsked: Boolean = false,
     val themeMode: String = SettingsStore.DEFAULT_THEME_MODE,
     val motionLevel: String = SettingsStore.DEFAULT_MOTION_LEVEL,
+    /** 桌面图标颜色 key（IconColor）；切换走 activity-alias，见 LauncherIconSwitcher */
+    val iconColor: String = SettingsStore.DEFAULT_ICON_COLOR,
 )
 
 /** 设置存取的窄接口：ViewModel 只依赖它，测试里可用内存 fake 替换 */
@@ -102,6 +104,7 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
         val SENIOR_MODE_ASKED = booleanPreferencesKey("senior_mode_asked")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val MOTION_LEVEL = stringPreferencesKey("motion_level")
+        val ICON_COLOR = stringPreferencesKey("icon_color")
 
         // 有序历史:stringSet 不保序,用单条 string 以 \n 分隔存列表(新词在前)
         val SEARCH_HISTORY = stringPreferencesKey("search_history")
@@ -154,6 +157,7 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
             seniorModeAsked = p[Keys.SENIOR_MODE_ASKED] ?: false,
             themeMode = p[Keys.THEME_MODE] ?: DEFAULT_THEME_MODE,
             motionLevel = p[Keys.MOTION_LEVEL] ?: DEFAULT_MOTION_LEVEL,
+            iconColor = p[Keys.ICON_COLOR] ?: DEFAULT_ICON_COLOR,
         )
     }
 
@@ -325,6 +329,11 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
 
     suspend fun setMotionLevel(levelKey: String) {
         context.dataStore.edit { it[Keys.MOTION_LEVEL] = levelKey }
+    }
+
+    /** 桌面图标颜色 key；落盘即可，alias 启停由调用方（ViewModel）经 LauncherIconSwitcher 做 */
+    suspend fun setIconColor(colorKey: String) {
+        context.dataStore.edit { it[Keys.ICON_COLOR] = colorKey }
     }
 
     /** 最近搜索,新词在前。不进 AppSettings:它是条目库的局部状态,不该每次设置变化都跟着重组 */
@@ -522,6 +531,9 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
 
         /** 默认「标准」。降级是给需要的用户的选项,不该是所有人的默认 */
         const val DEFAULT_MOTION_LEVEL = "standard"
+
+        /** 桌面图标默认蓝紫（IconColor.BLUE_PURPLE） */
+        const val DEFAULT_ICON_COLOR = "blue_purple"
 
         const val MAX_SEARCH_HISTORY = 10
         private const val SEARCH_HISTORY_SEPARATOR = "\n"

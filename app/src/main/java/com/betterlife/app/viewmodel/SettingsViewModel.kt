@@ -1,5 +1,6 @@
 package com.betterlife.app.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -16,6 +17,8 @@ import com.betterlife.app.data.backup.BackupManager
 import com.betterlife.app.data.content.ContentSyncRepository
 import com.betterlife.app.data.db.ChatMessageDao
 import com.betterlife.app.tasks.ReminderScheduler
+import com.betterlife.app.ui.theme.IconColor
+import com.betterlife.app.ui.theme.LauncherIconSwitcher
 import com.betterlife.app.ui.theme.MotionLevel
 import com.betterlife.app.ui.theme.ThemeMode
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +36,7 @@ class SettingsViewModel(
     private val backupManager: BackupManager,
     private val chatMessageDao: ChatMessageDao,
     private val contentSyncRepository: ContentSyncRepository,
+    private val appContext: Context,
 ) : ViewModel() {
 
     /** 某张卡的连接自检结果，交给界面翻成文案 */
@@ -316,6 +320,14 @@ class SettingsViewModel(
         }
     }
 
+    /** 桌面图标换色：先落盘再启停 alias；alias 状态由系统持久化，无需冷启动重放 */
+    fun setIconColor(color: IconColor) {
+        viewModelScope.launch(Dispatchers.IO) {
+            settingsStore.setIconColor(color.key)
+            LauncherIconSwitcher.apply(appContext, color)
+        }
+    }
+
     fun setMotionLevel(level: MotionLevel) {
         viewModelScope.launch(Dispatchers.IO) {
             settingsStore.setMotionLevel(level.key)
@@ -333,6 +345,7 @@ class SettingsViewModel(
                 SettingsViewModel(
                     c.settingsStore, c.reminderScheduler, c.llmClient, c.webSearcher,
                     c.backupManager, c.chatMessageDao, c.contentSyncRepository,
+                    app.applicationContext,
                 )
             }
         }
