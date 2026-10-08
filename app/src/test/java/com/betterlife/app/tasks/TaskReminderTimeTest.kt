@@ -84,10 +84,29 @@ class TaskReminderTimeTest {
     }
 
     @Test
-    fun `撤销补排-每日任务不设日期时总能排到未来`() {
+    fun `撤销补排-一次性待办无截止日不设日期时总能排到未来`() {
         // 无日期语义下已过点会顺延到明天，所以恒在未来
         val now = millis("2026-03-05", "20:00")
         assertEquals(true, shouldRescheduleReminder(7 * 60, now, zone))
+    }
+
+    @Test
+    fun `撤销补排-每日任务带行日期且到点未到则补排`() {
+        val now = millis("2026-03-05", "08:00")
+        assertEquals(
+            true,
+            shouldRescheduleReminder(9 * 60 + 30, now, zone, LocalDate.parse("2026-03-05")),
+        )
+    }
+
+    @Test
+    fun `撤销补排-每日任务带行日期且到点已过不补排（不顺延明天）`() {
+        // DAILY 行只在当天有效：顺延到明天对今天的行是废 work（worker 会按日期跳过）
+        val now = millis("2026-03-05", "20:00")
+        assertEquals(
+            false,
+            shouldRescheduleReminder(7 * 60, now, zone, LocalDate.parse("2026-03-05")),
+        )
     }
 
     @Test

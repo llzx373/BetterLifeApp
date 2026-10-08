@@ -261,11 +261,18 @@ class TaskManager(
             addEntryState(task.entryId, EntryStateEntity.STATE_TODO)
         }
         val minutes = task.remindAtMinutes
-        val dueDate = task.onceDueDate()
+        // 补排按任务行自己的日期判断：DAILY 行只在当天有效，无日期语义的「已过点顺延到
+        // 明天」对今天的行是废 work（TaskReminderWorker 会按日期跳过），今天到点已过就不补；
+        // ONCE 仍按截止日（无截止日 = 今天/明天语义）。
+        val date = if (task.type == TaskEntity.TYPE_DAILY) {
+            task.date?.let(LocalDate::parse)
+        } else {
+            task.onceDueDate()
+        }
         if (minutes != null &&
-            shouldRescheduleReminder(minutes, System.currentTimeMillis(), ZoneId.systemDefault(), dueDate)
+            shouldRescheduleReminder(minutes, System.currentTimeMillis(), ZoneId.systemDefault(), date)
         ) {
-            reminderScheduler.scheduleTaskReminder(taskId, minutes, dueDate)
+            reminderScheduler.scheduleTaskReminder(taskId, minutes, date)
         }
     }
 
