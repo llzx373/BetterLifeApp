@@ -5,6 +5,7 @@
 package com.betterlife.app.data.health
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -77,6 +78,10 @@ class StepsRepository(
      * 不可用（未安装 / 需更新 / API 26-27）→ 降级传感器，传感器路径的步数随事件实时更新。
      *
      * 每次收集都会重新判定状态，权限变化后 VM 重新收集即可生效。
+     *
+     * HC 服务抖动、权限在检查后被收回、传感器流中途出错都会抛
+     * SecurityException/IOException；统一 catch 降级为 Unavailable（卡片不渲染），
+     * 不让异常冲出收集协程把 App 打崩（对照 TaskManager.autoCompleteByHealth 的逐层 runCatching）。
      */
     fun stepsFlow(): Flow<StepsState> = flow {
         when (healthConnect.status()) {
@@ -96,5 +101,5 @@ class StepsRepository(
                 )
             }
         }
-    }
+    }.catch { emit(StepsState.Unavailable) }
 }

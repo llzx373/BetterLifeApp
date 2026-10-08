@@ -2,6 +2,7 @@ package com.betterlife.app.data.health
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -14,10 +15,20 @@ class StepsRepositoryTest {
         var status: HealthConnectStatus = HealthConnectStatus.AVAILABLE,
         var granted: Boolean = true,
         var steps: Long = 0L,
+        val throwOnPermissionCheck: Boolean = false,
+        val throwOnRead: Boolean = false,
     ) : HealthConnectSteps {
         override suspend fun status(): HealthConnectStatus = status
-        override suspend fun hasStepsPermission(): Boolean = granted
-        override suspend fun readTodaySteps(): Long = steps
+
+        override suspend fun hasStepsPermission(): Boolean {
+            if (throwOnPermissionCheck) throw SecurityException("权限在检查后被收回")
+            return granted
+        }
+
+        override suspend fun readTodaySteps(): Long {
+            if (throwOnRead) throw java.io.IOException("HC 服务抖动")
+            return steps
+        }
     }
 
     private class FakeSensor(
@@ -97,6 +108,36 @@ class StepsRepositoryTest {
         val repo = StepsRepository(
             FakeHealthConnect(status = HealthConnectStatus.UNAVAILABLE),
             FakeSensor(available = false),
+        )
+
+        assertEquals(StepsState.Unavailable, repo.stepsFlow().first())
+    }
+
+    @Test
+    fun `HC权限检查抛SecurityException时降级Unavailable而不是崩溃`() = runTest {
+        val repo = StepsRepository(
+            FakeHealthConnect(throwOnPermissionCheck = true),
+            FakeSensor(),
+        )
+
+        assertEquals(StepsState.Unavailable, repo.stepsFlow().first())
+    }
+
+    @Test
+    fun `HC读步数抛IOException时降级Unavailable而不是崩溃`() = runTest {
+        val repo = StepsRepository(
+            FakeHealthConnect(throwOnRead = true),
+            FakeSensor(),
+        )
+
+        assertEquals(StepsState.Unavailable, repo.stepsFlow().first())
+    }
+
+    @Test
+    fun `传感器流中途抛异常时降级Unavailable而不是崩溃`() = runTest {
+        val repo = StepsRepository(
+            FakeHealthConnect(status = HealthConnectStatus.UNAVAILABLE),
+            FakeSensor(stepsFlow = flow { throw java.io.IOException("传感器服务断开") }),
         )
 
         assertEquals(StepsState.Unavailable, repo.stepsFlow().first())
