@@ -50,6 +50,8 @@ class ChatViewModel(
         /** 多供应商并行时标注这张气泡是谁答的；单供应商为 null，UI 不显示 */
         val providerName: String? = null,
         val sources: List<AiSource> = emptyList(),
+        /** 消息时间戳(毫秒);0 = 无时间戳,按天分隔只对有时间戳的消息生效 */
+        val createdAt: Long = 0,
     )
 
     data class UiState(
@@ -79,7 +81,14 @@ class ChatViewModel(
         // 落库只存 role/content/providerName，sources、错误标记等 UI 态重载时不还原。
         viewModelScope.launch(Dispatchers.IO) {
             val history = chatMessageDao.allFlow().first()
-                .map { ChatUiMessage(role = it.role, content = it.content, providerName = it.providerName) }
+                .map {
+                    ChatUiMessage(
+                        role = it.role,
+                        content = it.content,
+                        providerName = it.providerName,
+                        createdAt = it.createdAt,
+                    )
+                }
             if (history.isEmpty()) return@launch
             _uiState.update { it.copy(messages = history + it.messages) }
         }
@@ -116,7 +125,11 @@ class ChatViewModel(
         _uiState.update {
             it.copy(
                 asking = true,
-                messages = it.messages + ChatUiMessage(ChatMessage.ROLE_USER, question),
+                messages = it.messages + ChatUiMessage(
+                    ChatMessage.ROLE_USER,
+                    question,
+                    createdAt = System.currentTimeMillis(),
+                ),
             )
         }
         viewModelScope.launch(Dispatchers.IO) {
@@ -147,7 +160,14 @@ class ChatViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                appendMessage(ChatUiMessage(ChatMessage.ROLE_ASSISTANT, e.message.orEmpty(), isError = true))
+                appendMessage(
+                    ChatUiMessage(
+                        ChatMessage.ROLE_ASSISTANT,
+                        e.message.orEmpty(),
+                        isError = true,
+                        createdAt = System.currentTimeMillis(),
+                    ),
+                )
                 _uiState.update { it.copy(asking = false) }
             }
         }
@@ -167,7 +187,12 @@ class ChatViewModel(
         useWeb: Boolean,
     ) {
         // 先放空气泡，流式增量就地填充
-        var bubble = ChatUiMessage(ChatMessage.ROLE_ASSISTANT, "", providerName = name)
+        var bubble = ChatUiMessage(
+            ChatMessage.ROLE_ASSISTANT,
+            "",
+            providerName = name,
+            createdAt = System.currentTimeMillis(),
+        )
         appendMessage(bubble)
         var failure: String? = null
         try {
@@ -282,8 +307,17 @@ class ChatViewModel(
                 val data = entriesData()
                 val result = aiAdvisor.explainEntry(profile, entryId, data.entries)
                 val reply = result.fold(
-                    onSuccess = { ChatUiMessage(ChatMessage.ROLE_ASSISTANT, it) },
-                    onFailure = { ChatUiMessage(ChatMessage.ROLE_ASSISTANT, it.message.orEmpty(), isError = true) },
+                    onSuccess = {
+                        ChatUiMessage(ChatMessage.ROLE_ASSISTANT, it, createdAt = System.currentTimeMillis())
+                    },
+                    onFailure = {
+                        ChatUiMessage(
+                            ChatMessage.ROLE_ASSISTANT,
+                            it.message.orEmpty(),
+                            isError = true,
+                            createdAt = System.currentTimeMillis(),
+                        )
+                    },
                 )
                 _uiState.update {
                     it.copy(asking = false, messages = it.messages + reply)
@@ -295,7 +329,12 @@ class ChatViewModel(
                 _uiState.update {
                     it.copy(
                         asking = false,
-                        messages = it.messages + ChatUiMessage(ChatMessage.ROLE_ASSISTANT, e.message.orEmpty(), isError = true),
+                        messages = it.messages + ChatUiMessage(
+                            ChatMessage.ROLE_ASSISTANT,
+                            e.message.orEmpty(),
+                            isError = true,
+                            createdAt = System.currentTimeMillis(),
+                        ),
                     )
                 }
             }

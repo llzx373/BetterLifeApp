@@ -265,6 +265,11 @@
     <!-- N8 语音输入:点击开始/再点结束,识别结果只填入输入框由用户确认再发 -->
     <string name="chat_voice_input">语音输入</string>
     <string name="chat_voice_stop">停止语音输入</string>
+    <!-- 历史按天分隔:今天/昨天说人话,更早给日期 -->
+    <string name="chat_day_today">今天</string>
+    <string name="chat_day_yesterday">昨天</string>
+    <string name="chat_day_label">%1$d 月 %2$d 日</string>
+    <string name="chat_day_label_year">%1$d 年 %2$d 月 %3$d 日</string>
 
     <!-- 我的收藏 -->
     <string name="favorites_title">我的收藏</string>

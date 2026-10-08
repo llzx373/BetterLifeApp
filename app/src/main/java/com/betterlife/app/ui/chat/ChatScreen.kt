@@ -49,6 +49,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearWavyProgressIndicator
@@ -93,6 +94,9 @@ import com.betterlife.app.ui.theme.motionEffectsSpec
 import com.betterlife.app.viewmodel.ChatViewModel
 import com.betterlife.app.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 private val BubbleMaxWidth = 300.dp
 private val ThinkingIndicatorWidth = 40.dp
@@ -130,9 +134,30 @@ fun ChatScreen(
     // 标准档滚动动画,减弱/关闭档瞬移;首次进带历史的会话一律瞬移,不做长距离滚动
     val motionLevel = LocalMotionLevel.current
     var didInitialScroll by rememberSaveable { mutableStateOf(false) }
+
+    // 按天分组的列表项:两天的交界处插分隔行,重启回放的历史不再糊成一长串;
+    // 无时间戳(createdAt==0)的消息不触发分隔,跟随所在位置的分组
+    val chatItems = remember(state.messages) {
+        buildList {
+            var currentDay: LocalDate? = null
+            state.messages.forEachIndexed { index, msg ->
+                if (msg.createdAt > 0) {
+                    val day = Instant.ofEpochMilli(msg.createdAt)
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate()
+                    if (day != currentDay) {
+                        add(ChatListItem.DayDivider(day))
+                        currentDay = day
+                    }
+                }
+                add(ChatListItem.Message(index, msg))
+            }
+        }
+    }
+
     LaunchedEffect(state.messages.size) {
-        if (state.messages.isEmpty()) return@LaunchedEffect
-        val last = state.messages.size - 1
+        if (chatItems.isEmpty()) return@LaunchedEffect
+        val last = chatItems.size - 1
         if (!didInitialScroll) {
             listState.scrollToItem(last)
             didInitialScroll = true
@@ -219,20 +244,31 @@ fun ChatScreen(
                         Suggestions(questions = state.sampleQuestions, onPick = { input = it })
                     }
                 }
-                items(state.messages.size, key = { it }) { i ->
-                    Bubble(
-                        msg = state.messages[i],
-                        plannedEntryIds = state.plannedEntryIds,
-                        onAddToTodo = vm::addSourceToTodo,
-                        onAddToDaily = vm::addSourceToDaily,
-                        onOpenEntry = onOpenEntry,
-                        // 只有最后一条是错误气泡时才给重试:中途的错误重试会截掉其后新对话
-                        onRetry = if (state.messages[i].isError && i == state.messages.lastIndex) {
-                            vm::retry
-                        } else {
-                            null
-                        },
-                    )
+                items(
+                    chatItems.size,
+                    key = { i ->
+                        when (val item = chatItems[i]) {
+                            is ChatListItem.DayDivider -> "day-${item.day}"
+                            is ChatListItem.Message -> item.index
+                        }
+                    },
+                ) { i ->
+                    when (val item = chatItems[i]) {
+                        is ChatListItem.DayDivider -> DayDividerRow(item.day)
+                        is ChatListItem.Message -> Bubble(
+                            msg = item.msg,
+                            plannedEntryIds = state.plannedEntryIds,
+                            onAddToTodo = vm::addSourceToTodo,
+                            onAddToDaily = vm::addSourceToDaily,
+                            onOpenEntry = onOpenEntry,
+                            // 只有最后一条是错误气泡时才给重试:中途的错误重试会截掉其后新对话
+                            onRetry = if (item.msg.isError && item.index == state.messages.lastIndex) {
+                                vm::retry
+                            } else {
+                                null
+                            },
+                        )
+                    }
                 }
                 if (state.asking) {
                     item(key = "asking") { ThinkingRow(entryCount = state.entryCount) }
@@ -455,6 +491,46 @@ private fun ThinkingRow(entryCount: Int) {
             else stringResource(R.string.chat_thinking_plain),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** 聊天列表项:气泡,或两天交界处的日期分隔行 */
+private sealed interface ChatListItem {
+    data class DayDivider(val day: LocalDate) : ChatListItem
+    data class Message(val index: Int, val msg: ChatViewModel.ChatUiMessage) : ChatListItem
+}
+
+/** 日期分隔行:今天/昨天说人话,更早的给日期;信息都在文字里,不靠分隔线传达 */
+@Composable
+private fun DayDividerRow(day: LocalDate) {
+    val today = LocalDate.now()
+    val label = when (day) {
+        today -> stringResource(R.string.chat_day_today)
+        today.minusDays(1) -> stringResource(R.string.chat_day_yesterday)
+        else -> if (day.year == today.year) {
+            stringResource(R.string.chat_day_label, day.monthValue, day.dayOfMonth)
+        } else {
+            stringResource(R.string.chat_day_label_year, day.year, day.monthValue, day.dayOfMonth)
+        }
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(vertical = LocalSpacing.current.space1),
+    ) {
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = LocalSpacing.current.space2),
+        )
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant,
         )
     }
 }
