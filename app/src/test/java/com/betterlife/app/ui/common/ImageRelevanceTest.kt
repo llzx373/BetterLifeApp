@@ -87,4 +87,40 @@ class ImageRelevanceTest {
             }
         }
     }
+
+    private fun assetDir(name: String): File =
+        listOf("src/main/assets/$name", "app/src/main/assets/$name", "../app/src/main/assets/$name")
+            .map { File(it) }
+            .firstOrNull { it.isDirectory }
+            ?: error("$name 目录未找到,工作目录=${File("").absolutePath}")
+
+    /**
+     * 配图规则硬检查(规则全文见 docs/BUILD.md「内容管线 · 配图」):
+     * 每个在架条目要么有专属图 images/entries/{key}.webp,要么章节图回退能通过关键词门控,
+     * 否则条目详情页会裸奔 —— 新增/改条目后此测试变红就是要补图了。
+     */
+    @Test
+    fun `每个在架条目都有可用配图`() {
+        val m = json.decodeFromString(
+            ImageManifest.serializer(),
+            assetFile("images/manifest.json").readText(),
+        )
+        val entries = json.decodeFromString(
+            com.betterlife.app.data.EntriesFile.serializer(),
+            assetFile("entries.json").readText(),
+        )
+        val entryImages = assetDir("images/entries").list().orEmpty().toSet()
+
+        val missing = entries.entries.filter { e ->
+            !e.removed &&
+                "${e.key}.webp" !in entryImages &&
+                !isSectionImageRelevant(m, e.secKey, e.title, e.human + "\n" + e.hay)
+        }
+        assertTrue(
+            "${missing.size} 个在架条目没有任何可用配图(专属图缺失且章节图门控不通过)," +
+                "按 docs/BUILD.md 配图规则补图: " +
+                missing.take(5).joinToString("; ") { "${it.key} ${it.title}" },
+            missing.isEmpty(),
+        )
+    }
 }

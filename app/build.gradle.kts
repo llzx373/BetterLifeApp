@@ -231,3 +231,9 @@ dependencies {
     screenshotTestImplementation(libs.compose.ui.tooling)
     screenshotTestImplementation(libs.screenshot.validation.api)
 }
+
+// 多个单测按相对路径直接读 src/main/assets(entries.json、images/manifest.json、图片文件),
+// 声明为测试输入:assets 一变测试就重跑,否则 Gradle 会用 FROM-CACHE 的旧结果放行
+tasks.withType<Test> {
+    inputs.dir("src/main/assets").withPropertyName("mainAssets").withPathSensitivity(PathSensitivity.RELATIVE)
+}
