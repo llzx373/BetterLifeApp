@@ -1,8 +1,9 @@
 // 番茄钟计时页：给「站起来活动 5 分钟」这类需要一段专注时间的任务用。
 //
 // 三态：Setup（选时长）→ Running（圆环倒计时，可暂停/放弃）→ Finished（自动打卡）。
-// 计时正确性不在这层：剩余时间永远按「结束时刻 - 真实时钟」算（见 TimerSession），
-// 切后台息屏回来自动校准；这层只负责每秒拿一次最新值来画。
+// 计时正确性不在这层：剩余时间永远按「结束时刻 - 单调时钟」算（见 TimerSession，
+// 默认 SystemClock.elapsedRealtime，墙钟被回调不跳变），切后台息屏回来自动校准；
+// 这层只负责每秒拿一次最新值来画。
 package com.betterlife.app.ui.timer
 
 import android.content.Context

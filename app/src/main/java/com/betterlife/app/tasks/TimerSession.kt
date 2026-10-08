@@ -1,14 +1,19 @@
 package com.betterlife.app.tasks
 
+import android.os.SystemClock
+
 /**
- * 番茄钟计时会话：纯逻辑，不依赖 Android，时钟可注入。
+ * 番茄钟计时会话：纯逻辑，时钟可注入（单测喂假时钟）。
  *
  * 计时不靠 tick 计数 —— 开始时记下结束时刻 endAt，剩余时间永远按「endAt - 现在」算，
  * 切后台、息屏、进程被冻结再回来，时间都自动校准，不会少走。
+ *
+ * 默认时钟用单调时钟 [SystemClock.elapsedRealtime] 而不是墙钟：系统时钟被用户/NTP
+ * 回调时剩余时间不会跳变；它含深度睡眠（番茄钟计时本就该把息屏时间算上），正合适。
  */
 class TimerSession(
     val durationMillis: Long,
-    private val clock: () -> Long = System::currentTimeMillis,
+    private val clock: () -> Long = SystemClock::elapsedRealtime,
 ) {
     private var endAtMillis: Long = clock() + durationMillis
 

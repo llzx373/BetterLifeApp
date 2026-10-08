@@ -115,7 +115,10 @@ class TimerViewModelTest {
     @Test
     fun `放弃不打卡`() = runTest {
         val gateway = FakeGateway()
-        val vm = TimerViewModel(taskId = 7, gateway = gateway, settings = FakeSettingsGateway())
+        // 默认时钟是 SystemClock.elapsedRealtime（Android 端），JVM 单测必须注入假时钟
+        val vm = TimerViewModel(
+            taskId = 7, gateway = gateway, settings = FakeSettingsGateway(), clock = { 0L },
+        )
         awaitSetup(vm)
 
         vm.start(60_000L)

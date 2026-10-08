@@ -1,5 +1,6 @@
 package com.betterlife.app.viewmodel
 
+import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -25,11 +26,11 @@ class TimerViewModel(
     private val taskId: Long,
     private val gateway: TimerTaskGateway,
     settings: SettingsGateway,
-    private val clock: () -> Long = System::currentTimeMillis,
+    private val clock: () -> Long = SystemClock::elapsedRealtime,
 ) : ViewModel() {
 
     /**
-     * 计时页状态。剩余时间每秒重算一次（按真实时钟，不是 tick 计数），
+     * 计时页状态。剩余时间每秒重算一次（按单调时钟，不是 tick 计数），
      * 所以切后台再回来不需要任何补偿逻辑。
      */
     sealed interface UiState {
