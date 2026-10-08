@@ -571,6 +571,8 @@
     <string name="today_leave_state">已请假</string>
     <string name="today_leave_cancel">取消请假</string>
     <string name="today_action_backfill">补昨天的卡</string>
+    <!-- 断签(昨天没完成)时习惯卡上直接露出的补卡入口,文案比菜单项短 -->
+    <string name="today_backfill_entry">补昨天</string>
     <string name="today_backfill_confirm">把昨天标记为已完成?</string>
     <string name="today_backfill_success">已补上昨天的卡</string>
     <string name="today_backfill_had">昨天已经有记录了</string>

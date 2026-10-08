@@ -57,6 +57,8 @@ class TodayViewModel(
         val isDailyHabit: Boolean = false,
         /** 今天是否已请假：请假日不打卡也不断签，卡片退成安静的「已请假」 */
         val onLeaveToday: Boolean = false,
+        /** 断签待挽回：昨天没完成也没请假（且习惯昨天就存在），卡片上露出「补昨天」入口 */
+        val missedYesterday: Boolean = false,
     ) {
         val displayTitle: String get() = entry?.title ?: customTitle ?: task.entryId
 
@@ -178,15 +180,17 @@ class TodayViewModel(
                                 val data = entryRepository.entriesData()
                                 _uiState.value = UiState.Ready(
                                     items = snapshot.tasks.mapIndexed { i, t ->
+                                        val leaves = leavesPerTask.getOrElse(i) { emptySet() }
                                         TaskItem(
                                             task = t,
                                             entry = data.byId[t.entryId],
                                             streak = taskManager.streak(t.entryId),
                                             customTitle = snapshot.customTitles[t.entryId],
                                             isDailyHabit = t.entryId in snapshot.dailyHabitIds,
-                                            onLeaveToday = leavesPerTask
-                                                .getOrElse(i) { emptySet() }
-                                                .contains(todayStr),
+                                            onLeaveToday = leaves.contains(todayStr),
+                                            missedYesterday = !t.done &&
+                                                t.entryId in snapshot.dailyHabitIds &&
+                                                taskManager.missedYesterday(t.entryId, leaves, date),
                                         )
                                     },
                                     profileIncomplete = !ProfileQuestions.isComplete(snap.answered),

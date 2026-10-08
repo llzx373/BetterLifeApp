@@ -795,6 +795,7 @@ private fun DailyTaskCard(
                 TaskAction(
                     done = done,
                     isDailyHabit = item.isDailyHabit,
+                    showBackfill = item.missedYesterday,
                     playPop = done && !celebrated,
                     onPopPlayed = { celebrated = true },
                     onCheckIn = onRequestCheckIn,
@@ -839,6 +840,7 @@ private const val CHECK_POP_MILLIS = 250
 private fun TaskAction(
     done: Boolean,
     isDailyHabit: Boolean,
+    showBackfill: Boolean,
     playPop: Boolean,
     onPopPlayed: () -> Unit,
     onCheckIn: () -> Unit,
@@ -852,8 +854,8 @@ private fun TaskAction(
     // 关闭档不套 AnimatedContent:静态帧否则可能抓到按钮切换的中间态
     if (LocalMotionLevel.current == MotionLevel.OFF) {
         TaskActionContent(
-            done, isDailyHabit, playPop, onPopPlayed, onCheckIn, onCheckInNote, onUndo, onDrop,
-            onRequestLeave, onRequestBackfill, onStartTimer,
+            done, isDailyHabit, showBackfill, playPop, onPopPlayed, onCheckIn, onCheckInNote, onUndo,
+            onDrop, onRequestLeave, onRequestBackfill, onStartTimer,
         )
         return
     }
@@ -871,8 +873,8 @@ private fun TaskAction(
         label = "taskAction",
     ) { isDone ->
         TaskActionContent(
-            isDone, isDailyHabit, playPop, onPopPlayed, onCheckIn, onCheckInNote, onUndo, onDrop,
-            onRequestLeave, onRequestBackfill, onStartTimer,
+            isDone, isDailyHabit, showBackfill, playPop, onPopPlayed, onCheckIn, onCheckInNote, onUndo,
+            onDrop, onRequestLeave, onRequestBackfill, onStartTimer,
         )
     }
 }
@@ -881,6 +883,7 @@ private fun TaskAction(
 private fun TaskActionContent(
     done: Boolean,
     isDailyHabit: Boolean,
+    showBackfill: Boolean,
     playPop: Boolean,
     onPopPlayed: () -> Unit,
     onCheckIn: () -> Unit,
@@ -965,6 +968,12 @@ private fun TaskActionContent(
                     }
                 },
             )
+            // 断签挽回:昨天没完成(也没请假)时,把「补昨天」从 ⋮ 菜单里露出来,少一步
+            if (showBackfill) {
+                TextButton(onClick = onRequestBackfill) {
+                    Text(stringResource(R.string.today_backfill_entry))
+                }
+            }
             // 计时入口只出现在未完成态：给已完成的任务计时会再触发一次打卡
             Spacer(Modifier.weight(1f))
             IconButton(onClick = onStartTimer) {

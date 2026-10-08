@@ -552,6 +552,23 @@ class TaskManager(
     suspend fun doneYesterday(entryId: String, today: LocalDate = LocalDate.now()): Boolean =
         taskDao.doneDates(entryId).contains(today.minusDays(1).toString())
 
+    /**
+     * 断签待挽回：昨天没完成、也没请假，且这个习惯昨天就存在（昨天有任务行，
+     * 或更早有过打卡）——今天才建的习惯不算断签，不拿「补昨天」打扰。
+     * 今天是否已打卡由调用方判断（今天的任务行就在它手边）。
+     */
+    suspend fun missedYesterday(
+        entryId: String,
+        leaveDates: Set<String>,
+        today: LocalDate = LocalDate.now(),
+    ): Boolean {
+        val yesterday = today.minusDays(1).toString()
+        if (yesterday in leaveDates) return false
+        val doneDates = taskDao.doneDates(entryId)
+        if (yesterday in doneDates) return false
+        return taskDao.dailyTaskByEntry(entryId, yesterday) != null || doneDates.any { it < yesterday }
+    }
+
     /** 用户自建任务的标题表（entryId → title），UI 标题解析用 */
     fun customEntriesFlow(): Flow<List<CustomEntryEntity>> = customEntryDao.allFlow()
 
