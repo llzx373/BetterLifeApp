@@ -90,7 +90,7 @@ python tools/gen_rules.py                    # 重新生成 tools/relevance_rule
 python tools/build_content_pack.py           # 打内容发布包(manifest + 全量 gz + 增量 patch)
 ```
 
-- `entries.json`:601 条结构化条目,含机器可读的成本标签(钱/时间/毅力/收益/口径)、性价比档(极高/高/一般)、
+- `entries.json`:614 条结构化条目,含机器可读的成本标签(钱/时间/毅力/收益/口径)、性价比档(极高/高/一般)、
   证据等级(A/B/C)。条目主键是标题派生的稳定 key(上游插入条目导致条号顺延时不受影响);
   标题轻微改动(增减几个字)由 `--prev-entries` 相似度继承兜住,机制见 [DESIGN.md](DESIGN.md) §3。
 - `relevance_rules.json`:55 条档案 → 条目的加权/排除规则 + 17 条每日习惯种子池(首次播种示例用)。

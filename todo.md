@@ -31,7 +31,7 @@
 
 | # | 事项 | 说明 |
 |---|---|---|
-| C7 | **多语言** | 中期规划。UI 文案已资源化(`UiNoChineseLiteralTest` 卡住),真正成本在内容层:601 条条目、检索 `hay` 字段、AI 护栏与口径分类法全绑中文,本地化 = 重做内容管线(`tools/build_content.py` 的解析正则复刻自中文源书) |
+| C7 | **多语言** | 中期规划。UI 文案已资源化(`UiNoChineseLiteralTest` 卡住),真正成本在内容层:614 条条目、检索 `hay` 字段、AI 护栏与口径分类法全绑中文,本地化 = 重做内容管线(`tools/build_content.py` 的解析正则复刻自中文源书) |
 | C8 | **内容分发的国内可达性** | 内容同步(2026-09-28 落地,见 DESIGN.md §3)走 GitHub Releases 滚动 tag `content-latest`,国内直连不稳;失败有 WorkManager 退避兜底、内容停留在旧版也能用,但若面向国内用户正式分发,应加 CDN/对象存储镜像(App 侧只改 base URL)。内容包发布为纯人工流程(见 BUILD.md「内容管线」);首个 `content-latest` Release 需按该流程手动 `gh release create` 建立 |
 | C13 | **下一阶段计划 N1–N9** | 2026-10-01 产品评审产出,详细执行计划(为什么/做什么/怎么验/估时)见 [`todo-next-phase.md`](todo-next-phase.md):P0 冷启动直入与渐进档案(N1)、断签去债务+HC 报喜+挽回通知(N2)、AI 问答行动闭环(N3);P1 周报推送(N4)、每日一条(N5)、里程碑日签(N6);P2 长辈模式(N7)、语音问 AI(N8)、设置分层(N9)。动手前按该文件逐条执行并回写本文档状态。**进度:N1–N9 全部完成(2026-10-01),P0/P1/P2 全部收官** |
 

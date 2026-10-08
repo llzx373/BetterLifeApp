@@ -56,7 +56,7 @@ ui/          Compose 页面:onboarding / today / todo / library / chat / setting
 ## 3. 内容管线(tools/)
 
 - 上游书库以 **git submodule** 挂在 `upstream/HowToLiveBetter`(GitHub: `eternity4719/HowToLiveBetter`),clone 本仓库用 `git clone --recursive` 或事后 `git submodule update --init`。
-- `build_content.py`:解析 submodule 的 `book/*.md`,输出 `app/src/main/assets/entries.json`。解析正则复刻自源仓库 index.html,**源书格式变了先改这里**,改完跑脚本看自检输出(601 条、六栏完整率、档位分布、key 冲突检查)。`--version` 传上游 commit short hash 作为 contentVersion。
+- `build_content.py`:解析 submodule 的 `book/*.md`,输出 `app/src/main/assets/entries.json`。解析正则复刻自源仓库 index.html,**源书格式变了先改这里**,改完跑脚本看自检输出(614 条、六栏完整率、档位分布、key 冲突检查)。`--version` 传上游 commit short hash 作为 contentVersion。
 - `build_content_pack.py`:把 entries.json 打成发布包(manifest.json + entries.json.gz 全量 + patch.json 增量),供人工发布到 GitHub Release(发布步骤见 [BUILD.md](BUILD.md)「内容管线」,刻意不走 CI:整体改标题的继承关系需要人工核对)。
 - `gen_rules.py` → `tools/relevance_rules.json` → 手动拷贝到 `app/src/main/assets/`。规则按 SS-NN 人工编写,**输出时自动换算成稳定 key**;脚本自带 id 存在性校验。
 
