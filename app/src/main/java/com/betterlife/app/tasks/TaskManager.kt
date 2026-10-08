@@ -92,29 +92,37 @@ class TaskManager(
     suspend fun ensureTodayTasks(profile: Profile, date: LocalDate = LocalDate.now()) {
         val dateStr = date.toString()
         val data = entryRepository.entriesData()
+        // 播种标记在 DataStore（文件 IO），读写都放到 Room 事务外：在事务内写的话，一旦事务
+        // 回滚就会出现「标记已落盘但库里没有种子行」，该用户从此永不播种。现在的方向保证是
+        // 「库里有种子行 → 标记已写」——宁可因崩溃窗口重复判断播种，也不能漏。
+        val alreadySeeded = settingsStore.isDailyHabitsSeeded()
         // 「当天行是否已存在 + 首次播种 + 插入」包进一个事务，靠 Room 单库事务串行化
         // 消除双插窗口（TodayViewModel、小组件、DailyReminderWorker 都可能同时触发）。
-        val toSchedule = database.withTransaction {
-            if (taskDao.countDailyByDate(dateStr) > 0) return@withTransaction emptyList()
+        val (toSchedule, seeded) = database.withTransaction {
+            if (taskDao.countDailyByDate(dateStr) > 0) {
+                return@withTransaction (emptyList<Pair<Long, Int>>() to false)
+            }
             val excluded = entryStateDao.excludedIds().toSet()
             val customIds = customEntryDao.all().mapTo(HashSet()) { it.entryId }
             // 自选每日习惯只按 DISMISSED 过滤，不按 DONE：打卡完成会写 DONE（见 completeTask），
             // 若把 DONE 也算排除，用户自选的习惯打一次卡就会从每日任务里消失。
             val dismissed = entryStateDao.entryIdsByState(EntryStateEntity.STATE_DISMISSED).toSet()
             var dailyIds = entryStateDao.entryIdsByState(EntryStateEntity.STATE_DAILY)
-            // 首次播种：一条自选习惯都没有且没播种过时才挑示例；标记无论挑到几条都写，
-            // 用户主动删光习惯后不会再被塞回来。播种结果直接并入今天的任务，不等明天。
-            if (dailyIds.isEmpty() && !settingsStore.isDailyHabitsSeeded()) {
+            // 首次播种：一条自选习惯都没有且没播种过时才挑示例；标记在事务提交成功后补写
+            // （见上面注释），无论挑到几条都写，用户主动删光习惯后不会再被塞回来。
+            // 播种结果直接并入今天的任务，不等明天。
+            var seededNow = false
+            if (dailyIds.isEmpty() && !alreadySeeded) {
                 val seeds = seedPicker.pickSeeds(profile, data.entries, data.rules, excluded)
                 val seedNow = System.currentTimeMillis()
                 seeds.forEach {
                     entryStateDao.upsert(EntryStateEntity(it.id, EntryStateEntity.STATE_DAILY, seedNow))
                 }
-                settingsStore.setDailyHabitsSeeded()
+                seededNow = true
                 dailyIds = seeds.map { it.id }
             }
             val chosen = dailyIds.filter { (it in data.byId || it in customIds) && it !in dismissed }
-            if (chosen.isEmpty()) return@withTransaction emptyList()
+            if (chosen.isEmpty()) return@withTransaction (emptyList<Pair<Long, Int>>() to seededNow)
             val now = System.currentTimeMillis()
             // 继承同条目最近一次的提醒设置（清除也是设置，null 不继承）：每天的任务是
             // 新建的行，不继承的话「每天 8:30 提醒我」只生效一天。
@@ -128,8 +136,10 @@ class TaskManager(
                 )
             }
             val ids = taskDao.insertAll(tasks)
-            tasks.zip(ids).mapNotNull { (task, id) -> task.remindAtMinutes?.let { id to it } }
+            tasks.zip(ids).mapNotNull { (task, id) -> task.remindAtMinutes?.let { id to it } } to seededNow
         }
+        // 事务已提交、种子行确定在库，再落 DataStore 标记
+        if (seeded) settingsStore.setDailyHabitsSeeded()
         toSchedule.forEach { (id, minutes) -> reminderScheduler.scheduleTaskReminder(id, minutes) }
     }
 
