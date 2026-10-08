@@ -197,6 +197,7 @@ def inherit_keys(sections: list, all_entries: list, prev: dict):
             mapped_prev_sec[s["n"]] = match
         else:
             mapped_prev_sec[s["n"]] = None  # 全新节(或并列不敢猜),用自然 key
+            final_sec_key[s["n"]] = s["key"]
     for s in sections:
         s["key"] = final_sec_key[s["n"]]
 
