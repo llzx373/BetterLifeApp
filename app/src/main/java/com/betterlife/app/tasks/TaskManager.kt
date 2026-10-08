@@ -482,6 +482,14 @@ class TaskManager(
         if (isCustomEntryId(entryId)) customEntryDao.delete(entryId)
     }
 
+    /** 撤销「取消每日习惯」：恢复 STATE_DAILY 并补今天的行；自定义条目的标题一并恢复 */
+    suspend fun restoreDailyHabit(entryId: String, title: String? = null) {
+        if (title != null && isCustomEntryId(entryId)) {
+            customEntryDao.upsert(CustomEntryEntity(entryId, title, System.currentTimeMillis()))
+        }
+        addDailyHabit(entryId)
+    }
+
     fun todayTasksFlow(date: LocalDate): Flow<List<TaskEntity>> =
         taskDao.dailyTasksFlow(date.toString())
 

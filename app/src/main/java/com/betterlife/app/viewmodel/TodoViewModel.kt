@@ -184,6 +184,11 @@ class TodoViewModel(
         viewModelScope.launch(Dispatchers.IO) { taskManager.removeDailyHabit(entryId) }
     }
 
+    /** 撤销「取消每日习惯」：自定义习惯的标题一并恢复（否则行回来了标题没了） */
+    fun restoreDailyHabit(entryId: String, customTitle: String?) {
+        viewModelScope.launch(Dispatchers.IO) { taskManager.restoreDailyHabit(entryId, customTitle) }
+    }
+
     /** 一次性待办 → 每周习惯（一周 [timesPerWeek] 次） */
     fun convertToWeekly(item: TodoItem, timesPerWeek: Int) {
         viewModelScope.launch(Dispatchers.IO) {

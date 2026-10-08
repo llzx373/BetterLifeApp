@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Timer
@@ -143,7 +144,23 @@ fun TodoScreen(
                     )
                 }
             },
-            onRemoveDailyHabit = vm::removeDailyHabit,
+            onRemoveDailyHabit = { item ->
+                vm.removeDailyHabit(item.task.entryId)
+                scope.launch {
+                    val message = resources.getString(
+                        R.string.todo_daily_removed,
+                        item.displayTitle,
+                    )
+                    val result = snackbar.showSnackbar(
+                        message = message,
+                        actionLabel = undoLabel,
+                        withDismissAction = true,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        vm.restoreDailyHabit(item.task.entryId, item.customTitle)
+                    }
+                }
+            },
             onToggleWeekly = vm::toggleWeekly,
             onDismissGraduation = vm::dismissGraduation,
             onRemoveWeekly = { entry ->
@@ -179,7 +196,7 @@ internal fun TodoContent(
     onStartTimer: (TaskEntity) -> Unit,
     onConvertToDaily: (TodoViewModel.TodoItem) -> Unit,
     onConvertToWeekly: (TodoViewModel.TodoItem, Int) -> Unit,
-    onRemoveDailyHabit: (String) -> Unit,
+    onRemoveDailyHabit: (TodoViewModel.TodoItem) -> Unit,
     onToggleWeekly: (String) -> Unit,
     onRemoveWeekly: (TodoViewModel.WeeklyEntry) -> Unit,
     onDismissGraduation: (String) -> Unit,
@@ -247,7 +264,7 @@ internal fun TodoContent(
                     onClick = { item.entry?.let { e -> onOpenEntry(e.id) } },
                     onOpenReminder = { reminderTarget = item.task },
                     onStartTimer = { onStartTimer(item.task) },
-                    onRemoveDailyHabit = { onRemoveDailyHabit(item.task.entryId) },
+                    onRemoveDailyHabit = { onRemoveDailyHabit(item) },
                     modifier = Modifier.animateItem(),
                 )
             }
@@ -699,9 +716,11 @@ private fun HabitRow(
         if (!task.done) TimerEntryButton(onStartTimer)
         ReminderBellButton(minutes = task.remindAtMinutes, onClick = onOpenReminder)
         if (isUserDaily) {
+            // EventBusy = 停掉这个反复出现的安排;Repeat 留给一次性待办的「转为每日/每周」,
+            // 此前两处同图标相反含义(一个取消重复、一个开启重复)
             IconButton(onClick = onRemoveDailyHabit) {
                 Icon(
-                    Icons.Filled.Repeat,
+                    Icons.Filled.EventBusy,
                     contentDescription = stringResource(R.string.todo_remove_daily),
                     tint = tint,
                 )

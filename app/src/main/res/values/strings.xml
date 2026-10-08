@@ -132,6 +132,7 @@
     <string name="todo_converted_daily">已转为每日习惯「%1$s」,见上方分区</string>
     <string name="todo_converted_weekly">已转为每周习惯「%1$s」,见上方分区</string>
     <string name="todo_remove_daily">取消每日习惯</string>
+    <string name="todo_daily_removed">已取消每日习惯「%1$s」</string>
     <string name="todo_weekly_title">每周习惯</string>
     <string name="todo_weekly_empty">没有每周习惯。把一次性待办转为每周,就能按「一周几次」来安排。</string>
     <string name="todo_weekly_progress">本周 %1$d/%2$d 次</string>
