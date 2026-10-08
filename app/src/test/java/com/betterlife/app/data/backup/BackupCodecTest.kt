@@ -129,4 +129,56 @@ class BackupCodecTest {
         // 只有 version 的最小 JSON 也能解析（各列表默认空）
         assertTrue(BackupCodec.decode("""{"version": 6}""").isSuccess)
     }
+
+    @Test
+    fun `缺 version 字段拒绝导入（任意 JSON 不能蒙混过校验）`() {
+        assertTrue(BackupCodec.decode("""{}""").isFailure)
+        assertTrue(BackupCodec.decode("""{"exportedAt": 1}""").isFailure)
+        assertTrue(BackupCodec.decode("""{"tasks": []}""").isFailure)
+        // 错误提示要指出缺的是哪个字段（设置页 Snackbar 原样展示）
+        val message = BackupCodec.decode("""{}""").exceptionOrNull()?.message.orEmpty()
+        assertTrue(message.contains("version"))
+    }
+
+    @Test
+    fun `task 的 type 非法拒绝导入`() {
+        val json = """{"version": 6, "tasks": [{"entryId": "02-01", "type": "HOURLY"}]}"""
+        val result = BackupCodec.decode(json)
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("type"))
+    }
+
+    @Test
+    fun `task 的 date 非法拒绝导入`() {
+        val bad = """{"version": 6, "tasks": [{"entryId": "02-01", "type": "DAILY", "date": "2024-13-40"}]}"""
+        assertTrue(BackupCodec.decode(bad).isFailure)
+        val notDate = """{"version": 6, "tasks": [{"entryId": "02-01", "type": "DAILY", "date": "昨天"}]}"""
+        assertTrue(BackupCodec.decode(notDate).isFailure)
+    }
+
+    @Test
+    fun `entryId 空白拒绝导入`() {
+        val badTask = """{"version": 6, "tasks": [{"entryId": " ", "type": "ONCE"}]}"""
+        assertTrue(BackupCodec.decode(badTask).isFailure)
+        val badNote = """{"version": 6, "entryNotes": [{"entryId": "", "text": "x"}]}"""
+        assertTrue(BackupCodec.decode(badNote).isFailure)
+    }
+
+    @Test
+    fun `entryStates 的 state 非法拒绝导入`() {
+        val json = """{"version": 6, "entryStates": [{"entryId": "02-01", "state": "MAYBE"}]}"""
+        assertTrue(BackupCodec.decode(json).isFailure)
+    }
+
+    @Test
+    fun `weeklyHabits 的 timesPerWeek 非正拒绝导入`() {
+        val json = """{"version": 6, "weeklyHabits": [{"entryId": "02-01", "timesPerWeek": 0}]}"""
+        assertTrue(BackupCodec.decode(json).isFailure)
+    }
+
+    @Test
+    fun `streakLeaves 的 date 非法拒绝导入`() {
+        val json = """{"version": 6, "streakLeaves": [{"entryId": "02-01", "date": "2024-02-30"}]}"""
+        assertTrue(BackupCodec.decode(json).isFailure)
+    }
 }

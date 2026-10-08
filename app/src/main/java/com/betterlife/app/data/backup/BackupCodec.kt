@@ -7,8 +7,11 @@ import com.betterlife.app.data.db.ProfileEntity
 import com.betterlife.app.data.db.StreakLeaveEntity
 import com.betterlife.app.data.db.TaskEntity
 import com.betterlife.app.data.db.WeeklyHabitEntity
+import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import java.time.LocalDate
 
 /** 备份文件里的 profile 行，字段与 [ProfileEntity] 一一对应 */
 @Serializable
@@ -91,10 +94,12 @@ data class StreakLeaveDto(
  * 只含 7 张持久表：chat_messages 是对话流水（可随时清空）不导出；
  * DataStore 里的 API key 等敏感配置一律不出设备，也不进备份。
  * 各列表默认空、可空字段默认 null，旧备份缺字段也能解析（前向兼容）。
+ * version 故意不给默认值：缺失即解码失败（MissingFieldException），
+ * 防止任意 JSON（甚至 "{}"）蒙混过版本校验、导入时清空全部数据。
  */
 @Serializable
 data class BackupPayload(
-    val version: Int = BackupCodec.VERSION,
+    val version: Int,
     val exportedAt: Long = 0L,
     val profile: ProfileDto? = null,
     val tasks: List<TaskDto> = emptyList(),
@@ -183,12 +188,80 @@ object BackupCodec {
 
     fun encode(payload: BackupPayload): String = json.encodeToString(BackupPayload.serializer(), payload)
 
-    /** 解析并校验版本；JSON 损坏或版本不符都返回 failure，调用方不得继续导入 */
+    /**
+     * 解析并全量校验：JSON 损坏、缺必填字段（version）、版本不符、行内数据非法
+     * 都返回 failure。只有全部通过才允许进入 BackupManager 的清表写库流程——
+     * 导入前先清 7 张表，脏数据放进去就是灾难。错误信息面向用户可读（设置页 Snackbar 原样展示）。
+     */
     fun decode(text: String): Result<BackupPayload> = runCatching {
-        val payload = json.decodeFromString(BackupPayload.serializer(), text)
+        val payload = try {
+            json.decodeFromString(BackupPayload.serializer(), text)
+        } catch (e: MissingFieldException) {
+            throw BackupFormatException("备份文件不完整：缺少字段 ${e.missingFields.joinToString("、")}")
+        } catch (e: SerializationException) {
+            throw BackupFormatException("备份文件格式不正确，无法解析")
+        } catch (e: IllegalArgumentException) {
+            throw BackupFormatException("备份文件格式不正确，无法解析")
+        }
         require(payload.version == VERSION) {
             "备份版本不支持：需要 version=$VERSION，实际 version=${payload.version}"
         }
+        validate(payload)
         payload
     }
+
+    /**
+     * 行内数据校验：主键/必填字段非空、枚举值合法、日期真实存在。
+     * 解码层 ignoreUnknownKeys 只管「多出来的字段」，不管「字段值对不对」。
+     */
+    private fun validate(payload: BackupPayload) {
+        payload.tasks.forEachIndexed { i, t ->
+            require(t.entryId.isNotBlank()) { "tasks[$i] 缺少 entryId" }
+            require(t.type in TASK_TYPES) { "tasks[$i] 的 type 非法：${t.type}" }
+            require(t.date == null || isValidDate(t.date)) { "tasks[$i] 的 date 非法：${t.date}" }
+            require(t.dueDate == null || isValidDate(t.dueDate)) { "tasks[$i] 的 dueDate 非法：${t.dueDate}" }
+            require(t.remindAtMinutes == null || t.remindAtMinutes in 0..MINUTES_PER_DAY - 1) {
+                "tasks[$i] 的 remindAtMinutes 非法：${t.remindAtMinutes}"
+            }
+        }
+        payload.entryStates.forEachIndexed { i, s ->
+            require(s.entryId.isNotBlank()) { "entryStates[$i] 缺少 entryId" }
+            require(s.state in ENTRY_STATES) { "entryStates[$i] 的 state 非法：${s.state}" }
+        }
+        payload.weeklyHabits.forEachIndexed { i, h ->
+            require(h.entryId.isNotBlank()) { "weeklyHabits[$i] 缺少 entryId" }
+            require(h.timesPerWeek > 0) { "weeklyHabits[$i] 的 timesPerWeek 非法：${h.timesPerWeek}" }
+        }
+        payload.customEntries.forEachIndexed { i, c ->
+            require(c.entryId.isNotBlank()) { "customEntries[$i] 缺少 entryId" }
+            require(c.title.isNotBlank()) { "customEntries[$i] 缺少 title" }
+        }
+        payload.entryNotes.forEachIndexed { i, n ->
+            require(n.entryId.isNotBlank()) { "entryNotes[$i] 缺少 entryId" }
+        }
+        payload.streakLeaves.forEachIndexed { i, l ->
+            require(l.entryId.isNotBlank()) { "streakLeaves[$i] 缺少 entryId" }
+            require(isValidDate(l.date)) { "streakLeaves[$i] 的 date 非法：${l.date}" }
+        }
+    }
+
+    private fun isValidDate(s: String): Boolean =
+        DATE_REGEX.matches(s) && runCatching { LocalDate.parse(s) }.isSuccess
+
+    /** 备份文件结构性错误（不是 JSON / 缺必填字段），message 面向用户可读 */
+    class BackupFormatException(message: String) : Exception(message)
+
+    private const val MINUTES_PER_DAY = 1440
+
+    private val DATE_REGEX = Regex("""\d{4}-\d{2}-\d{2}""")
+
+    private val TASK_TYPES = setOf(TaskEntity.TYPE_DAILY, TaskEntity.TYPE_ONCE, TaskEntity.TYPE_WEEKLY)
+
+    private val ENTRY_STATES = setOf(
+        EntryStateEntity.STATE_TODO,
+        EntryStateEntity.STATE_DONE,
+        EntryStateEntity.STATE_DISMISSED,
+        EntryStateEntity.STATE_FAVORITE,
+        EntryStateEntity.STATE_DAILY,
+    )
 }
