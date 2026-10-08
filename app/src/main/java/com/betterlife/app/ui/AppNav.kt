@@ -401,7 +401,8 @@ private fun AppScaffold(
                 ChatScreen(
                     entryId = entry.toRoute<ChatRoute>().entryId,
                     onBack = { navController.popBackStack() },
-                    onOpenSettings = { navController.navigate(SettingsRoute) },
+                    // banner 指向的是配 API Key,Key 在高级设置二级页,直达而非落一级设置
+                    onOpenSettings = { navController.navigate(SettingsAdvancedRoute) },
                     onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
                 )
             }
