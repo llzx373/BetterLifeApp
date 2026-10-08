@@ -456,7 +456,13 @@ internal fun TodayContent(
             else -> items(tasks, key = { it.task.taskId }) { item ->
                 DailyTaskCard(
                     item = item,
-                    onRequestCheckIn = { noteDialogTask = item.task },
+                    // 打卡是一步动作:直接完成,沉降钉位与带备注路径一致;写备注走 ⋮ 菜单
+                    onRequestCheckIn = {
+                        settlingId = item.task.taskId
+                        settlingPinnedDone = item.task.done
+                        onCheckIn(item.task, null)
+                    },
+                    onRequestCheckInNote = { noteDialogTask = item.task },
                     onUndo = {
                         // 撤销同样走沉降延迟:卡片先在已完成组停 300ms,等勾的形变做完再升回去
                         settlingId = item.task.taskId
@@ -708,6 +714,7 @@ private fun StreakPill(days: Int) {
 private fun DailyTaskCard(
     item: TodayViewModel.TaskItem,
     onRequestCheckIn: () -> Unit,
+    onRequestCheckInNote: () -> Unit,
     onUndo: () -> Unit,
     onDrop: () -> Unit,
     onRequestLeave: () -> Unit,
@@ -791,6 +798,7 @@ private fun DailyTaskCard(
                     playPop = done && !celebrated,
                     onPopPlayed = { celebrated = true },
                     onCheckIn = onRequestCheckIn,
+                    onCheckInNote = onRequestCheckInNote,
                     onUndo = onUndo,
                     onDrop = onDrop,
                     onRequestLeave = onRequestLeave,
@@ -826,7 +834,7 @@ private const val CHECK_POP_FROM = 0.9f
 private const val CHECK_POP_PEAK = 1.15f
 private const val CHECK_POP_MILLIS = 250
 
-/** 打卡动作:未完成是「打卡 + 更多」分裂按钮,已完成收成一个可撤销的按钮 */
+/** 打卡动作:未完成是「打卡 + 更多」分裂按钮(点按即完成,写备注在 ⋮ 菜单里),已完成收成一个可撤销的按钮 */
 @Composable
 private fun TaskAction(
     done: Boolean,
@@ -834,6 +842,7 @@ private fun TaskAction(
     playPop: Boolean,
     onPopPlayed: () -> Unit,
     onCheckIn: () -> Unit,
+    onCheckInNote: () -> Unit,
     onUndo: () -> Unit,
     onDrop: () -> Unit,
     onRequestLeave: () -> Unit,
@@ -843,7 +852,7 @@ private fun TaskAction(
     // 关闭档不套 AnimatedContent:静态帧否则可能抓到按钮切换的中间态
     if (LocalMotionLevel.current == MotionLevel.OFF) {
         TaskActionContent(
-            done, isDailyHabit, playPop, onPopPlayed, onCheckIn, onUndo, onDrop,
+            done, isDailyHabit, playPop, onPopPlayed, onCheckIn, onCheckInNote, onUndo, onDrop,
             onRequestLeave, onRequestBackfill, onStartTimer,
         )
         return
@@ -862,7 +871,7 @@ private fun TaskAction(
         label = "taskAction",
     ) { isDone ->
         TaskActionContent(
-            isDone, isDailyHabit, playPop, onPopPlayed, onCheckIn, onUndo, onDrop,
+            isDone, isDailyHabit, playPop, onPopPlayed, onCheckIn, onCheckInNote, onUndo, onDrop,
             onRequestLeave, onRequestBackfill, onStartTimer,
         )
     }
@@ -875,6 +884,7 @@ private fun TaskActionContent(
     playPop: Boolean,
     onPopPlayed: () -> Unit,
     onCheckIn: () -> Unit,
+    onCheckInNote: () -> Unit,
     onUndo: () -> Unit,
     onDrop: () -> Unit,
     onRequestLeave: () -> Unit,
@@ -918,6 +928,14 @@ private fun TaskActionContent(
                             )
                         }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            // 写备注是可选增强:打卡本身点左侧主按钮一步完成
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.today_action_checkin_note)) },
+                                onClick = {
+                                    menuOpen = false
+                                    onCheckInNote()
+                                },
+                            )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.today_action_drop)) },
                                 onClick = {
