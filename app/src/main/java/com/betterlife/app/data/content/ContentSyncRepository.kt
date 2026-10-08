@@ -27,6 +27,8 @@ data class ContentManifest(
     val entryCount: Int = 0,
     val entries: List<EntryHash> = emptyList(),
     val removed: List<String> = emptyList(),
+    /** 旧key→新key 别名表,随包在线分发(老 APK 也能收到新别名);与 assets 内置表合并应用 */
+    val aliases: Map<String, String> = emptyMap(),
     val fullUrl: String = "",
     val patchUrl: String? = null,
     val patchBase: String? = null,
@@ -123,7 +125,7 @@ class ContentSyncRepository(
             if (path == SyncPath.UP_TO_DATE) {
                 return@withContext SyncResult.UpToDate
             }
-            applyKeyAliases()
+            applyKeyAliases(manifest.aliases)
             val now = System.currentTimeMillis()
             if (path == SyncPath.PATCH) {
                 try {
@@ -144,14 +146,17 @@ class ContentSyncRepository(
 
     /**
      * key 别名改写必须在应用新内容之前做：旧 key 下架后用户数据会脱钩，
-     * 先按别名表把五张用户表的 entryId 挂到新 key 上。空表（当前默认）直接跳过。
+     * 先按别名表把五张用户表的 entryId 挂到新 key 上。
+     * 别名有两个来源：manifest 在线下发（[remoteAliases]，老 APK 也能收到新别名）
+     * 和 assets 内置表（APK 断网首装时的兜底）；冲突时以在线表为准。两表皆空直接跳过。
      */
-    private suspend fun applyKeyAliases() {
-        val aliases = runCatching {
+    private suspend fun applyKeyAliases(remoteAliases: Map<String, String>) {
+        val assetAliases = runCatching {
             context.assets.open("key_aliases.json").bufferedReader().use {
                 json.decodeFromString(KeyAliases.serializer(), it.readText())
             }.aliases
         }.getOrDefault(emptyMap())
+        val aliases = assetAliases + remoteAliases
         if (aliases.isEmpty()) return
         database.withTransaction {
             val db = database.openHelper.writableDatabase

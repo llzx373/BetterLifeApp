@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
+import kotlinx.serialization.json.Json
 
 /**
  * 内容同步的纯逻辑单测：路径决策（chooseSyncPath）、落库后与清单的全量比对
@@ -82,6 +83,28 @@ class ContentSyncLogicTest {
     fun `稳定 key 与 custom 前缀不受影响`() {
         assertEquals("95eb456c7501", LegacyEntryId.remap("95eb456c7501", idToKey))
         assertEquals("custom:uuid-1", LegacyEntryId.remap("custom:uuid-1", idToKey))
+    }
+
+    // ---------- manifest 别名表(在线分发) ----------
+
+    private val wireJson = Json { ignoreUnknownKeys = true }
+
+    @Test
+    fun `清单携带别名表时原样解析`() {
+        val m = wireJson.decodeFromString(
+            ContentManifest.serializer(),
+            """{"contentVersion":"b","aliases":{"oldKey":"newKey"}}""",
+        )
+        assertEquals(mapOf("oldKey" to "newKey"), m.aliases)
+    }
+
+    @Test
+    fun `旧版清单没有 aliases 字段时按空表处理`() {
+        val m = wireJson.decodeFromString(
+            ContentManifest.serializer(),
+            """{"contentVersion":"b","entries":[]}""",
+        )
+        assertEquals(emptyMap<String, String>(), m.aliases)
     }
 
     private fun h(key: String, hash: String) = ContentManifest.EntryHash(key = key, hash = hash)

@@ -4,13 +4,15 @@
 用法:
   python tools/build_content_pack.py [--entries app/src/main/assets/entries.json]
       [--out-dir build/content] [--prev-manifest <path或URL>]
-      [--base-url <release资产URL前缀>]
+      [--base-url <release资产URL前缀>] [--aliases app/src/main/assets/key_aliases.json]
 
 manifest.json 字段:
   contentVersion  内容版本(上游 commit short hash)
   entryCount      条目总数
   entries         [{key, hash}] 全量清单,App 端据此校验与 diff
   removed         相对上一版消失的 key(上一版有、本版没有)
+  aliases         key 别名表(旧key→新key,来自 key_aliases.json):随包在线分发,
+                  老版本 APK 也能拿到新别名;App 端与 assets 内置表合并后改写用户表
   fullUrl/patchUrl/patchBase  下载地址与增量基线;patchBase=null 表示无增量包
 
 patch.json(仅当有上一版时生成):
@@ -46,11 +48,17 @@ def main():
     ap.add_argument("--prev-manifest", default=None,
                     help="上一版 manifest.json 的路径或 URL;缺省则只产全量包")
     ap.add_argument("--base-url", default=DEFAULT_BASE_URL)
+    ap.add_argument("--aliases", default=r"app/src/main/assets/key_aliases.json",
+                    help="key 别名表,嵌入 manifest 随包在线分发;文件缺失时按空表处理")
     args = ap.parse_args()
 
     data = load_json(args.entries)
     version = data.get("contentVersion") or "local"
     entries = data["entries"]
+
+    aliases = {}
+    if os.path.exists(args.aliases):
+        aliases = load_json(args.aliases).get("aliases", {})
 
     prev = None
     if args.prev_manifest:
@@ -85,6 +93,7 @@ def main():
         "entryCount": len(entries),
         "entries": [{"key": e["key"], "hash": e["hash"]} for e in entries],
         "removed": gone_keys,
+        "aliases": aliases,
         "fullUrl": f"{args.base_url}/entries.json.gz",
         "patchUrl": None,
         "patchBase": None,
@@ -115,7 +124,7 @@ def main():
     with open(os.path.join(args.out_dir, "manifest.json"), "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=1)
 
-    print(f"版本: {version},条目: {len(entries)}")
+    print(f"版本: {version},条目: {len(entries)},别名: {len(aliases)}")
     if prev:
         print(f"相对 {prev['contentVersion']}: 新增 {len(new_keys)},"
               f"变更 {len(changed_keys)},消失 {len(gone_keys)}")
