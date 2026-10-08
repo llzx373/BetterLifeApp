@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -95,6 +96,8 @@ import kotlinx.coroutines.launch
 fun StatsScreen(
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenLens: (String) -> Unit,
+    onOpenTodo: () -> Unit,
     vm: StatsViewModel = viewModel(factory = StatsViewModel.Factory),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -109,6 +112,8 @@ fun StatsScreen(
         onOpenSettings = onOpenSettings,
         onSelectPeriod = vm::selectPeriod,
         onInterpret = { label -> vm.interpretPeriod(label) },
+        onOpenLens = onOpenLens,
+        onOpenTodo = onOpenTodo,
         onShareMilestone = { achievement ->
             if (sharing) return@StatsContent
             sharing = true
@@ -151,6 +156,8 @@ internal fun StatsContent(
     onSelectPeriod: (StatsPeriod) -> Unit,
     onInterpret: (String) -> Unit,
     onShareMilestone: (Achievement) -> Unit,
+    onOpenLens: (String) -> Unit = {},
+    onOpenTodo: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -210,7 +217,7 @@ internal fun StatsContent(
                 AchievementsCard(state.achievements, state.newAchievementKeys, onShareMilestone)
             }
             MotionEntrance(visibleState = staggeredCardVisible(1), slideFromBottom = true) {
-                StreakCard(state)
+                StreakCard(state, onOpenTodo)
             }
             MotionEntrance(visibleState = staggeredCardVisible(2), slideFromBottom = true) {
                 TrendCard(state.weeklyTrend)
@@ -219,7 +226,7 @@ internal fun StatsContent(
                 PeriodReportCard(state, onSelectPeriod, onInterpret, onOpenSettings)
             }
             MotionEntrance(visibleState = staggeredCardVisible(4), slideFromBottom = true) {
-                CompletionCard(state.lensCompletion, state.sectionCompletion)
+                CompletionCard(state.lensCompletion, state.sectionCompletion, onOpenLens)
             }
         }
     }
@@ -351,7 +358,7 @@ private fun AchievementsCard(
 // ---- 连续天数 ----
 
 @Composable
-private fun StreakCard(state: StatsViewModel.UiState) {
+private fun StreakCard(state: StatsViewModel.UiState, onOpenTodo: () -> Unit = {}) {
     StatsCard(R.string.stats_section_streak) {
         if (state.streaks.isEmpty()) {
             Text(
@@ -374,9 +381,14 @@ private fun StreakCard(state: StatsViewModel.UiState) {
                 )
             }
             state.streaks.forEach { streak ->
+                // 连签靠每日习惯维持:行可点直达待办页,看完数字有行动出口
+                val openTodoLabel = stringResource(R.string.nav_todo)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .clickable(onClickLabel = openTodoLabel) { onOpenTodo() },
                 ) {
                     Text(
                         streak.title,
@@ -482,6 +494,7 @@ private fun TrendCard(trend: List<WeeklyCompletion>) {
 internal fun CompletionCard(
     lensCompletion: List<StatsViewModel.LensCompletion>,
     sectionCompletion: List<StatsViewModel.SectionCompletion>,
+    onOpenLens: (String) -> Unit = {},
 ) {
     StatsCard(R.string.stats_completion_title) {
         lensCompletion.forEach { item ->
@@ -491,6 +504,8 @@ internal fun CompletionCard(
                 tint = LocalLensColors.current.forLens(item.lens)
                     ?: MaterialTheme.colorScheme.onSurfaceVariant,
                 icon = lensIcon(item.lens),
+                // 口径行可点:去条目库看该口径还有哪些没做(带 lens 筛选进入)
+                onClick = { onOpenLens(item.lens) },
             )
         }
         if (sectionCompletion.isNotEmpty()) {
@@ -517,13 +532,25 @@ private fun CompletionRow(
     stats: EntryStats,
     tint: Color,
     icon: ImageVector?,
+    onClick: (() -> Unit)? = null,
 ) {
     val total = stats.pending + stats.done + stats.dismissed
     val fraction = if (total == 0) 0f else stats.done.toFloat() / total
+    // 可点的行触控面拉到 48dp;纯展示的章节行保持紧凑
+    val openLensLabel = stringResource(R.string.stats_completion_open_lens)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.space2),
-        modifier = Modifier.fillMaxWidth().heightIn(min = 32.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = if (onClick != null) 48.dp else 32.dp)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(onClickLabel = openLensLabel, onClick = onClick)
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         if (icon != null) {
             Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(Spacing.space4))

@@ -111,12 +111,19 @@ internal val THREE_PANE_MIN_WIDTH = 1200.dp
 
 @Composable
 fun LibraryScreen(
+    initialLens: String? = null,
     onOpenSection: (Int) -> Unit,
     onOpenEntry: (String) -> Unit,
     onOpenChat: (String) -> Unit,
     vm: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
+
+    // 统计页完成度行带口径跳入:进库即带好该 lens 筛选,进任意章/搜索都生效,
+    // 筛选行上的激活角标与「清空」是它的出口
+    LaunchedEffect(initialLens) {
+        if (initialLens != null) vm.setFilter(EntryFilter(lenses = setOf(initialLens)))
+    }
 
     // 用 WindowInfo.containerSize 而不是 Configuration.screenWidthDp:后者在不同 targetSdk 下
     // inset 行为不同、而且被取整,分屏与折叠屏上会判错(Compose 自带 lint 也会报这条)。

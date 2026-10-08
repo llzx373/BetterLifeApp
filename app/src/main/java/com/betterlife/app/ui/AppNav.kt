@@ -87,7 +87,7 @@ import kotlinx.serialization.Serializable
 import kotlin.reflect.KClass
 
 // ---- 路由 ----
-// 四个 tab 用 data object 就够了;带参的(Section/Entry/Chat)是 data class,参数即路由参数。
+// tab 路由用 data object 就够了;带参的(Section/Entry/Chat/Library 的 lens 筛选)是 data class,参数即路由参数。
 
 @Serializable
 data object TodayRoute
@@ -96,7 +96,7 @@ data object TodayRoute
 data object TodoRoute
 
 @Serializable
-data object LibraryRoute
+data class LibraryRoute(val lens: String? = null)
 
 @Serializable
 data class SectionRoute(val sectionN: Int)
@@ -172,7 +172,7 @@ internal fun tabsFor(seniorMode: Boolean): List<TabSpec> =
                 LibraryRoute::class,
                 R.string.nav_library,
                 Icons.AutoMirrored.Filled.List,
-            ) { it.navigate(LibraryRoute) { tabOptions() } },
+            ) { it.navigate(LibraryRoute()) { tabOptions() } },
             TabSpec(MineRoute::class, R.string.nav_mine, Icons.Filled.Person) {
                 it.navigate(MineRoute) { tabOptions() }
             },
@@ -321,7 +321,7 @@ private fun AppScaffold(
                     onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
                     onOpenChat = { navController.navigate(ChatRoute()) },
                     onEditProfile = { navController.navigate(OnboardingRoute) },
-                    onOpenLibrary = { navController.navigate(LibraryRoute) { tabOptions() } },
+                    onOpenLibrary = { navController.navigate(LibraryRoute()) { tabOptions() } },
                     onOpenMine = { navController.navigate(MineRoute) },
                     onStartTimer = { id -> navController.navigate(TimerRoute(id)) },
                 )
@@ -332,8 +332,10 @@ private fun AppScaffold(
                     onStartTimer = { id -> navController.navigate(TimerRoute(id)) },
                 )
             }
-            composable<LibraryRoute> {
+            composable<LibraryRoute> { entry ->
                 LibraryScreen(
+                    // 统计页完成度行带口径进来:进库即带好该 lens 筛选
+                    initialLens = entry.toRoute<LibraryRoute>().lens,
                     onOpenSection = { n -> navController.navigate(SectionRoute(n)) },
                     onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
                     onOpenChat = { id -> navController.navigate(ChatRoute(id)) },
@@ -363,7 +365,7 @@ private fun AppScaffold(
                     onOpenCompleted = { navController.navigate(CompletedRoute) },
                     onOpenStats = { navController.navigate(StatsRoute) },
                     // N7:长辈模式下条目库/待办不再是 tab,入口收进「我的」页(二级页语义,不带 tabOptions)
-                    onOpenLibrary = { navController.navigate(LibraryRoute) },
+                    onOpenLibrary = { navController.navigate(LibraryRoute()) },
                     onOpenTodo = { navController.navigate(TodoRoute) },
                 )
             }
@@ -371,6 +373,9 @@ private fun AppScaffold(
                 StatsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenSettings = { navController.navigate(SettingsRoute) },
+                    // 完成度口径行 → 条目库带该 lens 筛选;连签行 → 待办页(二级页语义,同「我的」)
+                    onOpenLens = { lens -> navController.navigate(LibraryRoute(lens)) },
+                    onOpenTodo = { navController.navigate(TodoRoute) },
                 )
             }
             composable<FavoritesRoute> {

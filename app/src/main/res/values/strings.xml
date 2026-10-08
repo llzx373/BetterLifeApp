@@ -527,6 +527,8 @@
     <string name="stats_ai_error">解读没有成功,可以重试</string>
     <string name="stats_completion_title">条目完成度</string>
     <string name="stats_completion_rate">%1$d/%2$d</string>
+    <!-- 口径完成度行可点:跳条目库带该口径筛选 -->
+    <string name="stats_completion_open_lens">查看该口径的条目</string>
 
     <!-- 设置页:数据(备份导出/导入、清空对话历史) -->
     <string name="settings_section_data">数据</string>
