@@ -7,6 +7,7 @@ import com.betterlife.app.data.db.ProfileEntity
 import com.betterlife.app.data.db.StreakLeaveEntity
 import com.betterlife.app.data.db.TaskEntity
 import com.betterlife.app.data.db.WeeklyHabitEntity
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -193,6 +194,7 @@ object BackupCodec {
      * 都返回 failure。只有全部通过才允许进入 BackupManager 的清表写库流程——
      * 导入前先清 7 张表，脏数据放进去就是灾难。错误信息面向用户可读（设置页 Snackbar 原样展示）。
      */
+    @OptIn(ExperimentalSerializationApi::class) // MissingFieldException.missingFields
     fun decode(text: String): Result<BackupPayload> = runCatching {
         val payload = try {
             json.decodeFromString(BackupPayload.serializer(), text)
