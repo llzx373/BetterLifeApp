@@ -48,16 +48,25 @@ class HealthConnectRepository(private val context: Context) : HealthConnectSteps
         return response.records.sumOf { it.count }
     }
 
+    /**
+     * 今日运动分钟：HC 的 between 命中「与今天有交集」的 session，时长裁剪到与今天的
+     * 交集部分再累计（见 [exerciseOverlapMillis]）——跨午夜的 session 按全长计会把昨晚的
+     * 部分也算给今天，直接误核销 exercise 类自动规则。
+     */
     override suspend fun readTodayExerciseMinutes(): Long {
         val zone = ZoneId.systemDefault()
         val dayStart = LocalDate.now(zone).atStartOfDay(zone).toInstant()
+        val now = Instant.now()
         val response = client().readRecords(
             ReadRecordsRequest(
                 recordType = ExerciseSessionRecord::class,
-                timeRangeFilter = TimeRangeFilter.between(dayStart, Instant.now()),
+                timeRangeFilter = TimeRangeFilter.between(dayStart, now),
             ),
         )
-        return response.records.sumOf { Duration.between(it.startTime, it.endTime).toMinutes() }
+        val millis = response.records.sumOf {
+            exerciseOverlapMillis(it.startTime, it.endTime, dayStart, now)
+        }
+        return millis / 60_000
     }
 
     /**
