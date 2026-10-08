@@ -10,9 +10,9 @@
   "note": "酒驾不碰方向盘 · 夜间警灯"
  },
  {
-  "key": "045073e649e2",
+  "key": "719f9b7fc8a8",
   "photoId": "6sl88x150Xs",
-  "note": "动手前先问三句：损害 · 法槌"
+  "note": "动手前先问一句：会不会报案 · 法槌"
  },
  {
   "key": "07a2f34bcad2",
@@ -35,11 +35,6 @@
   "note": "收钱写「定金」不写「 · 签合同"
  },
  {
-  "key": "0f4b477cd536",
-  "photoId": "u2bL7sIdA1E",
-  "note": "每周150分钟快走 · 公园步道"
- },
- {
   "key": "139875f8cece",
   "photoId": "xFItahF3CY4",
   "note": "不帮陌生人带东西 · 机场行李箱"
@@ -50,9 +45,9 @@
   "note": "遇到熊、野猪、成 · 林中棕熊"
  },
  {
-  "key": "14169db54dee",
+  "key": "e4ee5114cf39",
   "photoId": "jSvoR46Xk8Q",
-  "note": "每天走到7000步 · 走路脚步"
+  "note": "每天走7000步或每周快走150分钟 · 走路脚步"
  },
  {
   "key": "1527412ea2e5",
@@ -175,9 +170,9 @@
   "note": "抑郁打12356 · 电话"
  },
  {
-  "key": "3f98c20300b7",
+  "key": "c844f83d2a76",
   "photoId": "VRqmHMYMq1c",
-  "note": "每周三次球拍运动 · 羽毛球拍"
+  "note": "常打球拍类运动 · 羽毛球拍"
  },
  {
   "key": "412d56e03d29",
@@ -263,11 +258,6 @@
   "key": "5f9fa71b99fe",
   "photoId": "0izFVmwJ5pw",
   "note": "乳腺癌筛查钼靶 · 钼靶检查"
- },
- {
-  "key": "5ff5b6b119ef",
-  "photoId": "fi5YSQfxbVk",
-  "note": "把穿什么固定下来 · 衣架衬衫"
  },
  {
   "key": "613a9cc56c8a",
@@ -595,7 +585,7 @@
   "note": "婚前财产房子加名 · 搬新家"
  },
  {
-  "key": "da505612f4b6",
+  "key": "2cd1223bd093",
   "photoId": "VZS-nK_E0q8",
   "note": "喝烧开的自来水 · 灶上水壶"
  },
@@ -693,5 +683,65 @@
   "key": "ff8a65e29b6c",
   "photoId": "kh8RIuPGdkM",
   "note": "荒郊野外被陌生人 · 打开钱包"
+ },
+ {
+  "key": "efa3f91f8e52",
+  "photoId": "m0EzHtexapU",
+  "note": "赌博障碍求助 · 黑底扑克筹码骰子"
+ },
+ {
+  "key": "4fa1f0a70a37",
+  "photoId": "w8p9cQDLX7I",
+  "note": "暴露前预防药 · 橙色药瓶洒出药片"
+ },
+ {
+  "key": "4791e3651272",
+  "photoId": "cbdRcyFsCwI",
+  "note": "骨密度检查 · 肩部X光片"
+ },
+ {
+  "key": "7c9931eff101",
+  "photoId": "5ZofAm1f27E",
+  "note": "抗骨质疏松药 · 手指捏胶囊"
+ },
+ {
+  "key": "66c4734189e9",
+  "photoId": "dkv2CXSoVfs",
+  "note": "冰面厚度 · 带裂纹的蓝冰"
+ },
+ {
+  "key": "d1acab1e3c17",
+  "photoId": "tXJhAFVOHVk",
+  "note": "角磨机安全 · 戴面罩切割火花"
+ },
+ {
+  "key": "4a2e25ea7101",
+  "photoId": "0-uzdU3gUYw",
+  "note": "直接问自杀念头 · 朋友相拥"
+ },
+ {
+  "key": "61a0e17b1080",
+  "photoId": "U9liWDW4xA0",
+  "note": "炒菜开抽油烟机 · 灶台与烟机"
+ },
+ {
+  "key": "985e7028ce82",
+  "photoId": "XWGUsWWopJc",
+  "note": "更年期潮热 · 手扶额头的女性"
+ },
+ {
+  "key": "d9145987d4a3",
+  "photoId": "xWlsYJU4ynE",
+  "note": "痛经别硬扛 · 床上捂腹"
+ },
+ {
+  "key": "c38993787687",
+  "photoId": "8wOToN7KeQ4",
+  "note": "性侵之后先打110 · 红色应急电话"
+ },
+ {
+  "key": "f44293498869",
+  "photoId": "fmB7IdFjhTM",
+  "note": "正畸找有资质医生 · 戴隐形牙套"
  }
 ]
