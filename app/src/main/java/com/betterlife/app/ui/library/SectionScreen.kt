@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -42,8 +43,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
@@ -51,6 +54,7 @@ import com.betterlife.app.data.EntryDto
 import com.betterlife.app.data.EntryKeys
 import com.betterlife.app.data.SectionDto
 import com.betterlife.app.recommend.EntryFilter
+import com.betterlife.app.ui.common.AssetImageBanner
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.DoneBadge
 import com.betterlife.app.ui.common.GradeBadge
@@ -59,6 +63,8 @@ import com.betterlife.app.ui.common.RatioBadge
 import com.betterlife.app.ui.common.SafeListItem
 import com.betterlife.app.ui.common.TodoBadge
 import com.betterlife.app.ui.common.lensGroupTitle
+import com.betterlife.app.ui.common.rememberAssetBanner
+import com.betterlife.app.ui.common.sectionImagePath
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.ui.theme.lensIcon
 import com.betterlife.app.viewmodel.EntrySort
@@ -117,10 +123,27 @@ internal fun SectionListContent(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
+        // 配图加载放在页面级作用域:LazyColumn item 是子组合,状态更新时被销毁会连带取消解码
+        val bannerPaths = listOfNotNull(section?.key?.let { sectionImagePath(it) })
+        val banner = rememberAssetBanner(bannerPaths)
         LazyColumn(
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(bottom = Spacing.space4),
         ) {
+            // 章节横幅图(assets/images/sections/{secKey}.webp),没配图就不渲染
+            if (banner != null) {
+                item {
+                    AssetImageBanner(
+                        banner = banner,
+                        contentDescription = section?.title,
+                        modifier = Modifier
+                            .padding(horizontal = Spacing.space4, vertical = Spacing.space2)
+                            .fillMaxWidth()
+                            .height(168.dp)
+                            .clip(MaterialTheme.shapes.medium),
+                    )
+                }
+            }
             section?.intro?.takeIf { it.isNotBlank() }?.let { intro ->
                 item {
                     Text(

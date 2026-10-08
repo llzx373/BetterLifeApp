@@ -72,6 +72,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -85,6 +86,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.R
 import com.betterlife.app.data.EntryDto
+import com.betterlife.app.ui.common.AssetImageBanner
 import com.betterlife.app.ui.common.CostMeter
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.DoneBadge
@@ -94,6 +96,7 @@ import com.betterlife.app.ui.common.PlannedBadge
 import com.betterlife.app.ui.common.RatioBadge
 import com.betterlife.app.ui.common.TodoBadge
 import com.betterlife.app.ui.common.predictiveBackTransition
+import com.betterlife.app.ui.common.rememberEntryBanner
 import com.betterlife.app.ui.theme.LocalMotionLevel
 import com.betterlife.app.ui.theme.MotionLevel
 import com.betterlife.app.ui.theme.Spacing
@@ -199,6 +202,10 @@ fun EntryDetailContent(
         }
         val e = current.entry
 
+        // 配图加载放在页面级作用域:LazyColumn item 是子组合,被销毁会连带取消解码。
+        // 回退到章节图时带关键词门控:正文与图片主题不沾边的条目不显示图
+        val banner = rememberEntryBanner(e.key, e.secKey, e.title, e.human + "\n" + e.hay)
+
         Box(Modifier.fillMaxSize().padding(padding)) {
             // 加载态到正文给一层淡入:加载快时整页硬切最刺眼。工具条的入场独立,不跟着走
             MotionEntrance(
@@ -222,6 +229,20 @@ fun EntryDetailContent(
                                 textRes = R.string.entry_removed_banner,
                                 container = MaterialTheme.colorScheme.secondaryContainer,
                                 content = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                        }
+                    }
+
+                    // 条目配图:专属图优先;回退章节图已过相关性门控,不相关时 banner 为 null 不画
+                    if (banner != null) {
+                        item {
+                            AssetImageBanner(
+                                banner = banner,
+                                contentDescription = e.title,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(160.dp)
+                                    .clip(MaterialTheme.shapes.medium),
                             )
                         }
                     }
