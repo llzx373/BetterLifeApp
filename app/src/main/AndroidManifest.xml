@@ -58,6 +58,10 @@
                 <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
                 <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
             </intent-filter>
+            <!-- 桌面长按图标的静态快捷方式:问 AI / 今日打卡 -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <!-- 桌面入口别名：蓝紫（默认）。IconColor 枚举与这组 alias 一一对应 -->

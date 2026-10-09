@@ -257,6 +257,8 @@ private fun AppScaffold(
         when {
             navTarget == MainActivity.ROUTE_TODO -> navController.navigate(TodoRoute) { tabOptions() }
             navTarget == MainActivity.ROUTE_TODAY -> navController.navigate(TodayRoute) { tabOptions() }
+            // 桌面快捷方式「问 AI」:聊天页非 tab(长辈模式才是),普通 navigate 压栈,返回回到来处
+            navTarget == MainActivity.ROUTE_CHAT -> navController.navigate(ChatRoute())
             // N4 周报深链：统计页不是 tab，直接 navigate（同 MinePage 的 onOpenStats）
             navTarget == MainActivity.ROUTE_STATS -> navController.navigate(StatsRoute)
             // N5 每日一条深链："entry/<entryId>" → 条目详情页

@@ -34,6 +34,12 @@
     <string name="widget_task_checkin_desc">打卡：%1$s</string>
     <string name="widget_task_undo_desc">撤销打卡：%1$s</string>
 
+    <!-- 桌面长按图标的快捷方式(App Shortcuts):问 AI / 今日打卡 -->
+    <string name="shortcut_chat_short">问 AI</string>
+    <string name="shortcut_chat_long">问 AI 一个问题</string>
+    <string name="shortcut_today_short">今日打卡</string>
+    <string name="shortcut_today_long">打开今日打卡</string>
+
     <!-- 通用动作 -->
     <string name="action_back">返回</string>
     <string name="action_retry">重试</string>

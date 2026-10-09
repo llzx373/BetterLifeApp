@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  桌面长按图标的静态快捷方式(App Shortcuts):「问 AI」直达聊天页,「今日打卡」直达今日页。
+  深链复用通知同一套机制:intent 带 MainActivity.EXTRA_OPEN_ROUTE extra,
+  MainActivity 读出后交给 AppNav 消费导航(与通知点击同路,不另起 deep link 解析)。
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="chat"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_chat_short"
+        android:shortcutLongLabel="@string/shortcut_chat_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.betterlife.app"
+            android:targetClass="com.betterlife.app.MainActivity">
+            <extra
+                android:name="com.betterlife.app.extra.OPEN_ROUTE"
+                android:value="chat" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="today"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_today_short"
+        android:shortcutLongLabel="@string/shortcut_today_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.betterlife.app"
+            android:targetClass="com.betterlife.app.MainActivity">
+            <extra
+                android:name="com.betterlife.app.extra.OPEN_ROUTE"
+                android:value="today" />
+        </intent>
+    </shortcut>
+</shortcuts>

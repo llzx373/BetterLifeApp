@@ -88,5 +88,8 @@ class MainActivity : ComponentActivity() {
 
         /** N5 每日一条深链："entry/<entryId>" → 条目详情页（entryId 是 sha1 hex，不含斜杠） */
         const val ROUTE_ENTRY_PREFIX = "entry/"
+
+        /** 桌面长按快捷方式(res/xml/shortcuts.xml)深链:聊天页(「问 AI」) */
+        const val ROUTE_CHAT = "chat"
     }
 }
