@@ -23,8 +23,13 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -32,6 +37,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -66,9 +72,11 @@ private const val STEP_COUNT = 4
 /** 动作栏最小高度:文字放大到 200% 时允许它长高,但正常字体下位置固定 */
 private val ActionBarMinHeight = 64.dp
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScreen(
     onFinished: () -> Unit,
+    onBack: () -> Unit,
     vm: ProfileViewModel = viewModel(factory = ProfileViewModel.Factory),
 ) {
     val profile by vm.profile.collectAsStateWithLifecycle()
@@ -93,7 +101,25 @@ fun OnboardingScreen(
         if (saveState is ProfileViewModel.SaveState.Success) onFinished()
     }
 
-    Scaffold { padding ->
+    Scaffold(
+        topBar = {
+            // 编辑模式(从「我的」进)给顶栏返回键:长辈用户不该只能靠系统返回;
+            // 标题挪进顶栏,正文不再重复渲染
+            if (editMode) {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.onboarding_title_edit)) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.action_back),
+                            )
+                        }
+                    },
+                )
+            }
+        },
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -101,12 +127,12 @@ fun OnboardingScreen(
                 .padding(horizontal = Spacing.space6),
         ) {
             Spacer(Modifier.height(Spacing.space4))
-            Text(
-                text = stringResource(
-                    if (editMode) R.string.onboarding_title_edit else R.string.onboarding_title_new,
-                ),
-                style = MaterialTheme.typography.headlineSmall,
-            )
+            if (!editMode) {
+                Text(
+                    text = stringResource(R.string.onboarding_title_new),
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+            }
             Text(
                 text = stringResource(R.string.onboarding_progress, page + 1, STEP_COUNT) +
                     if (editMode) "" else stringResource(R.string.onboarding_skippable_hint),
@@ -162,7 +188,8 @@ fun OnboardingScreen(
                 Spacer(Modifier.weight(1f))
 
                 if (page < STEP_COUNT - 1) {
-                    TextButton(onClick = { goToPage(STEP_COUNT - 1) }) {
+                    // 首步是「跳到目标」直达最后一步;其后是「跳过本步」只进一步,文案与行为一致
+                    TextButton(onClick = { goToPage(if (page == 0) STEP_COUNT - 1 else page + 1) }) {
                         Text(
                             stringResource(
                                 if (page == 0) R.string.onboarding_jump else R.string.onboarding_skip,
@@ -417,6 +444,7 @@ private fun StepFamily(profile: Profile, update: ((Profile) -> Profile) -> Unit)
 @Composable
 private fun StepGoals(profile: Profile, update: ((Profile) -> Profile) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.space3)) {
+        StepNote(R.string.onboarding_why_goals)
         FieldLabel(stringResource(R.string.field_goals))
         Text(
             stringResource(R.string.field_goals_hint),

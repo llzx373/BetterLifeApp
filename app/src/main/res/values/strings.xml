@@ -335,6 +335,7 @@
     <string name="onboarding_why_basics">年龄段是必选的,不同年龄段的重点差别最大;其余可跳过。</string>
     <string name="onboarding_why_habits">吸烟、饮酒、慢性病会直接决定推荐哪几条;这些只存在你的手机上。</string>
     <string name="onboarding_why_family">家里有没有老人、小孩,会改变一些建议的优先级;不确定就跳过。</string>
+    <string name="onboarding_why_goals">目标直接决定每天给你推哪类条目,是最影响推荐的一项;不确定就先选一个最在意的。</string>
     <string name="onboarding_prev">上一步</string>
     <string name="onboarding_jump">跳到目标</string>
     <string name="onboarding_skip">跳过本步</string>

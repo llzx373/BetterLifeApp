@@ -427,14 +427,18 @@ private fun AppScaffold(
                 // 进入本页时 onboardingDone 还没被本次保存改写:首次完成为 false,
                 // 从「我的」进编辑档案为 true —— 只有首次完成才触发长辈模式询问
                 val firstRun = remember { !settings.onboardingDone }
-                OnboardingScreen(onFinished = {
-                    if (firstRun && !settings.seniorModeAsked && !settings.seniorMode) {
-                        showSeniorAsk = true
-                    }
-                    navController.navigate(TodayRoute) {
-                        popUpTo(OnboardingRoute) { inclusive = true }
-                    }
-                })
+                OnboardingScreen(
+                    onFinished = {
+                        if (firstRun && !settings.seniorModeAsked && !settings.seniorMode) {
+                            showSeniorAsk = true
+                        }
+                        navController.navigate(TodayRoute) {
+                            popUpTo(OnboardingRoute) { inclusive = true }
+                        }
+                    },
+                    // 编辑模式顶栏的返回键:不保存,原路退回(「我的」/今日页)
+                    onBack = { navController.popBackStack() },
+                )
             }
             }
         }
