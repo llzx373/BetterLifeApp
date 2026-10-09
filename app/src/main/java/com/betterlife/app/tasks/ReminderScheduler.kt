@@ -12,10 +12,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
-import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
@@ -28,9 +26,7 @@ import com.betterlife.app.recommend.ProfileQuestions
 import com.betterlife.app.widget.WidgetUpdater
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import java.time.Duration
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
@@ -39,6 +35,10 @@ import java.util.concurrent.TimeUnit
  * N2b 报喜（hcPraiseEnabled）、N2c 挽回（reengageEnabled）。work 的去留由「任一开关开着」
  * 决定（见 ensureScheduled / cancel），发哪条由 worker 内按各自开关门控：
  * 报喜/挽回默认开，不应随每日提醒开关一起消失。
+ *
+ * 调度用自续链而非周期 work：每次执行末尾由 worker 按 [nextTriggerMillis] 重排下一个
+ * 墙钟锚点（unique + REPLACE）。周期 work 的固定 24h 是真实时间间隔，DST 切换后触发
+ * 时刻在墙钟上偏移且不再回正；一过一算（ZonedDateTime）才始终对准 hour:minute。
  */
 class ReminderScheduler(private val context: Context) {
 
@@ -79,35 +79,34 @@ class ReminderScheduler(private val context: Context) {
         }
     }
 
-    /** 按设定时间入队（已存在则更新）。首次触发时间对齐到最近的 hour:minute。 */
+    /**
+     * 排下一次每日 tick：锚定最近的 hour:minute 墙钟时刻（已过点顺延明天），REPLACE 重锚。
+     * 设置页改时间、worker 每轮执行末尾的自续都走这里。
+     */
     fun enqueue(hour: Int, minute: Int) {
-        enqueuePeriodic(hour, minute, ExistingPeriodicWorkPolicy.UPDATE)
+        enqueueOnce(hour, minute, ExistingWorkPolicy.REPLACE)
     }
 
     /**
-     * 应用启动时兜底注册：任一依赖开关（每日提醒/报喜/挽回）开着就确保 work 在
-     * （KEEP：已排队的锚点不被 App 重启重置）；全关则不管（cancel 已撤）。
-     * 触发时刻用存储的 reminderHour/reminderMinute（每日提醒从未开过时是默认 8:00）。
+     * 应用启动时兜底注册：任一依赖开关（每日提醒/报喜/挽回）开着就确保链在
+     * （KEEP：已排队/在跑的锚点不动——进程可能正是被链上 work 唤醒的，REPLACE 会误撤它）；
+     * 全关则不管（cancel 已撤）。触发时刻用存储的 reminderHour/reminderMinute（默认 8:00）。
      */
     suspend fun ensureScheduled() {
         val settings = SettingsStore(context).current()
         if (settings.reminderEnabled || settings.hcPraiseEnabled || settings.reengageEnabled) {
-            enqueuePeriodic(settings.reminderHour, settings.reminderMinute, ExistingPeriodicWorkPolicy.KEEP)
+            enqueueOnce(settings.reminderHour, settings.reminderMinute, ExistingWorkPolicy.KEEP)
         }
     }
 
-    private fun enqueuePeriodic(hour: Int, minute: Int, policy: ExistingPeriodicWorkPolicy) {
+    private fun enqueueOnce(hour: Int, minute: Int, policy: ExistingWorkPolicy) {
         ensureChannel(context)
-        val now = LocalDateTime.now()
-        var next = now.withHour(hour).withMinute(minute).withSecond(0).withNano(0)
-        if (!next.isAfter(now)) next = next.plusDays(1)
-        val initialDelayMs = Duration.between(now, next).toMillis()
-
-        val request = PeriodicWorkRequestBuilder<DailyReminderWorker>(24, TimeUnit.HOURS, 1, TimeUnit.HOURS)
-            .setInitialDelay(initialDelayMs, TimeUnit.MILLISECONDS)
+        val now = System.currentTimeMillis()
+        val triggerAt = nextTriggerMillis(now, hour * 60 + minute, ZoneId.systemDefault())
+        val request = OneTimeWorkRequestBuilder<DailyReminderWorker>()
+            .setInitialDelay((triggerAt - now).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
             .build()
-        WorkManager.getInstance(context)
-            .enqueueUniquePeriodicWork(WORK_NAME, policy, request)
+        WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, policy, request)
     }
 
     /**
@@ -291,6 +290,12 @@ class DailyReminderWorker(
         ) {
             container.reminderScheduler.notifyReengage()
             container.settingsStore.setReengageSentDate(today)
+        }
+        // 自续链：按当前设置重排下一天的墙钟锚点（DST 安全），全关则断链。
+        // 放在所有副作用之后、return 之前——REPLACE 会撤掉同名在跑的 work（即本轮自己），
+        // 排完立即返回，不打断上面的写库/通知
+        if (settings.reminderEnabled || settings.hcPraiseEnabled || settings.reengageEnabled) {
+            container.reminderScheduler.enqueue(settings.reminderHour, settings.reminderMinute)
         }
         return Result.success()
     }

@@ -26,7 +26,9 @@ internal fun shouldRescheduleReminder(
     remindAtMinutes != null && nextTriggerMillis(nowMillis, remindAtMinutes, zone, date) > nowMillis
 
 /**
- * 单任务提醒的触发时刻计算。提成纯函数是为了能脱离 Android 环境单测。
+ * 「今天/明天最近的 targetMinutesOfDay 墙钟时刻」计算。提成纯函数是为了能脱离 Android 环境单测。
+ * 两处用途：单任务提醒的触发时刻；每日 tick 自续链的下一天锚点（ReminderScheduler，
+ * 靠 ZonedDateTime 保证 DST 切换后仍对准墙钟 hour:minute）。
  *
  * 不指定日期：目标时间晚于当前 → 今天触发；已经过点 → 顺延到明天同一时刻。
  * 指定日期（一次性待办的截止日）：定在该日期的目标时刻触发；

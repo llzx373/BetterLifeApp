@@ -135,4 +135,35 @@ class TaskReminderTimeTest {
             shouldRescheduleReminder(9 * 60, now, zone, LocalDate.parse("2026-03-06")),
         )
     }
+
+    // ---- DST 维度（每日 tick 自续链的墙钟锚点也走本函数，见 ReminderScheduler）----
+
+    private val usZone: ZoneId = ZoneId.of("America/New_York")
+
+    private fun usMillis(date: String, time: String): Long =
+        LocalDate.parse(date).atTime(LocalTime.parse(time)).atZone(usZone).toInstant().toEpochMilli()
+
+    @Test
+    fun `DST 春季拨快次日仍锚定同一墙钟时刻`() {
+        // 2026-03-08 凌晨 2 点拨快到 3 点：前一天中午排 08:30，必须落在 3/8 墙钟 08:30
+        // （真实间隔 23h，而非固定 24h 后漂到 09:30）
+        val now = usMillis("2026-03-07", "12:00")
+        val trigger = nextTriggerMillis(now, 8 * 60 + 30, usZone)
+        assertEquals(usMillis("2026-03-08", "08:30"), trigger)
+    }
+
+    @Test
+    fun `DST 春季拨快当天执行后下一天仍锚定同一墙钟时刻`() {
+        val now = usMillis("2026-03-08", "08:30")
+        val trigger = nextTriggerMillis(now, 8 * 60 + 30, usZone)
+        assertEquals(usMillis("2026-03-09", "08:30"), trigger)
+    }
+
+    @Test
+    fun `DST 秋季拨回次日仍锚定同一墙钟时刻`() {
+        // 2026-11-01 凌晨 2 点拨回 1 点：真实间隔 25h，墙钟仍 08:30
+        val now = usMillis("2026-10-31", "12:00")
+        val trigger = nextTriggerMillis(now, 8 * 60 + 30, usZone)
+        assertEquals(usMillis("2026-11-01", "08:30"), trigger)
+    }
 }
