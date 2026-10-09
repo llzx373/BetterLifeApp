@@ -554,12 +554,10 @@ private fun themeModeLabel(mode: ThemeMode): String = stringResource(
 @Composable
 private fun launcherIconLabel(icon: LauncherIcon): String = stringResource(
     when (icon) {
-        LauncherIcon.WINE_GOLD -> R.string.launcher_icon_wine_gold
-        LauncherIcon.BLUE_GOLD -> R.string.launcher_icon_blue_gold
-        LauncherIcon.GREEN_GOLD -> R.string.launcher_icon_green_gold
-        LauncherIcon.TEAL_GOLD -> R.string.launcher_icon_teal_gold
-        LauncherIcon.SLATE_GOLD -> R.string.launcher_icon_slate_gold
-        LauncherIcon.ROSE_TEAL -> R.string.launcher_icon_rose_teal
+        LauncherIcon.BLACK -> R.string.launcher_icon_black
+        LauncherIcon.GREEN -> R.string.launcher_icon_green
+        LauncherIcon.NAVY -> R.string.launcher_icon_navy
+        LauncherIcon.WINE -> R.string.launcher_icon_wine
     },
 )
 

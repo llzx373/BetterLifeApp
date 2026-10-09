@@ -468,16 +468,14 @@
     <string name="settings_daily_content_sub">每天早 8 点档推一条精选内容,30 天内不重样;没有合适的内容就不发</string>
     <string name="action_open_settings">去开启</string>
     <string name="settings_section_theme">主题</string>
-    <!-- 桌面图标：拼色底（健康域 × 财富域）+ % 前景，切换经 activity-alias（LauncherIcon） -->
+    <!-- 桌面图标：白底红心（健康域）× 金色钱币（财富域）拼色底 + % 前景，切换经 activity-alias（LauncherIcon） -->
     <string name="settings_section_icon_color">桌面图标</string>
     <!-- 切换延迟到退后台执行（前台切 alias 会被 launcher 关掉当前 task），这里给用户说明 -->
     <string name="settings_icon_color_hint">选好样式后，回到桌面时生效</string>
-    <string name="launcher_icon_wine_gold">酒红 × 金（默认）</string>
-    <string name="launcher_icon_blue_gold">蓝紫 × 金</string>
-    <string name="launcher_icon_green_gold">青绿 × 金</string>
-    <string name="launcher_icon_teal_gold">青 × 金</string>
-    <string name="launcher_icon_slate_gold">石墨 × 金</string>
-    <string name="launcher_icon_rose_teal">玫瑰 × 青</string>
+    <string name="launcher_icon_black">玄黑（默认）</string>
+    <string name="launcher_icon_green">翠绿</string>
+    <string name="launcher_icon_navy">深蓝</string>
+    <string name="launcher_icon_wine">酒红</string>
     <!-- N7 长辈模式:一级开关 + onboarding 完成后的一次性询问 -->
     <string name="settings_section_senior">长辈模式</string>
     <string name="settings_senior_mode">长辈模式</string>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 拼色图标背景：青绿 × 金（LauncherIcon.GREEN_GOLD，对应品牌主题 brand_green）。结构同 ic_launcher_bg_wine_gold。 -->
+<!-- 拼色图标背景：白 × 深蓝（LauncherIcon.NAVY，延续旧蓝紫品牌调）。心域（左上）白底，钱域（右下）蓝 → 藏青。结构同 ic_launcher_bg_white_black。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
@@ -12,7 +12,7 @@
                 android:type="linear"
                 android:startX="0" android:startY="0"
                 android:endX="108" android:endY="108"
-                android:startColor="#C77C02" android:endColor="#7A3E00" />
+                android:startColor="#3554A8" android:endColor="#0D184A" />
         </aapt:attr>
     </path>
     <path android:pathData="M0,0 L101.25,0 L6.75,108 L0,108 Z">
@@ -21,7 +21,7 @@
                 android:type="linear"
                 android:startX="0" android:startY="0"
                 android:endX="108" android:endY="108"
-                android:startColor="#43A047" android:endColor="#1B5E20" />
+                android:startColor="#FFFFFF" android:endColor="#E6E6EC" />
         </aapt:attr>
     </path>
     <path

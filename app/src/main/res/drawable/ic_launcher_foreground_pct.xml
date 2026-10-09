@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  白底红心 × 金色钱币 变体的前景层（LauncherIcon 全部 4 个变体共用）。
+  几何与 ic_launcher_foreground.xml 完全一致：斜杠骑双色底分界线，白域半边灰、
+  着色域半边白（clip-path 按分界线裁切）；心形红、硬币金。
+  启动画面（Theme.BetterLife.Splash）与 monochrome 仍引用旧前景 ic_launcher_foreground，
+  本 drawable 只服务于 mipmap-anydpi 下的图标变体。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 斜杠（梁）：(40,70)→(68,38)，与拼色底分界线共线；白域内的半边用灰 -->
+    <group>
+        <clip-path android:pathData="M0,0 L101.25,0 L6.75,108 L0,108 Z" />
+        <path
+            android:pathData="M40,70 L68,38"
+            android:strokeColor="#FF8E8E99"
+            android:strokeWidth="3.5"
+            android:strokeLineCap="round" />
+    </group>
+    <!-- 斜杠在着色域内的半边用白 -->
+    <group>
+        <clip-path android:pathData="M101.25,0 L108,0 L108,108 L6.75,108 Z" />
+        <path
+            android:pathData="M40,70 L68,38"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="3.5"
+            android:strokeLineCap="round" />
+    </group>
+    <!-- 心点（左上）：白底红心，路径同旧前景 -->
+    <path
+        android:fillColor="#FFE22B33"
+        android:pathData="M32.65,40.17 A4.6,4.6 0 1 1 41.85,40.17 A4.6,4.6 0 1 1 32.65,40.17 Z M39.15,40.17 A4.6,4.6 0 1 1 48.35,40.17 A4.6,4.6 0 1 1 39.15,40.17 Z M40.5,36.92 L47,43.42 L41.35,49.07 L39.65,49.07 L34,43.42 Z M39.31,48.23 A1.19,1.19 0 1 1 41.69,48.23 A1.19,1.19 0 1 1 39.31,48.23 Z" />
+    <!-- 硬币圆环（右下）：金色，中心 (67.5,65.5)，r=8.5 -->
+    <path
+        android:pathData="M59,65.5 A8.5,8.5 0 1 1 76,65.5 A8.5,8.5 0 1 1 59,65.5 Z"
+        android:strokeColor="#FFF2BE45"
+        android:strokeWidth="2.8" />
+    <!-- ¥ 符号：金色 -->
+    <path
+        android:pathData="M64.95,61.68 L67.5,65.08 L70.05,61.68 M67.5,65.08 L67.5,70.17 M65.21,66.78 L69.79,66.78 M65.21,68.9 L69.79,68.9"
+        android:strokeColor="#FFF2BE45"
+        android:strokeWidth="1.83" />
+</vector>

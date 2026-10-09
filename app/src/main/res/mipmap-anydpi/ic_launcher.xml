@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- minSdk 26，自适应图标（API 26 引入）覆盖全部支持设备，无需再提供 PNG 位图。
-     monochrome 直接复用前景层（纯白剪影），保证主题图标与普通图标形状一致。 -->
+     默认 = 白 × 玄黑（LauncherIcon.BLACK）；foreground 用白底红心 × 金色钱币前景，
+     monochrome 仍复用旧纯白前景（主题图标只取 alpha，两前景剪影一致）。 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@drawable/ic_launcher_bg_wine_gold" />
-    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <background android:drawable="@drawable/ic_launcher_bg_white_black" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground_pct" />
     <monochrome android:drawable="@drawable/ic_launcher_foreground" />
 </adaptive-icon>

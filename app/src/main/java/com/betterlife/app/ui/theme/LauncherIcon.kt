@@ -1,4 +1,4 @@
-// 桌面图标变体（拼色底 + % 前景）。Android 没有"运行时改 android:icon"的 API，
+// 桌面图标变体（白底红心 × 金色钱币，拼色底 + % 前景）。Android 没有"运行时改 android:icon"的 API，
 // 换图标靠启停 manifest 里一一对应的 activity-alias（每个 alias 挂一个 mipmap 变体）。
 // 枚举顺序即设置页「桌面图标」选择器的展示顺序；key 存进 DataStore（SettingsStore）。
 package com.betterlife.app.ui.theme
@@ -13,41 +13,41 @@ enum class LauncherIcon(
     val aliasName: String,
     /** manifest 里 android:enabled 的初始值（判断「当前是否已启用」时兜底用） */
     val enabledByDefault: Boolean,
-    /** 设置页色板预览：健康域（左上）与财富域（右下）的浅色端，与 ic_launcher_bg_* 一致 */
+    /** 设置页色板预览：健康域（左上）与财富域（右下）的浅色端，与 ic_launcher_bg_white_* 一致 */
     val previewHealth: Long,
     val previewWealth: Long,
 ) {
-    /** 酒红 × 金（默认）：红金 = 喜庆与财富 */
-    WINE_GOLD("wine_gold", ".launcher.WineGoldAlias", true, 0xFFC2185B, 0xFFC77C02),
+    /** 白 × 玄黑（默认）：金在黑底上对比最强 */
+    BLACK("black", ".launcher.BlackAlias", true, 0xFFFFFFFF, 0xFF3C3C44),
 
-    /** 蓝紫 × 金：与品牌默认主题同色 */
-    BLUE_GOLD("blue_gold", ".launcher.BlueGoldAlias", false, 0xFF4F4DCB, 0xFFC77C02),
+    /** 白 × 翠绿 */
+    GREEN("green", ".launcher.GreenAlias", false, 0xFFFFFFFF, 0xFF21A05A),
 
-    /** 青绿 × 金 */
-    GREEN_GOLD("green_gold", ".launcher.GreenGoldAlias", false, 0xFF43A047, 0xFFC77C02),
+    /** 白 × 深蓝：延续旧蓝紫品牌调 */
+    NAVY("navy", ".launcher.NavyAlias", false, 0xFFFFFFFF, 0xFF3554A8),
 
-    /** 青 × 金 */
-    TEAL_GOLD("teal_gold", ".launcher.TealGoldAlias", false, 0xFF006A63, 0xFFC77C02),
-
-    /** 石墨 × 金：低调商务 */
-    SLATE_GOLD("slate_gold", ".launcher.SlateGoldAlias", false, 0xFF455A64, 0xFFC77C02),
-
-    /** 玫瑰 × 青：唯一财富域非金的变体 */
-    ROSE_TEAL("rose_teal", ".launcher.RoseTealAlias", false, 0xFFE75480, 0xFF006A63),
+    /** 白 × 酒红 */
+    WINE("wine", ".launcher.WineAlias", false, 0xFFFFFFFF, 0xFFA62D3C),
     ;
 
     companion object {
-        /** 旧版单色图标的 key → 最接近的新变体（升级迁移用，单色图标已随本版移除） */
+        /** 旧版图标的 key → 最接近的新变体（升级迁移用，旧拼色/单色图标已随本版移除） */
         private val LEGACY_KEY_MAP = mapOf(
-            "blue_purple" to BLUE_GOLD,
-            "green" to GREEN_GOLD,
-            "orange" to WINE_GOLD,
-            "teal" to TEAL_GOLD,
+            "wine_gold" to WINE,
+            "blue_gold" to NAVY,
+            "green_gold" to GREEN,
+            "teal_gold" to GREEN,
+            "slate_gold" to BLACK,
+            "rose_teal" to WINE,
+            "blue_purple" to NAVY,
+            "green" to GREEN,
+            "orange" to WINE,
+            "teal" to GREEN,
         )
 
-        /** 旧 key 走迁移映射，未知/缺失 key 回落到默认酒红金 */
+        /** 旧 key 走迁移映射，未知/缺失 key 回落到默认玄黑 */
         fun fromKey(key: String?): LauncherIcon =
-            entries.firstOrNull { it.key == key } ?: LEGACY_KEY_MAP[key] ?: WINE_GOLD
+            entries.firstOrNull { it.key == key } ?: LEGACY_KEY_MAP[key] ?: BLACK
     }
 }
 

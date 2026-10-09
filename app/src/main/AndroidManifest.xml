@@ -64,9 +64,9 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
-        <!-- 桌面入口别名：酒红 × 金（默认）。LauncherIcon 枚举与这组 alias 一一对应 -->
+        <!-- 桌面入口别名：白 × 玄黑（默认）。LauncherIcon 枚举与这组 alias 一一对应 -->
         <activity-alias
-            android:name=".launcher.WineGoldAlias"
+            android:name=".launcher.BlackAlias"
             android:enabled="true"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
@@ -79,12 +79,12 @@
             </intent-filter>
         </activity-alias>
         <activity-alias
-            android:name=".launcher.BlueGoldAlias"
+            android:name=".launcher.GreenAlias"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_blue_gold"
+            android:icon="@mipmap/ic_launcher_green"
             android:label="@string/app_name"
-            android:roundIcon="@mipmap/ic_launcher_blue_gold_round"
+            android:roundIcon="@mipmap/ic_launcher_green_round"
             android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -92,12 +92,12 @@
             </intent-filter>
         </activity-alias>
         <activity-alias
-            android:name=".launcher.GreenGoldAlias"
+            android:name=".launcher.NavyAlias"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_green_gold"
+            android:icon="@mipmap/ic_launcher_navy"
             android:label="@string/app_name"
-            android:roundIcon="@mipmap/ic_launcher_green_gold_round"
+            android:roundIcon="@mipmap/ic_launcher_navy_round"
             android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -105,38 +105,12 @@
             </intent-filter>
         </activity-alias>
         <activity-alias
-            android:name=".launcher.TealGoldAlias"
+            android:name=".launcher.WineAlias"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_teal_gold"
+            android:icon="@mipmap/ic_launcher_wine"
             android:label="@string/app_name"
-            android:roundIcon="@mipmap/ic_launcher_teal_gold_round"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-        <activity-alias
-            android:name=".launcher.SlateGoldAlias"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_slate_gold"
-            android:label="@string/app_name"
-            android:roundIcon="@mipmap/ic_launcher_slate_gold_round"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-        <activity-alias
-            android:name=".launcher.RoseTealAlias"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_rose_teal"
-            android:label="@string/app_name"
-            android:roundIcon="@mipmap/ic_launcher_rose_teal_round"
+            android:roundIcon="@mipmap/ic_launcher_wine_round"
             android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

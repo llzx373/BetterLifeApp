@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  拼色图标背景：酒红（健康域）× 金（财富域），默认款（LauncherIcon.WINE_GOLD）。
-  两域各带 135° 浅→深渐变；分割线 (101.25,0)→(6.75,108) 与前景 % 斜杠共线。
-  左上角叠一层极淡白色高光（同旧版），浅色壁纸上不发闷。
--->
+<!-- 拼色图标背景：白 × 玄黑（LauncherIcon.BLACK，默认）。心域（左上）白底，钱域（右下）炭灰 → 近黑。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
@@ -16,7 +12,7 @@
                 android:type="linear"
                 android:startX="0" android:startY="0"
                 android:endX="108" android:endY="108"
-                android:startColor="#C77C02" android:endColor="#7A3E00" />
+                android:startColor="#3C3C44" android:endColor="#08080C" />
         </aapt:attr>
     </path>
     <path android:pathData="M0,0 L101.25,0 L6.75,108 L0,108 Z">
@@ -25,7 +21,7 @@
                 android:type="linear"
                 android:startX="0" android:startY="0"
                 android:endX="108" android:endY="108"
-                android:startColor="#C2185B" android:endColor="#6D0F36" />
+                android:startColor="#FFFFFF" android:endColor="#E6E6EC" />
         </aapt:attr>
     </path>
     <path

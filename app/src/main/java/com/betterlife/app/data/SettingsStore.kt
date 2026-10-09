@@ -550,8 +550,8 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
         /** 默认「标准」。降级是给需要的用户的选项,不该是所有人的默认 */
         const val DEFAULT_MOTION_LEVEL = "standard"
 
-        /** 桌面图标默认酒红 × 金（LauncherIcon.WINE_GOLD） */
-        const val DEFAULT_LAUNCHER_ICON = "wine_gold"
+        /** 桌面图标默认白 × 玄黑（LauncherIcon.BLACK） */
+        const val DEFAULT_LAUNCHER_ICON = "black"
 
         const val MAX_SEARCH_HISTORY = 10
         private const val SEARCH_HISTORY_SEPARATOR = "\n"
