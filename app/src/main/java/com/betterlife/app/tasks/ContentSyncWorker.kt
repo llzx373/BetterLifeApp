@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
@@ -35,6 +36,9 @@ class ContentSyncWorker(
     companion object {
         const val WORK_NAME = "content_sync"
 
+        /** 手动「检查更新」的 unique work 名：与周期队列分开（否则 KEEP 会被周期 work 吞掉） */
+        const val WORK_NAME_ONCE = "content_sync_once"
+
         private val networkConstraint = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
@@ -48,12 +52,13 @@ class ContentSyncWorker(
                 .enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
         }
 
-        /** 设置页「检查更新」：立刻跑一次，与周期队列互不影响 */
+        /** 设置页「检查更新」：立刻跑一次；KEEP 防连点——已有手动同步在跑/排队时不再起并发 */
         fun enqueueOnce(context: Context) {
             val request = OneTimeWorkRequestBuilder<ContentSyncWorker>()
                 .setConstraints(networkConstraint)
                 .build()
-            WorkManager.getInstance(context).enqueue(request)
+            WorkManager.getInstance(context)
+                .enqueueUniqueWork(WORK_NAME_ONCE, ExistingWorkPolicy.KEEP, request)
         }
     }
 }
