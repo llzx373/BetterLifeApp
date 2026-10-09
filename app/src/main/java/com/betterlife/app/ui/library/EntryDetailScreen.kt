@@ -141,9 +141,10 @@ fun EntryDetailScreen(
     // 顶栏放条目标题:此前直接显示 entryId(一串哈希),对人是乱码;
     // 与正文共用同一个缓存数据源,读到之前留空(Hero 区已有大标题兜底)
     val context = LocalContext.current
-    val repo = (context.applicationContext as BetterLifeApp).container.entryRepository
+    // 预览/截图渲染环境下 Application 不是 BetterLifeApp,留空即可
+    val repo = (context.applicationContext as? BetterLifeApp)?.container?.entryRepository
     val entryTitle by produceState<String?>(null, entryId) {
-        value = withContext(Dispatchers.IO) { repo.entriesData().byId[entryId]?.title }
+        value = repo?.let { withContext(Dispatchers.IO) { it.entriesData().byId[entryId]?.title } }
     }
     EntryDetailContent(
         entryId = entryId,
@@ -188,8 +189,12 @@ fun EntryDetailContent(
     topBar: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    val repo = (context.applicationContext as BetterLifeApp).container.entryRepository
+    // 预览/截图渲染环境下 Application 不是 BetterLifeApp,停在 Loading 即可
+    val repo = (context.applicationContext as? BetterLifeApp)?.container?.entryRepository
     val state by produceState<DetailState>(DetailState.Loading, entryId) {
+        if (repo == null) {
+            return@produceState
+        }
         val found = withContext(Dispatchers.IO) {
             val data = repo.entriesData()
             data.byId[entryId]?.let { it to data.articleByFile }

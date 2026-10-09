@@ -578,7 +578,9 @@ internal fun LibraryCatalogContent(
 @Composable
 private fun rememberArticleCount(): Int {
     val context = LocalContext.current
-    val repo = (context.applicationContext as BetterLifeApp).container.entryRepository
+    // 预览/截图渲染环境下 Application 不是 BetterLifeApp,按 0 处理(不显示入口)
+    val app = context.applicationContext as? BetterLifeApp ?: return 0
+    val repo = app.container.entryRepository
     val count by produceState(0) {
         value = withContext(Dispatchers.IO) { repo.entriesData().articles.size }
     }

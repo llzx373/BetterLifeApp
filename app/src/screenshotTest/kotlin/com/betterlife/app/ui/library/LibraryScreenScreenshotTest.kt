@@ -115,6 +115,8 @@ fun LibraryListDetailExpanded() {
             onAddDaily = {},
             onAddWeekly = { _, _ -> },
             onOpenChat = {},
+            onOpenArticle = {},
+            onOpenArticleList = {},
         )
     }
 }
@@ -142,6 +144,8 @@ fun LibraryThreePaneExpanded() {
             onAddDaily = {},
             onAddWeekly = { _, _ -> },
             onOpenChat = {},
+            onOpenArticle = {},
+            onOpenArticleList = {},
         )
     }
 }
@@ -168,6 +172,8 @@ fun LibraryTwoPaneExpanded() {
             onAddOnce = {},
             onAddDaily = {},
             onAddWeekly = { _, _ -> },
+            onOpenArticle = {},
+            onOpenArticleList = {},
         )
     }
 }
@@ -189,6 +195,7 @@ fun LibraryCatalogCompact() {
             onSearchSubmit = {},
             onOpenSection = {},
             onOpenEntry = {},
+            onOpenArticleList = {},
         )
     }
 }

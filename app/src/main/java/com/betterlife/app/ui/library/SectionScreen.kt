@@ -146,10 +146,11 @@ internal fun SectionListContent(
     var addPlanTarget by remember { mutableStateOf<String?>(null) }
     // 本节长文(secs 含本节号)+ 引言里 docs 链接的解析索引,一次读取两者都要用
     val context = LocalContext.current
-    val repo = (context.applicationContext as BetterLifeApp).container.entryRepository
+    // 预览/截图渲染环境下 Application 不是 BetterLifeApp,按无长文处理
+    val repo = (context.applicationContext as? BetterLifeApp)?.container?.entryRepository
     val articlesData by produceState<Pair<List<ArticleDto>, Map<String, ArticleDto>>?>(null, section?.n) {
         val n = section?.n
-        value = if (n == null) {
+        value = if (n == null || repo == null) {
             emptyList<ArticleDto>() to emptyMap()
         } else {
             withContext(Dispatchers.IO) {

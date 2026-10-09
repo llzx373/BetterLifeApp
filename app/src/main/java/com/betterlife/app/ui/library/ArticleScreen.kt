@@ -133,8 +133,12 @@ fun ArticleScreen(
     onOpenArticle: (String) -> Unit,
 ) {
     val context = LocalContext.current
-    val repo = (context.applicationContext as BetterLifeApp).container.entryRepository
+    // 预览/截图渲染环境下 Application 不是 BetterLifeApp,停在 Loading 即可
+    val repo = (context.applicationContext as? BetterLifeApp)?.container?.entryRepository
     val state by produceState<ArticleState>(ArticleState.Loading, articleKey) {
+        if (repo == null) {
+            return@produceState
+        }
         value = withContext(Dispatchers.IO) {
             val data = repo.entriesData()
             val article = data.articleByKey[articleKey]
