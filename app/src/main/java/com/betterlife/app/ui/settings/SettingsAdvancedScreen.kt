@@ -64,7 +64,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.R
 import com.betterlife.app.data.AiProvider
-import com.betterlife.app.ui.theme.IconColor
+import com.betterlife.app.ui.theme.LauncherIcon
 import com.betterlife.app.ui.theme.MotionLevel
 import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.ui.theme.ThemeMode
@@ -180,30 +180,38 @@ fun SettingsAdvancedScreen(
 
             SectionTitle(stringResource(R.string.settings_section_icon_color))
 
-            // 换图标颜色 = 启停 manifest 里一一对应的 activity-alias，桌面图标稍后由 launcher 刷新
-            val currentIconColor = IconColor.fromKey(settings.iconColor)
-            val iconColors = IconColor.entries
-            iconColors.forEachIndexed { index, color ->
+            // 换桌面图标 = 启停 manifest 里一一对应的 activity-alias；这里只落盘，
+            // 由 MainActivity 在退后台时启停（前台切会让 launcher 关掉当前 task，像闪退）
+            val currentLauncherIcon = LauncherIcon.fromKey(settings.launcherIcon)
+            val launcherIcons = LauncherIcon.entries
+            launcherIcons.forEachIndexed { index, icon ->
                 SegmentedListItem(
-                    selected = currentIconColor == color,
-                    onClick = { vm.setIconColor(color) },
-                    shapes = ListItemDefaults.segmentedShapes(index = index, count = iconColors.size),
+                    selected = currentLauncherIcon == icon,
+                    onClick = { vm.setLauncherIcon(icon) },
+                    shapes = ListItemDefaults.segmentedShapes(index = index, count = launcherIcons.size),
                     leadingContent = {
+                        // 双色斜切圆点：左上健康域色，右下财富域色（0.5 硬切模拟图标拼色底）
                         Box(
                             Modifier
                                 .size(20.dp)
                                 .background(
                                     Brush.linearGradient(
-                                        listOf(Color(color.previewLight), Color(color.previewDeep)),
+                                        0.49f to Color(icon.previewHealth),
+                                        0.51f to Color(icon.previewWealth),
                                     ),
                                     CircleShape,
                                 ),
                         )
                     },
                 ) {
-                    Text(iconColorLabel(color))
+                    Text(launcherIconLabel(icon))
                 }
             }
+            Text(
+                text = stringResource(R.string.settings_icon_color_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             SectionTitle(stringResource(R.string.settings_section_motion))
 
@@ -544,12 +552,14 @@ private fun themeModeLabel(mode: ThemeMode): String = stringResource(
 )
 
 @Composable
-private fun iconColorLabel(color: IconColor): String = stringResource(
-    when (color) {
-        IconColor.BLUE_PURPLE -> R.string.theme_brand_blue_purple
-        IconColor.GREEN -> R.string.theme_brand_green
-        IconColor.ORANGE -> R.string.theme_brand_orange
-        IconColor.TEAL -> R.string.theme_brand_teal
+private fun launcherIconLabel(icon: LauncherIcon): String = stringResource(
+    when (icon) {
+        LauncherIcon.WINE_GOLD -> R.string.launcher_icon_wine_gold
+        LauncherIcon.BLUE_GOLD -> R.string.launcher_icon_blue_gold
+        LauncherIcon.GREEN_GOLD -> R.string.launcher_icon_green_gold
+        LauncherIcon.TEAL_GOLD -> R.string.launcher_icon_teal_gold
+        LauncherIcon.SLATE_GOLD -> R.string.launcher_icon_slate_gold
+        LauncherIcon.ROSE_TEAL -> R.string.launcher_icon_rose_teal
     },
 )
 

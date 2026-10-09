@@ -43,7 +43,7 @@
             android:theme="@style/Theme.BetterLife.Splash">
             <!--
               桌面入口（MAIN/LAUNCHER）不在本 Activity 上，而在下方的 activity-alias 上：
-              换图标颜色 = 启停不同 alias（LauncherIconSwitcher），每个 alias 一个图标。
+              换桌面图标 = 启停不同 alias（LauncherIconSwitcher），每个 alias 一个图标变体。
               注意：桌面已有快捷方式认的是组件名，升级后旧图标可能从桌面消失，需用户重新拖出。
             -->
             <!--
@@ -64,9 +64,9 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
-        <!-- 桌面入口别名：蓝紫（默认）。IconColor 枚举与这组 alias 一一对应 -->
+        <!-- 桌面入口别名：酒红 × 金（默认）。LauncherIcon 枚举与这组 alias 一一对应 -->
         <activity-alias
-            android:name=".launcher.BluePurpleAlias"
+            android:name=".launcher.WineGoldAlias"
             android:enabled="true"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
@@ -79,12 +79,12 @@
             </intent-filter>
         </activity-alias>
         <activity-alias
-            android:name=".launcher.GreenAlias"
+            android:name=".launcher.BlueGoldAlias"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_green"
+            android:icon="@mipmap/ic_launcher_blue_gold"
             android:label="@string/app_name"
-            android:roundIcon="@mipmap/ic_launcher_green_round"
+            android:roundIcon="@mipmap/ic_launcher_blue_gold_round"
             android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -92,12 +92,12 @@
             </intent-filter>
         </activity-alias>
         <activity-alias
-            android:name=".launcher.OrangeAlias"
+            android:name=".launcher.GreenGoldAlias"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_orange"
+            android:icon="@mipmap/ic_launcher_green_gold"
             android:label="@string/app_name"
-            android:roundIcon="@mipmap/ic_launcher_orange_round"
+            android:roundIcon="@mipmap/ic_launcher_green_gold_round"
             android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -105,12 +105,38 @@
             </intent-filter>
         </activity-alias>
         <activity-alias
-            android:name=".launcher.TealAlias"
+            android:name=".launcher.TealGoldAlias"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_teal"
+            android:icon="@mipmap/ic_launcher_teal_gold"
             android:label="@string/app_name"
-            android:roundIcon="@mipmap/ic_launcher_teal_round"
+            android:roundIcon="@mipmap/ic_launcher_teal_gold_round"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".launcher.SlateGoldAlias"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_slate_gold"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_slate_gold_round"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".launcher.RoseTealAlias"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_rose_teal"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_rose_teal_round"
             android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

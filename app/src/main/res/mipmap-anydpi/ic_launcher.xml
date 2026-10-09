@@ -2,7 +2,7 @@
 <!-- minSdk 26，自适应图标（API 26 引入）覆盖全部支持设备，无需再提供 PNG 位图。
      monochrome 直接复用前景层（纯白剪影），保证主题图标与普通图标形状一致。 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@drawable/ic_launcher_background" />
+    <background android:drawable="@drawable/ic_launcher_bg_wine_gold" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
     <monochrome android:drawable="@drawable/ic_launcher_foreground" />
 </adaptive-icon>

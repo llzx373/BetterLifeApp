@@ -1,63 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  自适应图标前景层：天平 = 「健康与金钱的平衡」，也是一张安静微笑的脸
-  （横梁=眉，心/硬币=双眼，立柱=鼻，浅弧=嘴）。
-  视口 108x108：满版构图，横梁/硬币边缘有意突破 66dp 安全圆（与微信/QQ 同策略），
-  圆形/圆角矩形蒙版下无裁切，极端方圆形蒙版可能轻微削到横梁两端。
-  心尖是与两腰相切的圆弧（半径 2.2，切点截断），底缘与硬币底缘齐平（y≈66）。
+  自适应图标前景层：百分比 % = 「健康与财富的配比」。
+  斜杠是旧天平梁的化身，骑在拼色底的分界线上；两个点分别是心（健康域）与
+  硬币（财富域）。视口 108x108，元素已收在 66dp 安全圆内（最远处约 31.4）。
   注意：Theme.BetterLife.Splash 的 windowSplashScreenAnimatedIcon 直接引用本 drawable，
-  改形状时启动画面会跟着变。
+  改形状时启动画面会跟着变；monochrome 动态取色图标也引用本 drawable。
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- 横梁（眉）：圆角矩形 [17,30.5]-[91,34]，r=1.7 -->
+    <!-- 斜杠（梁）：(40,70)→(68,38)，与拼色底分界线共线 -->
     <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M18.7,30.5 L89.3,30.5 A1.7,1.7 0 0 1 91,32.2 L91,32.3 A1.7,1.7 0 0 1 89.3,34 L18.7,34 A1.7,1.7 0 0 1 17,32.3 L17,32.2 A1.7,1.7 0 0 1 18.7,30.5 Z" />
-    <!-- 立柱（鼻）：顶在横梁下缘，鼻底 y=57（眉到下巴的三庭 2/3 处） -->
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M54,33.5 L57,57 L51,57 Z" />
-    <!-- 嘴：平中带一点微笑的浅弧（椭圆 13x3 的 15°~165° 段） -->
-    <path
-        android:pathData="M66.56,67.28 A13,3 0 0 1 41.44,67.28"
+        android:pathData="M40,70 L68,38"
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="3.2"
+        android:strokeWidth="3.5"
         android:strokeLineCap="round" />
-    <!-- 左吊绳（心形吊点） -->
+    <!-- 心点（左上）：由原天平心形（宽 28.98）按 0.5414 缩放平移至中心 (40.5,42.5) -->
     <path
-        android:pathData="M30,34 L19.5,42.5 M30,34 L40.5,42.5"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.4" />
-    <!-- 右吊绳（搭在硬币圆环 45° 点上） -->
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M32.65,40.17 A4.6,4.6 0 1 1 41.85,40.17 A4.6,4.6 0 1 1 32.65,40.17 Z" />
     <path
-        android:pathData="M78,34 L68.8,43.8 M78,34 L87.2,43.8"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.4" />
-    <!-- 硬币圆环：中心 (78,53)，r=13 -->
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M39.15,40.17 A4.6,4.6 0 1 1 48.35,40.17 A4.6,4.6 0 1 1 39.15,40.17 Z" />
     <path
-        android:pathData="M65,53 A13,13 0 1 1 91,53 A13,13 0 1 1 65,53 Z"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="3" />
-    <!-- ¥ 符号 -->
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M40.5,36.92 L47,43.42 L41.35,49.07 L39.65,49.07 L34,43.42 Z" />
     <path
-        android:pathData="M74.1,47.15 L78,52.35 L81.9,47.15 M78,52.35 L78,60.15 M74.49,54.95 L81.51,54.95 M74.49,58.2 L81.51,58.2"
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M39.31,48.23 A1.19,1.19 0 1 1 41.69,48.23 A1.19,1.19 0 1 1 39.31,48.23 Z" />
+    <!-- 硬币圆环（右下）：中心 (67.5,65.5)，r=8.5 -->
+    <path
+        android:pathData="M59,65.5 A8.5,8.5 0 1 1 76,65.5 A8.5,8.5 0 1 1 59,65.5 Z"
         android:strokeColor="#FFFFFFFF"
         android:strokeWidth="2.8" />
-    <!-- 心形：双瓣圆（中心 (24,48)/(36,48)，r=8.49）+ 菱形身体 + 相切圆头尖 -->
+    <!-- ¥ 符号（相对原稿按 8.5/13 缩放） -->
     <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M15.51,48 A8.49,8.49 0 1 1 32.49,48 A8.49,8.49 0 1 1 15.51,48 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M27.51,48 A8.49,8.49 0 1 1 44.49,48 A8.49,8.49 0 1 1 27.51,48 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M30,42 L42,54 L31.56,64.44 L28.44,64.44 L18,54 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M27.8,62.89 A2.2,2.2 0 1 1 32.2,62.89 A2.2,2.2 0 1 1 27.8,62.89 Z" />
+        android:pathData="M64.95,61.68 L67.5,65.08 L70.05,61.68 M67.5,65.08 L67.5,70.17 M65.21,66.78 L69.79,66.78 M65.21,68.9 L69.79,68.9"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.83" />
 </vector>

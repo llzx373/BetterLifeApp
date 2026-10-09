@@ -13,6 +13,8 @@ import androidx.lifecycle.lifecycleScope
 import com.betterlife.app.data.AppSettings
 import com.betterlife.app.ui.AppNav
 import com.betterlife.app.ui.theme.BetterLifeTheme
+import com.betterlife.app.ui.theme.LauncherIcon
+import com.betterlife.app.ui.theme.LauncherIconSwitcher
 import com.betterlife.app.ui.theme.MotionLevel
 import com.betterlife.app.ui.theme.ThemeMode
 import com.betterlife.app.ui.theme.areSystemAnimationsDisabled
@@ -27,6 +29,9 @@ class MainActivity : ComponentActivity() {
     /** 通知深链目标（N2c 挽回通知直达待办页等）：AppNav 消费一次后由回调置空 */
     private val navRequest = MutableStateFlow<String?>(null)
 
+    /** 最近一次从 DataStore 读到的桌面图标 key，onStop 时据此切换桌面图标 alias */
+    private var latestLauncherIconKey: String = AppSettings().launcherIcon
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // 必须在 super.onCreate 之前调用：它负责把主题里的 postSplashScreenTheme 应用上。
         // 放到 super 之后会先渲染一帧启动主题的背景，再切到 Compose，出现闪屏。
@@ -37,6 +42,9 @@ class MainActivity : ComponentActivity() {
 
         // 主题模式与动效档位都是持久化设置，在这里订阅，切换即时生效（无需重启 Activity）
         val settingsStore = (application as BetterLifeApp).container.settingsStore
+        lifecycleScope.launch {
+            settingsStore.settingsFlow.collect { latestLauncherIconKey = it.launcherIcon }
+        }
         setContent {
             val settings by settingsStore.settingsFlow
                 .collectAsStateWithLifecycle(initialValue = AppSettings())
@@ -64,6 +72,17 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         navRequest.value = intent.getStringExtra(EXTRA_OPEN_ROUTE)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // 换桌面图标必须等退到后台再做：在前台启停 alias 会停掉当前 task 的启动 alias，
+        // launcher 立刻把这个 task 关掉回桌面，用户看到的就是「切换图标时 App 闪退」。
+        // alias 状态由系统持久化，下次冷启动无需重放；onStop 里顺带兜底校正不一致的状态。
+        LauncherIconSwitcher.applyIfNeeded(
+            applicationContext,
+            LauncherIcon.fromKey(latestLauncherIconKey),
+        )
     }
 
     override fun onResume() {

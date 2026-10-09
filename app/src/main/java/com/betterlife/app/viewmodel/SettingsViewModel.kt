@@ -1,6 +1,5 @@
 package com.betterlife.app.viewmodel
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -17,8 +16,7 @@ import com.betterlife.app.data.backup.BackupManager
 import com.betterlife.app.data.content.ContentSyncRepository
 import com.betterlife.app.data.db.ChatMessageDao
 import com.betterlife.app.tasks.ReminderScheduler
-import com.betterlife.app.ui.theme.IconColor
-import com.betterlife.app.ui.theme.LauncherIconSwitcher
+import com.betterlife.app.ui.theme.LauncherIcon
 import com.betterlife.app.ui.theme.MotionLevel
 import com.betterlife.app.ui.theme.ThemeMode
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +34,6 @@ class SettingsViewModel(
     private val backupManager: BackupManager,
     private val chatMessageDao: ChatMessageDao,
     private val contentSyncRepository: ContentSyncRepository,
-    private val appContext: Context,
 ) : ViewModel() {
 
     /** 某张卡的连接自检结果，交给界面翻成文案 */
@@ -320,11 +317,13 @@ class SettingsViewModel(
         }
     }
 
-    /** 桌面图标换色：先落盘再启停 alias；alias 状态由系统持久化，无需冷启动重放 */
-    fun setIconColor(color: IconColor) {
+    /**
+     * 桌面图标换款：这里只落盘。启停 alias 由 MainActivity 在退后台（onStop）时做——
+     * 前台切会把当前 task 的启动 alias 停掉，launcher 立刻把 task 关掉，用户看到的就是闪退。
+     */
+    fun setLauncherIcon(icon: LauncherIcon) {
         viewModelScope.launch(Dispatchers.IO) {
-            settingsStore.setIconColor(color.key)
-            LauncherIconSwitcher.apply(appContext, color)
+            settingsStore.setLauncherIcon(icon.key)
         }
     }
 
@@ -345,7 +344,6 @@ class SettingsViewModel(
                 SettingsViewModel(
                     c.settingsStore, c.reminderScheduler, c.llmClient, c.webSearcher,
                     c.backupManager, c.chatMessageDao, c.contentSyncRepository,
-                    app.applicationContext,
                 )
             }
         }
