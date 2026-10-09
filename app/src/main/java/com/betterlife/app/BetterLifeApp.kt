@@ -42,10 +42,10 @@ class BetterLifeApp : Application() {
         container = AppContainer(this)
         // 内容库周期同步（每天一次、联网才跑）；KEEP 语义，重复注册不会重置已排队的任务
         ContentSyncWorker.enqueuePeriodic(this)
-        // N4：每周日晚周报（7 天周期，锚定周日 20:07）；KEEP 语义，重复注册不重置锚点
-        WeeklyReportWorker.enqueuePeriodic(this)
-        // N5：每日一条内容推送（24h 周期，锚定 08:07，默认关——开关只在 doWork 里门控）
-        DailyContentWorker.enqueuePeriodic(this)
+        // N4：每周日晚周报（自续链，锚定周日 20:07）；KEEP 语义，已排队的锚点不被重置
+        WeeklyReportWorker.enqueue(this)
+        // N5：每日一条内容推送（自续链，锚定 08:07，默认关——开关只在 doWork 里门控）
+        DailyContentWorker.enqueue(this)
         // 每日 tick（汇总/报喜/挽回共用载体）：任一依赖开关开着就确保 work 在——
         // 报喜/挽回默认开，不依赖「每日提醒」开关；读设置需挂起，放 IO 协程
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
