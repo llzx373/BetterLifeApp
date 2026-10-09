@@ -233,6 +233,13 @@
     <string name="article_loading">正在打开长文</string>
     <string name="article_missing">没找到这篇长文,可能已被移除</string>
     <string name="article_extended_reading">延伸阅读</string>
+    <!-- 长文列表页与条目库目录的「长文」入口(篇数取运行时内容库,不写死) -->
+    <string name="article_list_title">长文</string>
+    <string name="article_list_empty">还没有长文</string>
+    <string name="article_section_label">第 %1$d 节 · %2$s</string>
+    <string name="library_articles_entry">长文</string>
+    <string name="library_articles_overline">深度文章</string>
+    <string name="library_articles_count">%1$d 篇</string>
 
     <!-- 条目详情 -->
     <string name="detail_loading">正在打开条目</string>

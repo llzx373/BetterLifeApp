@@ -67,6 +67,7 @@ import com.betterlife.app.ui.common.OfflineBanner
 import com.betterlife.app.ui.completed.CompletedScreen
 import com.betterlife.app.ui.dismissed.DismissedScreen
 import com.betterlife.app.ui.favorites.FavoritesScreen
+import com.betterlife.app.ui.library.ArticleListScreen
 import com.betterlife.app.ui.library.ArticleScreen
 import com.betterlife.app.ui.library.EntryDetailScreen
 import com.betterlife.app.ui.library.LibraryScreen
@@ -107,6 +108,9 @@ data class EntryRoute(val entryId: String)
 
 @Serializable
 data class ArticleRoute(val key: String)
+
+@Serializable
+data object ArticleListRoute
 
 @Serializable
 data object MineRoute
@@ -346,6 +350,7 @@ private fun AppScaffold(
                     onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
                     onOpenChat = { id -> navController.navigate(ChatRoute(id)) },
                     onOpenArticle = { key -> navController.navigate(ArticleRoute(key)) },
+                    onOpenArticleList = { navController.navigate(ArticleListRoute) },
                 )
             }
             composable<SectionRoute> { entry ->
@@ -370,6 +375,12 @@ private fun AppScaffold(
                     onBack = { navController.popBackStack() },
                     onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
                     // 长文互链(正文里的 docs 链接)压栈即可,返回回到上一篇
+                    onOpenArticle = { key -> navController.navigate(ArticleRoute(key)) },
+                )
+            }
+            composable<ArticleListRoute> {
+                ArticleListScreen(
+                    onBack = { navController.popBackStack() },
                     onOpenArticle = { key -> navController.navigate(ArticleRoute(key)) },
                 )
             }

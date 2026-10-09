@@ -38,6 +38,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -62,6 +63,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -69,6 +71,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
@@ -77,6 +80,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.R
 import com.betterlife.app.ai.RetrievedEntry
 import com.betterlife.app.data.SectionDto
@@ -95,7 +99,9 @@ import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.ui.theme.lensIcon
 import com.betterlife.app.viewmodel.EntrySort
 import com.betterlife.app.viewmodel.LibraryViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val ShareBarWidth = 40.dp
 private val ShareBarHeight = 4.dp
@@ -116,6 +122,7 @@ fun LibraryScreen(
     onOpenEntry: (String) -> Unit,
     onOpenChat: (String) -> Unit,
     onOpenArticle: (String) -> Unit,
+    onOpenArticleList: () -> Unit,
     vm: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -150,6 +157,7 @@ fun LibraryScreen(
                 onAddWeekly = vm::addWeekly,
                 onOpenChat = onOpenChat,
                 onOpenArticle = onOpenArticle,
+                onOpenArticleList = onOpenArticleList,
             )
         }
         width >= LIST_DETAIL_MIN_WIDTH -> Box(Modifier.statusBarsPadding()) {
@@ -166,6 +174,7 @@ fun LibraryScreen(
                 onAddWeekly = vm::addWeekly,
                 onOpenChat = onOpenChat,
                 onOpenArticle = onOpenArticle,
+                onOpenArticleList = onOpenArticleList,
             )
         }
         width >= TWO_PANE_MIN_WIDTH -> Box(Modifier.statusBarsPadding()) {
@@ -181,6 +190,7 @@ fun LibraryScreen(
                 onAddDaily = vm::addDaily,
                 onAddWeekly = vm::addWeekly,
                 onOpenArticle = onOpenArticle,
+                onOpenArticleList = onOpenArticleList,
             )
         }
         else -> Scaffold { padding ->
@@ -190,6 +200,7 @@ fun LibraryScreen(
                 onSearchSubmit = vm::submitSearch,
                 onOpenSection = onOpenSection,
                 onOpenEntry = onOpenEntry,
+                onOpenArticleList = onOpenArticleList,
                 modifier = Modifier.fillMaxSize().padding(padding),
             )
         }
@@ -216,6 +227,7 @@ internal fun LibraryTwoPane(
     onAddDaily: (String) -> Unit,
     onAddWeekly: (String, Int) -> Unit,
     onOpenArticle: (String) -> Unit,
+    onOpenArticleList: () -> Unit,
 ) {
     // 600–839 落在 medium 宽度档,默认指令只给一栏 —— 目录(搜索/章节)会被详情栏顶掉,
     // 用户就没法选章。显式用 medium 也出两栏的指令,保持「两栏都常驻」的设计。
@@ -242,6 +254,7 @@ internal fun LibraryTwoPane(
                     onSearchSubmit = onSearchSubmit,
                     onOpenSection = onSelectSection,
                     onOpenEntry = onOpenEntry,
+                    onOpenArticleList = onOpenArticleList,
                 )
             }
         },
@@ -289,10 +302,12 @@ internal fun LibraryListDetail(
     onAddWeekly: (String, Int) -> Unit,
     onOpenChat: (String) -> Unit,
     onOpenArticle: (String) -> Unit,
+    onOpenArticleList: () -> Unit,
 ) {
     val navigator = rememberListDetailPaneScaffoldNavigator<String>()
     val scope = rememberCoroutineScope()
     val section = state.sections.firstOrNull { it.n == state.selectedSection }
+    val articleCount = rememberArticleCount()
 
     // 目录不在这个档位里,没选过章左栏就是空态 —— 默认选中第 1 章
     LaunchedEffect(state.sections, state.selectedSection) {
@@ -348,6 +363,8 @@ internal fun LibraryListDetail(
                         sections = state.sections,
                         selected = section,
                         onSelectSection = onSelectSection,
+                        articleCount = articleCount,
+                        onOpenArticleList = onOpenArticleList,
                     )
                     Spacer(Modifier.height(Spacing.space2))
                     SearchField(
@@ -401,6 +418,7 @@ internal fun LibraryThreePane(
     onAddWeekly: (String, Int) -> Unit,
     onOpenChat: (String) -> Unit,
     onOpenArticle: (String) -> Unit,
+    onOpenArticleList: () -> Unit,
 ) {
     val outerNavigator = rememberListDetailPaneScaffoldNavigator<Int>()
     val innerNavigator = rememberListDetailPaneScaffoldNavigator<String>()
@@ -436,6 +454,7 @@ internal fun LibraryThreePane(
                     onSearchSubmit = onSearchSubmit,
                     onOpenSection = onSelectSection,
                     onOpenEntry = onSelectEntry,
+                    onOpenArticleList = onOpenArticleList,
                 )
             }
         },
@@ -496,11 +515,13 @@ internal fun LibraryCatalogContent(
     onSearchSubmit: () -> Unit,
     onOpenSection: (Int) -> Unit,
     onOpenEntry: (String) -> Unit,
+    onOpenArticleList: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val totalEntries = remember(state.sections) {
         state.sections.sumOf { it.entries }.coerceAtLeast(1)
     }
+    val articleCount = rememberArticleCount()
 
     Column(modifier = modifier.fillMaxSize()) {
         Spacer(Modifier.height(Spacing.space3))
@@ -526,7 +547,9 @@ internal fun LibraryCatalogContent(
                     sectionLens = state.sectionLens,
                     sectionStats = state.sectionStats,
                     totalEntries = totalEntries,
+                    articleCount = articleCount,
                     onOpenSection = onOpenSection,
+                    onOpenArticleList = onOpenArticleList,
                 )
             }
         }
@@ -549,6 +572,17 @@ internal fun LibraryCatalogContent(
         )
         Spacer(Modifier.height(Spacing.space3))
     }
+}
+
+/** 长文篇数(目录「长文」入口与章节选择器共用);0 = 不显示入口 */
+@Composable
+private fun rememberArticleCount(): Int {
+    val context = LocalContext.current
+    val repo = (context.applicationContext as BetterLifeApp).container.entryRepository
+    val count by produceState(0) {
+        value = withContext(Dispatchers.IO) { repo.entriesData().articles.size }
+    }
+    return count
 }
 
 @Composable
@@ -608,12 +642,15 @@ private fun SearchField(
     )
 }
 
-/** 章节选择器:840–1199dp 档里目录的替代形态(置底,贴近拇指区) —— 当前章标题按钮 + 全章节下拉(带每章条数) */
+/** 章节选择器:840–1199dp 档里目录的替代形态(置底,贴近拇指区) —— 当前章标题按钮 + 全章节下拉(带每章条数);
+ * 下拉末尾带「长文」项(articleCount > 0 时),否则这一档够不到长文列表页 */
 @Composable
 private fun SectionPicker(
     sections: List<SectionDto>,
     selected: SectionDto?,
     onSelectSection: (Int) -> Unit,
+    articleCount: Int,
+    onOpenArticleList: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -665,6 +702,22 @@ private fun SectionPicker(
                     onClick = {
                         expanded = false
                         onSelectSection(section.n)
+                    },
+                )
+            }
+            if (articleCount > 0) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.library_articles_entry)) },
+                    trailingIcon = {
+                        Text(
+                            stringResource(R.string.library_articles_count, articleCount),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onOpenArticleList()
                     },
                 )
             }
@@ -761,14 +814,17 @@ private fun SearchResults(
     }
 }
 
-/** 章目录:左边是这章的主导口径(图标 + 口径色),右边是它在全书里的分量 + 状态统计 */
+/** 章目录:左边是这章的主导口径(图标 + 口径色),右边是它在全书里的分量 + 状态统计;
+ * 全部章节之后跟一行「长文」入口(articleCount > 0 才显示),直达长文列表页 */
 @Composable
 private fun Catalog(
     sections: List<SectionDto>,
     sectionLens: Map<Int, String>,
     sectionStats: Map<Int, EntryStats>,
     totalEntries: Int,
+    articleCount: Int,
     onOpenSection: (Int) -> Unit,
+    onOpenArticleList: () -> Unit,
 ) {
     LazyColumn(contentPadding = PaddingValues(bottom = Spacing.space4)) {
         items(sections, key = { it.n }) { section ->
@@ -802,6 +858,37 @@ private fun Catalog(
                 modifier = Modifier.clickable { onOpenSection(section.n) },
             ) {
                 Text(section.title)
+            }
+        }
+        // 长文入口:篇数来自运行时内容库,空库(老库未补播等)不显示
+        if (articleCount > 0) {
+            item(key = "articles-entry") {
+                SafeListItem(
+                    leadingContent = {
+                        Icon(
+                            Icons.AutoMirrored.Filled.MenuBook,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(Spacing.space6),
+                        )
+                    },
+                    overlineContent = {
+                        Text(
+                            stringResource(R.string.library_articles_overline),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    },
+                    trailingContent = {
+                        Text(
+                            text = stringResource(R.string.library_articles_count, articleCount),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                    modifier = Modifier.clickable { onOpenArticleList() },
+                ) {
+                    Text(stringResource(R.string.library_articles_entry))
+                }
             }
         }
     }

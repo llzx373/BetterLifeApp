@@ -81,6 +81,8 @@ internal fun ArticleEntryCard(
     title: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 可选副标题(如所属节名),小字弱化显示在标题下 */
+    subtitle: String? = null,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -93,11 +95,16 @@ internal fun ArticleEntryCard(
                 .clickable(onClick = onClick)
                 .padding(Spacing.space3),
         ) {
-            Text(
-                title,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
-            )
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.bodyMedium)
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,

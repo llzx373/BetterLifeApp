@@ -1,9 +1,11 @@
 package com.betterlife.app.data.content
 
+import com.betterlife.app.data.ArticleDto
 import com.betterlife.app.data.EntriesFile
 import com.betterlife.app.data.EntriesData
 import com.betterlife.app.data.EntryDto
 import com.betterlife.app.data.RulesFile
+import com.betterlife.app.data.sortArticlesForList
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -156,5 +158,24 @@ class MarkdownLiteTest {
         assertEquals("k-1-26", data.entryBySecN["1-26"]?.key)
         assertEquals("k-2-39", data.entryBySecN["2-39"]?.key)
         assertNull("下架条目不收进跳转索引", data.entryBySecN["16-9"])
+    }
+
+    // ---------- 长文列表页排序 ----------
+
+    private fun article(key: String, secs: List<Int>) =
+        ArticleDto(key = key, file = "$key.md", title = key, secs = secs)
+
+    @Test
+    fun `sortArticlesForList 按首节号升序,无节号排最后,同节保持稳定`() {
+        val sorted = sortArticlesForList(
+            listOf(
+                article("s26", listOf(26)),
+                article("s8b", listOf(8, 13)),
+                article("s1", listOf(1)),
+                article("none", emptyList()),
+                article("s8a", listOf(8)),
+            ),
+        )
+        assertEquals(listOf("s1", "s8b", "s8a", "s26", "none"), sorted.map { it.key })
     }
 }

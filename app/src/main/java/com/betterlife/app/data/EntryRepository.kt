@@ -95,6 +95,10 @@ private fun ContentEntryEntity.toDto() = EntryDto(
     cs = cs, ratio = ratio, dispute = dispute, todo = todo, hay = hay,
 )
 
+/** 长文列表页的展示顺序:按 secs 首节号升序(无节号的排最后),稳定排序保持同节内的 assets 顺序 */
+internal fun sortArticlesForList(articles: List<ArticleDto>): List<ArticleDto> =
+    articles.sortedBy { it.secs.firstOrNull() ?: Int.MAX_VALUE }
+
 /** Room 行 → 运行模型：secs 从逗号分隔字符串还原成节号列表 */
 private fun ContentArticleEntity.toDto() = ArticleDto(
     key = key, file = file, title = title,
