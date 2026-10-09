@@ -3,6 +3,8 @@ package com.betterlife.app.data.content
 import android.content.Context
 import android.util.Log
 import androidx.room.withTransaction
+import com.betterlife.app.data.ArticleDto
+import com.betterlife.app.data.ArticlesFile
 import com.betterlife.app.data.EntriesFile
 import com.betterlife.app.data.EntryRepository
 import com.betterlife.app.data.SectionDto
@@ -29,6 +31,10 @@ data class ContentManifest(
     val removed: List<String> = emptyList(),
     /** 旧key→新key 别名表,随包在线分发(老 APK 也能收到新别名);与 assets 内置表合并应用 */
     val aliases: Map<String, String> = emptyMap(),
+    /** 长文清单(key→hash),应用后对照校验,与 entries 同策略;旧包没有此字段 */
+    val articles: List<EntryHash> = emptyList(),
+    /** 长文全量包 articles.json.gz;为空 = 本包不含长文更新,本地已有长文保留不动 */
+    val articlesUrl: String? = null,
     val fullUrl: String = "",
     val patchUrl: String? = null,
     val patchBase: String? = null,
@@ -37,7 +43,8 @@ data class ContentManifest(
     data class EntryHash(val key: String = "", val hash: String = "")
 }
 
-/** 增量包：sections 是全量节表（新条目可能属于新节），updated 只含新增/变更条目 */
+/** 增量包：sections 是全量节表（新条目可能属于新节），updated 只含新增/变更条目;
+ * articles 在包内是全量长文列表(长文只有 9 篇级别,不做增量),空列表 = 本包不动长文 */
 @Serializable
 private data class ContentPatch(
     val base: String = "",
@@ -45,6 +52,7 @@ private data class ContentPatch(
     val sections: List<SectionDto> = emptyList(),
     val updated: List<EntryDto> = emptyList(),
     val removedKeys: List<String> = emptyList(),
+    val articles: List<ArticleDto> = emptyList(),
 )
 
 /** assets/key_aliases.json：上游改标题导致 key 变化时登记 旧key→新key */
@@ -81,6 +89,16 @@ internal fun contentMismatch(active: Map<String, String>, manifest: ContentManif
     }
 }
 
+/** 长文的 key→hash 全量比对,与 [contentMismatch] 同策略(缺失/多出/hash 不同一次全覆盖) */
+internal fun articlesMismatch(active: Map<String, String>, manifest: ContentManifest): String? {
+    val expected = manifest.articles.associate { it.key to it.hash }
+    return if (active == expected) {
+        null
+    } else {
+        "长文校验失败：本地 ${active.size} 篇 / 清单 ${expected.size} 篇"
+    }
+}
+
 /**
  * 运行时内容同步：从 GitHub Releases（滚动 tag content-latest）拉 manifest，
  * 版本相同即 UpToDate；本地版本等于 patchBase 走增量包，否则下全量 gzip 包。
@@ -90,6 +108,10 @@ internal fun contentMismatch(active: Map<String, String>, manifest: ContentManif
  * 做 key→hash 全量校验（600 条级别很便宜）：增量校验不过回滚后自动改走全量，
  * 全量校验不过则整轮放弃（返回 Failed，WorkManager 指数退避重试）。
  * 下架条目里有用户数据的，先在事务内按标题相似度保守重挂（见 reattachUserData）。
+ * 长文随包同步：全量路下载 manifest.articlesUrl 指向的 articles.json.gz、增量路用
+ * patch.articles 全量列表,都是整份替换(长文无下架保留语义);清单带 articlesUrl 时
+ * 按 manifest.articles 做 key→hash 校验,与条目校验同事务同回滚;旧包无该字段则跳过,
+ * 本地已有长文不清空。
  * 任何网络/解析失败都不写库，返回 [SyncResult.Failed]。
  */
 class ContentSyncRepository(
@@ -174,6 +196,8 @@ class ContentSyncRepository(
                 dao.markRemoved(patch.removedKeys)
                 reattachUserData(patch.removedKeys)
             }
+            // patch.articles 是全量长文列表:整份替换(空 = 本包不动长文)
+            if (patch.articles.isNotEmpty()) replaceArticles(patch.articles)
             dao.upsertMeta(
                 ContentMetaEntity(
                     contentVersion = patch.version,
@@ -187,6 +211,9 @@ class ContentSyncRepository(
 
     private suspend fun applyFull(manifest: ContentManifest, now: Long, aliases: Map<String, String>) {
         val file = fetchGzipJson(manifest.fullUrl, EntriesFile.serializer())
+        // 清单带 articlesUrl 才下载长文包;旧包没有该字段时跳过,本地已有长文保留不清空
+        val articles = manifest.articlesUrl
+            ?.let { fetchGzipJson(it, ArticlesFile.serializer()).articles }
         database.withTransaction {
             applyAliases(aliases)
             val dao = database.contentDao()
@@ -199,6 +226,7 @@ class ContentSyncRepository(
                 dao.markRemoved(stale)
                 reattachUserData(stale)
             }
+            if (articles != null) replaceArticles(articles)
             dao.upsertMeta(
                 ContentMetaEntity(
                     contentVersion = manifest.contentVersion,
@@ -207,6 +235,20 @@ class ContentSyncRepository(
                 )
             )
             verifyAgainst(manifest)
+        }
+    }
+
+    /**
+     * 长文整份替换(须在 applyPatch/applyFull 的事务内调用):upsert 新快照 +
+     * 删掉不在快照里的行。与条目不同,长文没有「下架保留」语义——它不被用户数据引用。
+     */
+    private suspend fun replaceArticles(articles: List<ArticleDto>) {
+        val dao = database.contentDao()
+        if (articles.isEmpty()) {
+            dao.clearArticles()
+        } else {
+            dao.upsertArticles(articles.map { it.toContentEntity() })
+            dao.deleteArticlesNotIn(articles.map { it.key })
         }
     }
 
@@ -223,12 +265,18 @@ class ContentSyncRepository(
         }
     }
 
-    /** 在架条目（removed=false）的 key→hash 必须与清单完全一致，否则抛 [VerificationException] 回滚 */
+    /** 在架条目（removed=false）的 key→hash 必须与清单完全一致，否则抛 [VerificationException] 回滚;
+     * 清单带 articlesUrl 时长文同样校验(旧包无此字段则跳过长文校验) */
     private suspend fun verifyAgainst(manifest: ContentManifest) {
-        val active = database.contentDao().allEntries()
+        val dao = database.contentDao()
+        val active = dao.allEntries()
             .filter { !it.removed }
             .associate { it.key to it.hash }
         contentMismatch(active, manifest)?.let { throw VerificationException(it) }
+        if (manifest.articlesUrl != null) {
+            val activeArticles = dao.allArticles().associate { it.key to it.hash }
+            articlesMismatch(activeArticles, manifest)?.let { throw VerificationException(it) }
+        }
     }
 
     /**

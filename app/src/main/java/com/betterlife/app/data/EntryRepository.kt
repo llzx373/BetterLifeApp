@@ -2,16 +2,18 @@ package com.betterlife.app.data
 
 import android.content.Context
 import com.betterlife.app.data.content.ContentBootstrap
+import com.betterlife.app.data.db.ContentArticleEntity
 import com.betterlife.app.data.db.ContentDao
 import com.betterlife.app.data.db.ContentEntryEntity
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 
-/** 条目 + 规则文件的内存视图，带索引 */
+/** 条目 + 长文 + 规则文件的内存视图，带索引 */
 class EntriesData(
     val entriesFile: EntriesFile,
     val rulesFile: RulesFile,
+    articles: List<ArticleDto> = emptyList(),
 ) {
     val entries: List<EntryDto> = entriesFile.entries
     val sections: List<SectionDto> = entriesFile.sections
@@ -22,6 +24,19 @@ class EntriesData(
     /** 浏览索引不含下架条目：用户不应在浏览/搜索里看到它们（详情页走 byId 不受影响） */
     val bySection: Map<Int, List<EntryDto>> = entries.filter { !it.removed }.groupBy { it.sec }
     val bySectionKey: Map<String, List<EntryDto>> = entries.filter { !it.removed }.groupBy { it.secKey }
+
+    /** 长文（深度文章） */
+    val articles: List<ArticleDto> = articles
+    val articleByKey: Map<String, ArticleDto> = articles.associateBy { it.key }
+
+    /** 备注/引言里的 `[label](../docs/<file>.md)` 链接靠文件名对上长文 */
+    val articleByFile: Map<String, ArticleDto> = articles.associateBy { it.file }
+
+    /** "sec-n"（如 "1-26"）→ 在架条目:长文正文「第 X 节第 Y 条」交叉引用的跳转索引;
+     * 下架条目不收——跳过去只剩快照,对读者是死路 */
+    val entryBySecN: Map<String, EntryDto> =
+        entries.filter { !it.removed }.associateBy { "${it.sec}-${it.n}" }
+
     val seedEntryIds: List<String> = rulesFile.seedEntryIds
     val rules: RulesFile = rulesFile
 }
@@ -63,10 +78,11 @@ class EntryRepository(
             SectionDto(n = it.n, title = it.title, intro = it.intro, entries = it.entryCount, key = it.key)
         }
         val entries = contentDao.allEntries().map { it.toDto() }
+        val articles = contentDao.allArticles().map { it.toDto() }
         val rules = context.assets.open("relevance_rules.json").bufferedReader().use {
             json.decodeFromString(RulesFile.serializer(), it.readText())
         }
-        return EntriesData(EntriesFile(sections = sections, entries = entries), rules)
+        return EntriesData(EntriesFile(sections = sections, entries = entries), rules, articles)
     }
 }
 
@@ -77,4 +93,11 @@ private fun ContentEntryEntity.toDto() = EntryDto(
     cost = cost, human = human, gain = gain, grade = grade, src = src, note = note,
     money = money, time = time, will = will, level = level, lens = lens,
     cs = cs, ratio = ratio, dispute = dispute, todo = todo, hay = hay,
+)
+
+/** Room 行 → 运行模型：secs 从逗号分隔字符串还原成节号列表 */
+private fun ContentArticleEntity.toDto() = ArticleDto(
+    key = key, file = file, title = title,
+    secs = secs.split(',').mapNotNull { it.trim().toIntOrNull() },
+    hash = hash, body = body,
 )

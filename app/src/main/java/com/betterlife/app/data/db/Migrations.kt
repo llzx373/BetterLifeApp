@@ -69,3 +69,19 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
         )
     }
 }
+
+/**
+ * v7 → v8：新增 content_articles（上游长文，见 ContentEntities.kt）。
+ * 纯建表，不动存量表；内容本身由 ContentBootstrap 在首启时从 assets/articles.json 补播
+ * （老库 meta 已存在、不会重播条目，所以长文单独按「表为空」补播）。
+ */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS content_articles" +
+                " (`key` TEXT NOT NULL, file TEXT NOT NULL, title TEXT NOT NULL," +
+                " secs TEXT NOT NULL DEFAULT '', hash TEXT NOT NULL DEFAULT ''," +
+                " body TEXT NOT NULL DEFAULT '', PRIMARY KEY(`key`))"
+        )
+    }
+}

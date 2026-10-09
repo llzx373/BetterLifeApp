@@ -57,6 +57,20 @@ data class ContentEntryEntity(
     val updatedAt: Long,
 )
 
+/**
+ * 一篇长文(上游 docs/ 深度文章)。secs 存逗号分隔的节号(如 "8,13"),
+ * 一篇可挂多节;不为这个一对多关系再开关联表。
+ */
+@Entity(tableName = "content_articles")
+data class ContentArticleEntity(
+    @PrimaryKey val key: String,
+    val file: String,
+    val title: String,
+    val secs: String = "",
+    val hash: String = "",
+    val body: String = "",
+)
+
 /** 内容库版本信息，单行（id 固定为 1）；meta 为空 = 尚未播种，ContentBootstrap 据此判断 */
 @Entity(tableName = "content_meta")
 data class ContentMetaEntity(

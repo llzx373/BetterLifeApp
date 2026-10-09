@@ -87,7 +87,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.R
+import com.betterlife.app.data.ArticleDto
 import com.betterlife.app.data.EntryDto
+import com.betterlife.app.data.content.findDocsLinks
+import com.betterlife.app.data.content.stripRanges
 import com.betterlife.app.ui.common.AddPlanDialog
 import com.betterlife.app.ui.common.AssetImageBanner
 import com.betterlife.app.ui.common.CostMeter
@@ -119,7 +122,11 @@ private val TOOLBAR_CLEARANCE = 96.dp
 private sealed interface DetailState {
     data object Loading : DetailState
     data object Missing : DetailState
-    data class Found(val entry: EntryDto) : DetailState
+    data class Found(
+        val entry: EntryDto,
+        /** 长文按上游文件名索引:备注里的 docs 链接靠它对上「延伸阅读」卡片 */
+        val articleByFile: Map<String, ArticleDto>,
+    ) : DetailState
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -128,6 +135,7 @@ fun EntryDetailScreen(
     entryId: String,
     onBack: () -> Unit,
     onExplain: (String) -> Unit,
+    onOpenArticle: (String) -> Unit,
     vm: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
 ) {
     // 顶栏放条目标题:此前直接显示 entryId(一串哈希),对人是乱码;
@@ -141,6 +149,7 @@ fun EntryDetailScreen(
         entryId = entryId,
         onExplain = onExplain,
         onDismissed = onBack,
+        onOpenArticle = onOpenArticle,
         vm = vm,
         modifier = Modifier.predictiveBackTransition(onBack),
         topBar = {
@@ -172,6 +181,8 @@ fun EntryDetailContent(
     onExplain: (String) -> Unit,
     /** 用户在工具栏点了「不再推荐」且屏蔽的正是当前展示的条目 */
     onDismissed: () -> Unit,
+    /** 备注里解析出的长文入口(「延伸阅读」卡片)点击 */
+    onOpenArticle: (String) -> Unit,
     vm: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
     modifier: Modifier = Modifier,
     topBar: (@Composable () -> Unit)? = null,
@@ -179,8 +190,15 @@ fun EntryDetailContent(
     val context = LocalContext.current
     val repo = (context.applicationContext as BetterLifeApp).container.entryRepository
     val state by produceState<DetailState>(DetailState.Loading, entryId) {
-        val found = withContext(Dispatchers.IO) { repo.entriesData().byId[entryId] }
-        value = if (found == null) DetailState.Missing else DetailState.Found(found)
+        val found = withContext(Dispatchers.IO) {
+            val data = repo.entriesData()
+            data.byId[entryId]?.let { it to data.articleByFile }
+        }
+        value = if (found == null) {
+            DetailState.Missing
+        } else {
+            DetailState.Found(found.first, found.second)
+        }
     }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -319,11 +337,36 @@ fun EntryDetailContent(
 
                     if (e.note.isNotBlank()) {
                         item {
+                            // 备注里的长文链接([label](../docs/<file>.md))能解析到长文时,
+                            // 原文链接文本剥掉、换成下方「延伸阅读」卡片;解析不到则保留原文
+                            val docsLinks = remember(e.note) { findDocsLinks(e.note) }
+                            val resolved = docsLinks.mapNotNull { link ->
+                                current.articleByFile[link.file]?.let { link to it }
+                            }
+                            val displayNote = remember(e.note, resolved) {
+                                if (resolved.isEmpty()) e.note
+                                else stripRanges(e.note, resolved.map { it.first.range })
+                            }
                             CollapsibleSection(
                                 title = stringResource(R.string.detail_section_note),
                                 initiallyExpanded = false,
                             ) {
-                                Text(e.note, style = MaterialTheme.typography.bodyMedium)
+                                if (displayNote.isNotBlank()) {
+                                    Text(displayNote, style = MaterialTheme.typography.bodyMedium)
+                                }
+                                if (resolved.isNotEmpty()) {
+                                    Text(
+                                        text = stringResource(R.string.article_extended_reading),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                    resolved.forEach { (_, article) ->
+                                        ArticleEntryCard(
+                                            title = article.title,
+                                            onClick = { onOpenArticle(article.key) },
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

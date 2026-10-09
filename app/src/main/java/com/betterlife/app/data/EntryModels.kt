@@ -57,6 +57,28 @@ data class EntryDto(
     val hay: String = "",    // 小写拼接的检索字段
 )
 
+/** 对应 assets/articles.json 的顶层结构(长文,随内容包一同发布) */
+@Serializable
+data class ArticlesFile(
+    val contentVersion: String = "",
+    val articles: List<ArticleDto> = emptyList(),
+)
+
+/** 一篇长文(上游 docs/ 下的深度文章);body 是 markdown 原文,不含 H1 */
+@Serializable
+data class ArticleDto(
+    /** 文件名派生的稳定 key,与条目 key 同一套生成规则 */
+    val key: String,
+    /** 上游 docs/ 下的文件名(如 "家庭应急装备清单.md");备注/引言里的 docs 链接靠它对上 */
+    val file: String,
+    val title: String,
+    /** 与本文相关的节号(一篇可挂多节) */
+    val secs: List<Int> = emptyList(),
+    /** 内容哈希,同步校验用(与条目同策略) */
+    val hash: String = "",
+    val body: String = "",
+)
+
 /** 对应 assets/relevance_rules.json */
 @Serializable
 data class RulesFile(

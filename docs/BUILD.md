@@ -85,7 +85,7 @@ keytool -genkeypair -v -keystore release.jks -keyalg RSA -keysize 2048 -validity
 
 ```bash
 git submodule update --init                  # 首次 clone 后拉上游内容
-python tools/build_content.py                # book/*.md → app/src/main/assets/entries.json
+python tools/build_content.py                # book/*.md → entries.json;docs/*.md 长文 → articles.json(同一次运行)
 python tools/gen_rules.py                    # 重新生成 tools/relevance_rules.json,需手动拷到 app/src/main/assets/
 python tools/build_content_pack.py           # 打内容发布包(manifest + 全量 gz + 增量 patch)
 python tools/fetch_section_images.py         # 章节配图下载 + 生成 images/manifest.json(已有图不重复下载)
@@ -97,6 +97,10 @@ python tools/check_image_relevance.py        # 配图相关性校验:哪些条�
   证据等级(A/B/C)。条目主键是标题派生的稳定 key(上游插入条目导致条号顺延时不受影响);
   标题轻微改动(增减几个字)由 `--prev-entries` 相似度继承兜住,机制见 [DESIGN.md](DESIGN.md) §3。
 - `relevance_rules.json`:55 条档案 → 条目的加权/排除规则 + 17 条每日习惯种子池(首次播种示例用)。
+- `articles.json`:9 篇 docs/ 长文(「引用对照.md」与核实记录/ 子目录不收),含 title、正文原文、
+  内容 hash 与 secs(关联章节:取 book/ 正文 docs/ 链接与 README 节目录行两处引用的并集,
+  secs 为空会打警告)。与 entries.json 同一次运行生成、同一个 contentVersion;
+  docs 目录缺失时打警告并跳过,不影响 entries。
 
 ### 配图规则(新增/改内容后必做)
 
@@ -129,7 +133,7 @@ key 继承稳定(见 [DESIGN.md](DESIGN.md) §3):标题增减几个字不会丢�
 git submodule update --remote upstream/HowToLiveBetter
 NEW=$(git -C upstream/HowToLiveBetter rev-parse --short HEAD)
 
-# 2. 留底上一版 entries.json 做 key 继承,再重建
+# 2. 留底上一版 entries.json 做 key 继承,再重建(entries 与 articles 同一次产出)
 cp app/src/main/assets/entries.json /tmp/prev_entries.json
 python tools/build_content.py --version "$NEW" --prev-entries /tmp/prev_entries.json
 ```
@@ -147,20 +151,25 @@ python tools/fetch_section_images.py         # 有新增/换图章节时重写 m
 python tools/fetch_entry_images.py           # 拉取 entry_image_selections.json 新登记的条目图
 
 # 4. 打增量包(以上一次发布的 manifest 为基线;--prev-manifest 也接受本地路径)
-#    key_aliases.json 的别名表会自动嵌入 manifest.json 随包分发
+#    key_aliases.json 的别名表会自动嵌入 manifest.json 随包分发;
+#    articles.json 存在时一并打出 articles.json.gz(长文永远全量替换,不做 diff;
+#    缺失时打警告并不加相关字段,老版本 APK 忽略 manifest 未知字段,向后兼容)
 python tools/build_content_pack.py \
   --prev-manifest "https://github.com/<owner>/<repo>/releases/download/content-latest/manifest.json" \
   --base-url    "https://github.com/<owner>/<repo>/releases/download/content-latest"
 
-# 5. 人工核对 build/content/patch.json(updated/removedKeys 是否符合预期),然后发布
+# 5. 人工核对 build/content/patch.json(updated/removedKeys/articles 是否符合预期),然后发布
 gh release upload content-latest \
-  build/content/manifest.json build/content/patch.json build/content/entries.json.gz --clobber
+  build/content/manifest.json build/content/patch.json build/content/entries.json.gz \
+  build/content/articles.json.gz --clobber
 # 首次发布先建 Release:
 # gh release create content-latest build/content/manifest.json build/content/entries.json.gz \
+#   build/content/articles.json.gz \
 #   --title "内容包(content-latest)" --notes "App 端内容同步的滚动 Release"
 
 # 6. 提交 submodule 指针与重建产物,保证 APK 构建可复现同一版内容
-git add upstream/HowToLiveBetter app/src/main/assets/entries.json app/src/main/assets/key_aliases.json \
-  app/src/main/assets/images tools/entry_image_selections.json tools/fetch_section_images.py
+git add upstream/HowToLiveBetter app/src/main/assets/entries.json app/src/main/assets/articles.json \
+  app/src/main/assets/key_aliases.json app/src/main/assets/images \
+  tools/entry_image_selections.json tools/fetch_section_images.py
 git commit -m "内容更新: 上游 $NEW"
 ```

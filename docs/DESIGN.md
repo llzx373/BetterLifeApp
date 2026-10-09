@@ -20,11 +20,13 @@
 ```
 data/        内容与持久层
   EntryModels.kt        entries.json / relevance_rules.json 的 DTO
-  EntryRepository.kt    Room 内容表 → 内存索引(byId/bySection/sections/seedEntryIds);invalidate() 供同步后失效
-  content/              ContentBootstrap(首装播种 + SS-NN→key 迁移)、ContentSyncRepository(增量/全量同步)
-  db/                   Room v7(11 表):profile、tasks、entry_states、weekly_habits、
+  EntryRepository.kt    Room 内容表 → 内存索引(byId/bySection/sections/seedEntryIds;
+                        长文 articles/articleByKey/articleByFile + 交叉引用索引 entryBySecN("sec-n"→在架条目));invalidate() 供同步后失效
+  content/              ContentBootstrap(首装播种 + SS-NN→key 迁移)、ContentSyncRepository(增量/全量同步,含长文)、
+                        MarkdownLite(长文 markdown-lite 解析与 docs 链接/交叉引用提取,纯 Kotlin 可单测)
+  db/                   Room v8(12 表):profile、tasks、entry_states、weekly_habits、
                         custom_entries、entry_notes、streak_leaves、chat_messages、
-                        content_sections、content_entries、content_meta
+                        content_sections、content_entries、content_meta、content_articles
   SettingsStore.kt      DataStore:API 配置、提醒时间、onboardingDone、搜索历史、已庆祝里程碑、每日一问进度(N1)、长辈模式(N7)
   NetworkMonitor.kt     连通性监听(壳层离线横幅的数据源)
   ProfileRepository.kt  Profile 领域模型 ↔ ProfileEntity;Profile.matches() 规则匹配;Profile.EMPTY 空档案、knownFields 部分已知、withAnswer 每日一问写档案(N1)
@@ -62,7 +64,9 @@ ui/          Compose 页面:onboarding / today / todo / library / chat / setting
 
 **稳定 key(2026-09-28 起)**:条目主键是 `key = sha1(节标题+条目标题)[:12]`,不是位置序号 `SS-NN`。上游插入条目会让条号顺延,但标题按上游约定只加字不换词,所以 key 稳定。`SS-NN` 仍保留在 entries.json 的 `id` 字段,仅供老用户首启迁移(五张用户表的 entryId 由 ContentBootstrap 改写)与旧备份导入改写(BackupManager,备份 format 仍 6 不 bump——格式没变只是 id 语义变了)使用。节同理有 `key`。标题「增减几个字」有两层相似度兼容:**构建期** `build_content.py --prev-entries`(发布前先把上一版 entries.json 留底)按标题相似度继承旧 key(SequenceMatcher,阈值 0.8、候选唯一,节先继承、条目再先精确后模糊,节改名导致的整节连锁断裂由条目的精确匹配兜住);**运行时** ContentSyncRepository 对下架且有用户数据的 key 在同节在架条目里做 bigram Jaccard 保守重挂(阈值 0.85 + 分差 0.05,见 TitleSimilarity)。两层都没接住的 → 旧 key 消失、新 key 出现,用户数据脱钩但保留;在 `app/src/main/assets/key_aliases.json` 登记 旧key→新key 别名,同步时会把用户数据挂回新条目。别名/迁移改写走冲突安全的 rewriteEntryId(2026-10-09):新旧 key 的同主键行并存时新 key 行胜出、撞主键的旧 key 行先删再 UPDATE,不再抛 SQLiteConstraintException 让同步/首启迁移永久卡死。构建与打包脚本都对「同节内消失+新增」打警告提醒登记别名,由发布人人工判断是否登记。
 
-**运行时内容同步**:内容落 Room(`content_sections/content_entries/content_meta`)。首装/升级时 ContentBootstrap 把捆绑 entries.json 播种进库;`ContentSyncWorker`(WorkManager 24h + 联网约束,Application.onCreate 注册)从滚动 Release `content-latest` 拉 manifest 比对版本,基线匹配走 patch.json 增量、否则 entries.json.gz 全量;别名改写与内容应用在同一事务(2026-10-09 起,此前独立事务先落库,apply 失败回滚会让用户数据悬空指向不存在的新 key);应用后在事务内对照 manifest 做全量 hash 校验,失败回滚等下轮。下架条目标 `removed`(行永不删):浏览/推荐/每日规划剔除,详情页展示快照 + 下架横幅,用户数据不受影响。设置页「检查内容更新」可手动触发(unique KEEP,连点不起并发同步)。
+**运行时内容同步**:内容落 Room(`content_sections/content_entries/content_meta`,长文在 `content_articles`)。首装/升级时 ContentBootstrap 把捆绑 entries.json(与 articles.json,同事务)播种进库;v7 老库升级走「content_articles 为空则补播长文」;`ContentSyncWorker`(WorkManager 24h + 联网约束,Application.onCreate 注册)从滚动 Release `content-latest` 拉 manifest 比对版本,基线匹配走 patch.json 增量、否则 entries.json.gz 全量;别名改写与内容应用在同一事务(2026-10-09 起,此前独立事务先落库,apply 失败回滚会让用户数据悬空指向不存在的新 key);应用后在事务内对照 manifest 做全量 hash 校验,失败回滚等下轮。**长文随包同步**:manifest 带 `articles: [{key,hash}]` 与 `articlesUrl` 时,全量路下载 articles.json.gz、增量路用 patch.articles 全量列表,都整份替换(长文不被用户数据引用,无下架保留语义)并按 manifest.articles 校验,与条目校验同事务同回滚;旧包无 articlesUrl 字段则跳过,本地已有长文不清空。下架条目标 `removed`(行永不删):浏览/推荐/每日规划剔除,详情页展示快照 + 下架横幅,用户数据不受影响。设置页「检查内容更新」可手动触发(unique KEEP,连点不起并发同步)。
+
+**长文(深度文章)**:上游 `docs/` 下 9 篇长文打包为 assets/articles.json 播种进 `content_articles`(key 主键 + file/title/secs/hash/body;secs 逗号分隔)。详情页备注与节首引言里的 `[label](../docs/<file>.md)` 链接按 file 对上长文后剥掉原文、改渲染入口卡片(详情页「延伸阅读」/章节页「本节长文」,secs 含本节号才出现),点击进 `ArticleRoute(key)` 长文阅读页(`ui/library/ArticleScreen.kt`);解析不到长文则保留原文不剥。阅读页用 `data/content/MarkdownLite.kt` 手写 lite 渲染(`##`/`###` 标题、段落、`- `/`1. ` 列表、表格、粗体、https 链接),不引第三方库;正文里「第 X 节第 Y 条」渲染为可点交叉引用,查 `entryBySecN["X-Y"]` 命中在架条目则跳详情,不命中按纯文本;长文互链(docs 链接指向另一篇)同样可点。
 
 entries.json 单条字段:`key/secKey/hash`(稳定标识与内容哈希)、`id`(节号-条号,仅迁移用)、`sec/n/title`、`cost/human/gain/grade/src/note`、`money/time/will/level/lens`、`cs/ratio/dispute/todo`、`hay`(检索用小写拼接)、`removed`。
 
@@ -147,7 +151,7 @@ python tools/build_content.py      # 内容变更后重跑,看自检统计
 - **N2a 断签文案去债务化(2026-10-01)**:连签判定逻辑不动(`computeStreak` 请假搭桥已够),只改展示——连签为 0(断签/未开始)时今日页问候区胶囊与统计页连续天数卡都不写「0 天」,统一落中性文案 `streak_fresh_start`(随时重新开始);断签次日打卡按新连签安静起步,全 App 无「你断了 N 天」式提示。小组件本就不展示连签数字,口径天然一致;成就(Achievements)只产出里程碑 key、无文案,判定不动
 - **N1 冷启动直入与渐进档案(2026-10-01)**:空档案 `Profile.EMPTY`(knownFields=空集)只命中 {} 普惠规则,`matches()` 对未知字段一律不命中;knownFields 不落库(`toEntity` 拒绝),已答集合存 SettingsStore(`profile_questions_answered` 等),读取侧由 `ProfileQuestions.effectiveProfile` 重建。onboarding 第一步可「先随便看看」(只写 onboardingDone 不写档案);完整向导保存 = 全部字段已答,每日一问终止。今日页顶部:有题问问题卡片(一天一题、「暂不回答」次日换下一题、暂缓字段轮回),没题但档案未填完时兜底「完善档案」Banner;答完落库、推荐当页重算并短暂显示「推荐已更新」。老用户迁移:首启时已有档案则全部字段标为已答,不补问。DailyReminderWorker/小组件的规划门槛从「有档案」改为「看过引导」(装完未打开不静默播种)
 - `EntryDetailScreen` 改用 `AppContainer` 的单例 `EntryRepository`,不再 `remember { EntryRepository(context) }` 每次进详情重解析 601 条 JSON
-- 条目状态 `entry_states` 用 `(entryId, state)` 复合主键:加入待办、已完成、不再推荐、已收藏、自选每日(STATE_DAILY)彼此正交,不会互相覆盖。**数据库 v7,真实迁移 + `exportSchema = true`**(v4 加 `weekly_habits`,v5 加 `custom_entries`,v6 给 tasks 加 note/doneBy/dueDate 并新增 entry_notes、streak_leaves、chat_messages 三表,v7 加 content_sections/content_entries/content_meta 三张内容表;schema JSON 在 `app/schemas/`,androidTest `MigrationTest` 用 `MigrationTestHelper` 校验,destructive fallback 已移除)。迁移链只保证 v5→v7;数据库版本 ≤4 的设备(均为未发布的开发构建)升级需卸载重装,不为 pre-release 版本补迁移链
+- 条目状态 `entry_states` 用 `(entryId, state)` 复合主键:加入待办、已完成、不再推荐、已收藏、自选每日(STATE_DAILY)彼此正交,不会互相覆盖。**数据库 v8,真实迁移 + `exportSchema = true`**(v4 加 `weekly_habits`,v5 加 `custom_entries`,v6 给 tasks 加 note/doneBy/dueDate 并新增 entry_notes、streak_leaves、chat_messages 三表,v7 加 content_sections/content_entries/content_meta 三张内容表,v8 加 content_articles 长文表——老库升级后由 ContentBootstrap 按「表为空」补播捆绑长文;schema JSON 在 `app/schemas/`,androidTest `MigrationTest` 用 `MigrationTestHelper` 校验,destructive fallback 已移除)。迁移链只保证 v5→v8;数据库版本 ≤4 的设备(均为未发布的开发构建)升级需卸载重装,不为 pre-release 版本补迁移链
 - **内容入 Room 与上游同步(2026-09-28)**:条目内容从 assets 只读改为 Room 内容表驱动(见 §3);`EntryRepository.entriesData()` 变为 suspend(先经 ContentBootstrap 幂等播种),全量调用点已改;老用户五张用户表的 `SS-NN` entryId 首启时一次性改写为稳定 key(DataStore 标记 `content_id_migrated`);旧备份导入时按同一份捆绑映射改写(BackupManager,备份 format 仍 6 不 bump——格式没变只是 id 语义变了)。「第X节第Y条」标签仍由 sec/n 在展示层现算,条号顺延不影响用户数据
 - **DONE 语义(2026-09-27 起)**:任何打卡完成(手动/小组件/自动核销/每周/补卡)都顺手写 `entry_states` 的 DONE,推荐引擎据此排除「做过」的内容,推荐池得以轮换;撤销打卡不清 DONE(「做过」这个事实不变)。配套修复:`ensureTodayTasks` 里用户自选每日习惯(STATE_DAILY)只按 DISMISSED 过滤、不按 DONE——否则自选习惯打一次卡就会从每日规划里消失。DONE 在 UI 上展示为「已完成」徽标(条目库列表/详情、待办页一次性分区),「已加入计划」展示为「已加入」徽标;书库目录每章与今日页每个口径分组显示 待看/完成/忽略 统计(`recommend/EntryStats.kt` 纯函数,每条目只落一个桶、DONE 优先于 DISMISSED)。TODO 与 ONCE 任务行同生命周期:完成/删除 ONCE 行清 TODO,撤销打卡/恢复删除补回(2026-09-29)
 - **Health Connect 自动核销(B1)**:条目→指标的映射写在 `assets/health_rules.json`,保守起见只收无歧义的两条(02-11 步数 ≥7000、02-13 睡眠 ≥7h)——误判自动打卡比不打卡更伤信任。`TaskManager.autoCompleteByHealth` 只核销映射内且当天有未完成 DAILY 行的条目;HC 不可用/缺权限/读取异常都安静返回空结果;打卡备注写达标证据(「今日步数 9234 ≥ 7000」),`doneBy` 区分来源(manual / auto:hc / widget)。睡眠窗口固定 [昨 18:00, 今 12:00),与查询时刻无关。触发点:今日页授权后、DailyReminderWorker。步数卡数据源 `stepsFlow` 统一 catch 降级 `Unavailable`(2026-10-09:HC 服务抖动、权限检查后被收回、传感器流中途出错,此前异常冲出收集协程直接崩溃)——取舍是**整卡隐藏**:步数卡只在 Available/Unauthorized 渲染,Unavailable 不出错误态

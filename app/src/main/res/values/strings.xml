@@ -226,6 +226,13 @@
     <string name="library_sort_order">原书顺序</string>
     <string name="section_title">第 %1$d 章 · %2$s</string>
     <string name="section_title_short">第 %1$d 章</string>
+    <!-- 本节长文:节首引言下方的长文入口卡片标题(该节有长文才出现) -->
+    <string name="section_articles">本节长文</string>
+
+    <!-- 长文阅读页(上游 docs/ 深度文章)与详情页备注里的长文入口 -->
+    <string name="article_loading">正在打开长文</string>
+    <string name="article_missing">没找到这篇长文,可能已被移除</string>
+    <string name="article_extended_reading">延伸阅读</string>
 
     <!-- 条目详情 -->
     <string name="detail_loading">正在打开条目</string>

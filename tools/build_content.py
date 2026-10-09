@@ -4,6 +4,12 @@
 解析规则复刻自 HowToLiveBetter/index.html(parseReadme + COST_W + ratio 档位算法)。
 用法: python tools/build_content.py [--book-dir upstream/HowToLiveBetter/book] [--version <commit>]
        [--prev-entries <上一版 entries.json>]
+       [--docs-dir upstream/HowToLiveBetter/docs] [--articles-out app/src/main/assets/articles.json]
+
+同一次运行还会解析 docs/*.md 长文(排除「引用对照.md」与子目录)生成 articles.json,
+contentVersion 与 entries.json 一致;docs-dir 不存在时打警告并跳过,不影响 entries。
+长文的 secs(关联章节)取两处并集:book/*.md 正文里的 docs/ 链接(节号取文件名前缀)、
+README.md 节目录行「N. [标题](book/...)」里的 docs 链接。
 
 上游仓库以 submodule 形式挂在 upstream/HowToLiveBetter。
 条目主键是稳定 key(标题派生),不是位置序号 SS-NN —— 上游插入条目会顺延条号,
@@ -243,6 +249,72 @@ def inherit_keys(sections: list, all_entries: list, prev: dict):
     print(f"key 继承: {renamed_secs} 个节改名继承,{inherited}/{len(all_entries)} 条继承旧条目 key")
 
 
+RE_H1 = re.compile(r"^# (.+)$")
+RE_DOCS_LINK = re.compile(r"docs/([^()\s]+\.md)")
+RE_README_SEC = re.compile(r"^(\d+)\. \[.*?\]\(book/")
+
+
+def collect_article_secs(docs_dir: str, book_dir: str):
+    """长文 → 关联节号 的映射(文件名 → set[int]),取两个来源的并集:
+    ① book/*.md 正文里出现的 docs/<文件名>(节号取 book 文件名前缀数字);
+    ② README.md 节目录行「N. [标题](book/...)」里出现的 docs 链接(节号取行首数字)。
+    """
+    secs = {}
+    for bp in glob.glob(os.path.join(book_dir, "*.md")):
+        m = re.match(r"(\d+)-", os.path.basename(bp))
+        if not m:
+            continue
+        with open(bp, encoding="utf-8") as f:
+            for name in RE_DOCS_LINK.findall(f.read()):
+                secs.setdefault(name, set()).add(int(m.group(1)))
+    readme = os.path.join(os.path.dirname(os.path.normpath(docs_dir)), "README.md")
+    if os.path.exists(readme):
+        with open(readme, encoding="utf-8") as f:
+            for line in f:
+                m = RE_README_SEC.match(line)
+                if m:
+                    for name in RE_DOCS_LINK.findall(line):
+                        secs.setdefault(name, set()).add(int(m.group(1)))
+    else:
+        print(f"警告: {readme} 不存在,长文关联节只统计 book/ 正文引用")
+    return secs
+
+
+def build_articles(docs_dir: str, secs_map: dict):
+    """解析 docs/*.md 长文,按文件名排序;排除「引用对照.md」与子目录(核实记录/ 是内部工件)。
+
+    每篇:key = sha1(文件名 utf8)[:12];title = 首个 H1 去掉「# 」;
+    body = 去掉首个 H1 行之后的 markdown 原文(首尾 trim);
+    hash = sha1(title + '\\n' + body)[:12]。没有 H1 的长文打警告并跳过。
+    """
+    articles = []
+    for path in sorted(glob.glob(os.path.join(docs_dir, "*.md"))):
+        name = os.path.basename(path)
+        if name == "引用对照.md":
+            continue
+        with open(path, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+        title = body = None
+        for i, line in enumerate(lines):
+            m = RE_H1.match(line)
+            if m:
+                title = m.group(1).strip()
+                body = "\n".join(lines[i + 1:]).strip()
+                break
+        if title is None:
+            print(f"警告: 长文 {name} 没有 H1 标题,跳过")
+            continue
+        articles.append({
+            "key": hashlib.sha1(name.encode("utf-8")).hexdigest()[:12],
+            "file": name,
+            "title": title,
+            "secs": sorted(secs_map.get(name, ())),
+            "hash": hashlib.sha1((title + "\n" + body).encode("utf-8")).hexdigest()[:12],
+            "body": body,
+        })
+    return articles
+
+
 def enrich(e: dict, sec_title: str):
     """复刻 index.html:dispute/todo/cs/ratio/hay;另生成稳定 key 与内容 hash。"""
     e["secKey"] = _key(sec_title)
@@ -273,6 +345,9 @@ def main():
                     help="内容版本号,CI 传上游 submodule 的 commit short hash")
     ap.add_argument("--prev-entries", default=None,
                     help="上一版 entries.json;给了就按标题相似度继承旧 key(阈值 0.8、候选唯一)")
+    ap.add_argument("--docs-dir", default=r"upstream/HowToLiveBetter/docs",
+                    help="长文目录;不存在时打警告并跳过 articles.json 生成,不影响 entries")
+    ap.add_argument("--articles-out", default=r"app/src/main/assets/articles.json")
     args = ap.parse_args()
 
     files = sorted(glob.glob(os.path.join(args.book_dir, "*.md")))
@@ -347,6 +422,23 @@ def main():
         for p in problems[:30]:
             print(" -", p)
     print(f"\n已写出 {args.out} ({os.path.getsize(args.out)//1024} KB)")
+
+    # 长文(docs/*.md):与 entries 同一次运行产出,contentVersion 一致
+    if os.path.isdir(args.docs_dir):
+        articles = build_articles(args.docs_dir,
+                                  collect_article_secs(args.docs_dir, args.book_dir))
+        arts_out = {"contentVersion": args.version, "articles": articles}
+        os.makedirs(os.path.dirname(args.articles_out), exist_ok=True)
+        with open(args.articles_out, "w", encoding="utf-8") as f:
+            json.dump(arts_out, f, ensure_ascii=False, indent=1)
+        print(f"\n长文: {len(articles)} 篇")
+        for a in articles:
+            print(f" - {a['file']}: 关联节 {a['secs']},正文 {len(a['body'])} 字符")
+            if not a["secs"]:
+                print(f"警告: 长文 {a['file']} 没有被任何章节引用(secs 为空)")
+        print(f"已写出 {args.articles_out} ({os.path.getsize(args.articles_out)//1024} KB)")
+    else:
+        print(f"警告: 长文目录 {args.docs_dir} 不存在,跳过 articles.json 生成")
 
 
 if __name__ == "__main__":

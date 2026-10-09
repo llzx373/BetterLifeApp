@@ -67,6 +67,7 @@ import com.betterlife.app.ui.common.OfflineBanner
 import com.betterlife.app.ui.completed.CompletedScreen
 import com.betterlife.app.ui.dismissed.DismissedScreen
 import com.betterlife.app.ui.favorites.FavoritesScreen
+import com.betterlife.app.ui.library.ArticleScreen
 import com.betterlife.app.ui.library.EntryDetailScreen
 import com.betterlife.app.ui.library.LibraryScreen
 import com.betterlife.app.ui.library.SectionScreen
@@ -103,6 +104,9 @@ data class SectionRoute(val sectionN: Int)
 
 @Serializable
 data class EntryRoute(val entryId: String)
+
+@Serializable
+data class ArticleRoute(val key: String)
 
 @Serializable
 data object MineRoute
@@ -341,6 +345,7 @@ private fun AppScaffold(
                     onOpenSection = { n -> navController.navigate(SectionRoute(n)) },
                     onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
                     onOpenChat = { id -> navController.navigate(ChatRoute(id)) },
+                    onOpenArticle = { key -> navController.navigate(ArticleRoute(key)) },
                 )
             }
             composable<SectionRoute> { entry ->
@@ -348,6 +353,7 @@ private fun AppScaffold(
                     sectionN = entry.toRoute<SectionRoute>().sectionN,
                     onBack = { navController.popBackStack() },
                     onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
+                    onOpenArticle = { key -> navController.navigate(ArticleRoute(key)) },
                 )
             }
             composable<EntryRoute> { entry ->
@@ -355,6 +361,16 @@ private fun AppScaffold(
                     entryId = entry.toRoute<EntryRoute>().entryId,
                     onBack = { navController.popBackStack() },
                     onExplain = { id -> navController.navigate(ChatRoute(id)) },
+                    onOpenArticle = { key -> navController.navigate(ArticleRoute(key)) },
+                )
+            }
+            composable<ArticleRoute> { entry ->
+                ArticleScreen(
+                    articleKey = entry.toRoute<ArticleRoute>().key,
+                    onBack = { navController.popBackStack() },
+                    onOpenEntry = { id -> navController.navigate(EntryRoute(id)) },
+                    // 长文互链(正文里的 docs 链接)压栈即可,返回回到上一篇
+                    onOpenArticle = { key -> navController.navigate(ArticleRoute(key)) },
                 )
             }
             composable<MineRoute> {

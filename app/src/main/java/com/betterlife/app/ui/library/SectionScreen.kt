@@ -40,20 +40,26 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.R
+import com.betterlife.app.data.ArticleDto
 import com.betterlife.app.data.EntryDto
 import com.betterlife.app.data.EntryKeys
 import com.betterlife.app.data.SectionDto
+import com.betterlife.app.data.content.findDocsLinks
+import com.betterlife.app.data.content.stripRanges
 import com.betterlife.app.recommend.EntryFilter
 import com.betterlife.app.recommend.EntryStatusFilter
 import com.betterlife.app.ui.common.AddPlanDialog
@@ -72,6 +78,8 @@ import com.betterlife.app.ui.theme.Spacing
 import com.betterlife.app.ui.theme.lensIcon
 import com.betterlife.app.viewmodel.EntrySort
 import com.betterlife.app.viewmodel.LibraryViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,6 +87,7 @@ fun SectionScreen(
     sectionN: Int,
     onBack: () -> Unit,
     onOpenEntry: (String) -> Unit,
+    onOpenArticle: (String) -> Unit,
     vm: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -110,6 +119,7 @@ fun SectionScreen(
             onSelectSort = vm::setSort,
             onSetFilter = vm::setFilter,
             onOpenEntry = onOpenEntry,
+            onOpenArticle = onOpenArticle,
             onAddOnce = vm::addToTodo,
             onAddDaily = vm::addDaily,
             onAddWeekly = vm::addWeekly,
@@ -126,6 +136,7 @@ internal fun SectionListContent(
     onSelectSort: (EntrySort) -> Unit,
     onSetFilter: (EntryFilter) -> Unit,
     onOpenEntry: (String) -> Unit,
+    onOpenArticle: (String) -> Unit,
     onAddOnce: (String) -> Unit,
     onAddDaily: (String) -> Unit,
     onAddWeekly: (String, Int) -> Unit,
@@ -133,6 +144,22 @@ internal fun SectionListContent(
 ) {
     // 条目行「+」的加计划弹窗:非 null 时弹 AddPlanDialog(与详情页/今日页推荐行同一套)
     var addPlanTarget by remember { mutableStateOf<String?>(null) }
+    // 本节长文(secs 含本节号)+ 引言里 docs 链接的解析索引,一次读取两者都要用
+    val context = LocalContext.current
+    val repo = (context.applicationContext as BetterLifeApp).container.entryRepository
+    val articlesData by produceState<Pair<List<ArticleDto>, Map<String, ArticleDto>>?>(null, section?.n) {
+        val n = section?.n
+        value = if (n == null) {
+            emptyList<ArticleDto>() to emptyMap()
+        } else {
+            withContext(Dispatchers.IO) {
+                val data = repo.entriesData()
+                data.articles.filter { n in it.secs } to data.articleByFile
+            }
+        }
+    }
+    val sectionArticles = articlesData?.first.orEmpty()
+    val articleByFile = articlesData?.second.orEmpty()
     Column(modifier = modifier.fillMaxSize()) {
         // 配图加载放在页面级作用域:LazyColumn item 是子组合,状态更新时被销毁会连带取消解码
         val bannerPaths = listOfNotNull(section?.key?.let { sectionImagePath(it) })
@@ -157,12 +184,41 @@ internal fun SectionListContent(
             }
             section?.intro?.takeIf { it.isNotBlank() }?.let { intro ->
                 item {
-                    Text(
-                        intro,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    // 引言里的长文链接能解析到长文时剥掉原文(下方「本节长文」卡片已表达),
+                    // 解析不到则保留原文
+                    val docsLinks = remember(intro) { findDocsLinks(intro) }
+                    val resolvedRanges = docsLinks.filter { it.file in articleByFile }.map { it.range }
+                    val displayIntro = remember(intro, resolvedRanges) {
+                        if (resolvedRanges.isEmpty()) intro else stripRanges(intro, resolvedRanges)
+                    }
+                    if (displayIntro.isNotBlank()) {
+                        Text(
+                            displayIntro,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space2),
+                        )
+                    }
+                }
+            }
+            if (sectionArticles.isNotEmpty()) {
+                item {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(Spacing.space2),
                         modifier = Modifier.padding(horizontal = Spacing.space4, vertical = Spacing.space2),
-                    )
+                    ) {
+                        Text(
+                            text = stringResource(R.string.section_articles),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        sectionArticles.forEach { article ->
+                            ArticleEntryCard(
+                                title = article.title,
+                                onClick = { onOpenArticle(article.key) },
+                            )
+                        }
+                    }
                 }
             }
             if (state.sectionEntries.isEmpty() && !state.filter.isEmpty) {

@@ -115,6 +115,7 @@ fun LibraryScreen(
     onOpenSection: (Int) -> Unit,
     onOpenEntry: (String) -> Unit,
     onOpenChat: (String) -> Unit,
+    onOpenArticle: (String) -> Unit,
     vm: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -148,6 +149,7 @@ fun LibraryScreen(
                 onAddDaily = vm::addDaily,
                 onAddWeekly = vm::addWeekly,
                 onOpenChat = onOpenChat,
+                onOpenArticle = onOpenArticle,
             )
         }
         width >= LIST_DETAIL_MIN_WIDTH -> Box(Modifier.statusBarsPadding()) {
@@ -163,6 +165,7 @@ fun LibraryScreen(
                 onAddDaily = vm::addDaily,
                 onAddWeekly = vm::addWeekly,
                 onOpenChat = onOpenChat,
+                onOpenArticle = onOpenArticle,
             )
         }
         width >= TWO_PANE_MIN_WIDTH -> Box(Modifier.statusBarsPadding()) {
@@ -177,6 +180,7 @@ fun LibraryScreen(
                 onAddOnce = vm::addToTodo,
                 onAddDaily = vm::addDaily,
                 onAddWeekly = vm::addWeekly,
+                onOpenArticle = onOpenArticle,
             )
         }
         else -> Scaffold { padding ->
@@ -211,6 +215,7 @@ internal fun LibraryTwoPane(
     onAddOnce: (String) -> Unit,
     onAddDaily: (String) -> Unit,
     onAddWeekly: (String, Int) -> Unit,
+    onOpenArticle: (String) -> Unit,
 ) {
     // 600–839 落在 medium 宽度档,默认指令只给一栏 —— 目录(搜索/章节)会被详情栏顶掉,
     // 用户就没法选章。显式用 medium 也出两栏的指令,保持「两栏都常驻」的设计。
@@ -251,6 +256,7 @@ internal fun LibraryTwoPane(
                         onSelectSort = onSelectSort,
                         onSetFilter = onSetFilter,
                         onOpenEntry = onOpenEntry,
+                        onOpenArticle = onOpenArticle,
                         onAddOnce = onAddOnce,
                         onAddDaily = onAddDaily,
                         onAddWeekly = onAddWeekly,
@@ -282,6 +288,7 @@ internal fun LibraryListDetail(
     onAddDaily: (String) -> Unit,
     onAddWeekly: (String, Int) -> Unit,
     onOpenChat: (String) -> Unit,
+    onOpenArticle: (String) -> Unit,
 ) {
     val navigator = rememberListDetailPaneScaffoldNavigator<String>()
     val scope = rememberCoroutineScope()
@@ -329,6 +336,7 @@ internal fun LibraryListDetail(
                                 onSelectSort = onSelectSort,
                                 onSetFilter = onSetFilter,
                                 onOpenEntry = onSelectEntry,
+                                onOpenArticle = onOpenArticle,
                                 onAddOnce = onAddOnce,
                                 onAddDaily = onAddDaily,
                                 onAddWeekly = onAddWeekly,
@@ -363,6 +371,7 @@ internal fun LibraryListDetail(
                         entryId = entryId,
                         onExplain = onOpenChat,
                         onDismissed = { onSelectEntry(null) },
+                        onOpenArticle = onOpenArticle,
                     )
                 }
             }
@@ -391,6 +400,7 @@ internal fun LibraryThreePane(
     onAddDaily: (String) -> Unit,
     onAddWeekly: (String, Int) -> Unit,
     onOpenChat: (String) -> Unit,
+    onOpenArticle: (String) -> Unit,
 ) {
     val outerNavigator = rememberListDetailPaneScaffoldNavigator<Int>()
     val innerNavigator = rememberListDetailPaneScaffoldNavigator<String>()
@@ -448,6 +458,7 @@ internal fun LibraryThreePane(
                                     onSelectSort = onSelectSort,
                                     onSetFilter = onSetFilter,
                                     onOpenEntry = onSelectEntry,
+                                    onOpenArticle = onOpenArticle,
                                     onAddOnce = onAddOnce,
                                     onAddDaily = onAddDaily,
                                     onAddWeekly = onAddWeekly,
@@ -466,6 +477,7 @@ internal fun LibraryThreePane(
                                     entryId = entryId,
                                     onExplain = onOpenChat,
                                     onDismissed = { onSelectEntry(null) },
+                                    onOpenArticle = onOpenArticle,
                                 )
                             }
                         }

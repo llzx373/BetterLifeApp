@@ -18,8 +18,9 @@ import androidx.room.RoomDatabase
         ContentSectionEntity::class,
         ContentEntryEntity::class,
         ContentMetaEntity::class,
+        ContentArticleEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -43,8 +44,9 @@ abstract class AppDatabase : RoomDatabase() {
                 // v6 给 tasks 加 note/doneBy/dueDate，新增 entry_notes、streak_leaves、
                 // chat_messages 三表（见 Migrations.kt），
                 // v7 新增内容库三表 content_sections / content_entries / content_meta
-                // （条目内容入 Room，主键换成标题派生的稳定 key）。
-                .addMigrations(MIGRATION_5_6, MIGRATION_6_7)
+                // （条目内容入 Room，主键换成标题派生的稳定 key），
+                // v8 新增 content_articles（上游长文，见 ContentEntities.kt）。
+                .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                 .build()
     }
 }

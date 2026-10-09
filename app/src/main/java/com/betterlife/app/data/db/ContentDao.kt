@@ -35,6 +35,19 @@ interface ContentDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertMeta(meta: ContentMetaEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertArticles(articles: List<ContentArticleEntity>)
+
+    @Query("SELECT * FROM content_articles")
+    suspend fun allArticles(): List<ContentArticleEntity>
+
+    /** 长文全量替换的收口:清掉不在新快照里的行(同步语义是整份替换,不做下架保留) */
+    @Query("DELETE FROM content_articles WHERE `key` NOT IN (:keys)")
+    suspend fun deleteArticlesNotIn(keys: List<String>)
+
+    @Query("DELETE FROM content_articles")
+    suspend fun clearArticles()
+
     /** 一整套内容快照原子落库：首启播种与后续同步 Worker 共用 */
     @Transaction
     suspend fun applySnapshot(
@@ -42,10 +55,12 @@ interface ContentDao {
         entries: List<ContentEntryEntity>,
         removedKeys: List<String>,
         meta: ContentMetaEntity,
+        articles: List<ContentArticleEntity> = emptyList(),
     ) {
         upsertSections(sections)
         upsertEntries(entries)
         if (removedKeys.isNotEmpty()) markRemoved(removedKeys)
+        if (articles.isNotEmpty()) upsertArticles(articles)
         upsertMeta(meta)
     }
 }

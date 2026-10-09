@@ -19,6 +19,11 @@ patch.json(仅当有上一版时生成):
   {base, version, updated:[entry...], removedKeys:[...]}
   base 是上一版 contentVersion,App 端版本等于 base 才能用增量包,否则走全量。
 
+长文(--articles,默认 app/src/main/assets/articles.json,存在时才打):
+  额外产 articles.json.gz;manifest 增加 articles:[{key, hash}] 与 articlesUrl;
+  patch.json 增加 "articles": 完整长文列表(约 90 KB,永远全量替换,不做 diff)。
+  文件缺失时打警告并不加这些字段 —— 老版本 APK 忽略 manifest 未知字段,向后兼容。
+
 检测「同节内条目消失+新增」会打警告:可能是上游改了条目标题(违反只加字约定),
 需要人工确认并在 app/src/main/assets/key_aliases.json 里登记别名(App 同步时按它改写用户表)。
 """
@@ -50,11 +55,19 @@ def main():
     ap.add_argument("--base-url", default=DEFAULT_BASE_URL)
     ap.add_argument("--aliases", default=r"app/src/main/assets/key_aliases.json",
                     help="key 别名表,嵌入 manifest 随包在线分发;文件缺失时按空表处理")
+    ap.add_argument("--articles", default=r"app/src/main/assets/articles.json",
+                    help="长文包;存在则一并打进发布包,缺失时打警告并维持旧行为")
     args = ap.parse_args()
 
     data = load_json(args.entries)
     version = data.get("contentVersion") or "local"
     entries = data["entries"]
+
+    articles_data = None
+    if os.path.exists(args.articles):
+        articles_data = load_json(args.articles)
+    else:
+        print(f"警告: {args.articles} 不存在,发布包不含长文(老版本 APK 不受影响)")
 
     aliases = {}
     if os.path.exists(args.aliases):
@@ -105,6 +118,14 @@ def main():
         f.write(gzip.compress(json.dumps(data, ensure_ascii=False).encode("utf-8"),
                               compresslevel=9))
 
+    if articles_data:
+        manifest["articles"] = [{"key": a["key"], "hash": a["hash"]}
+                                for a in articles_data["articles"]]
+        manifest["articlesUrl"] = f"{args.base_url}/articles.json.gz"
+        with open(os.path.join(args.out_dir, "articles.json.gz"), "wb") as f:
+            f.write(gzip.compress(json.dumps(articles_data, ensure_ascii=False)
+                                  .encode("utf-8"), compresslevel=9))
+
     if prev:
         updated = [cur_by_key[k] for k in new_keys + changed_keys]
         patch = {
@@ -116,6 +137,9 @@ def main():
             "updated": updated,
             "removedKeys": gone_keys,
         }
+        if articles_data:
+            # 长文永远全量替换(约 90 KB),不做 diff
+            patch["articles"] = articles_data["articles"]
         with open(os.path.join(args.out_dir, "patch.json"), "w", encoding="utf-8") as f:
             json.dump(patch, f, ensure_ascii=False, indent=1)
         manifest["patchUrl"] = f"{args.base_url}/patch.json"
@@ -124,13 +148,14 @@ def main():
     with open(os.path.join(args.out_dir, "manifest.json"), "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=1)
 
-    print(f"版本: {version},条目: {len(entries)},别名: {len(aliases)}")
+    print(f"版本: {version},条目: {len(entries)},别名: {len(aliases)}"
+          + (f",长文: {len(articles_data['articles'])}" if articles_data else ""))
     if prev:
         print(f"相对 {prev['contentVersion']}: 新增 {len(new_keys)},"
               f"变更 {len(changed_keys)},消失 {len(gone_keys)}")
     else:
         print("无上一版,只产全量包")
-    for name in ("manifest.json", "entries.json.gz", "patch.json"):
+    for name in ("manifest.json", "entries.json.gz", "articles.json.gz", "patch.json"):
         p = os.path.join(args.out_dir, name)
         if os.path.exists(p):
             print(f"  {name}: {os.path.getsize(p)//1024} KB")

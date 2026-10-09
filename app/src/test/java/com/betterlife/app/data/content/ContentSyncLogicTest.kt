@@ -107,5 +107,42 @@ class ContentSyncLogicTest {
         assertEquals(emptyMap<String, String>(), m.aliases)
     }
 
+    // ---------- manifest 长文字段(articles / articlesUrl) ----------
+
+    @Test
+    fun `清单携带长文字段时原样解析`() {
+        val m = wireJson.decodeFromString(
+            ContentManifest.serializer(),
+            """{"contentVersion":"b","articlesUrl":"https://x/articles.json.gz",""" +
+                """"articles":[{"key":"ak","hash":"ah"}]}""",
+        )
+        assertEquals("https://x/articles.json.gz", m.articlesUrl)
+        assertEquals(listOf(ContentManifest.EntryHash("ak", "ah")), m.articles)
+    }
+
+    @Test
+    fun `旧版清单没有长文字段时按空处理(不清空本地长文)`() {
+        val m = wireJson.decodeFromString(
+            ContentManifest.serializer(),
+            """{"contentVersion":"b","entries":[]}""",
+        )
+        assertNull(m.articlesUrl)
+        assertEquals(emptyList<ContentManifest.EntryHash>(), m.articles)
+    }
+
+    // ---------- articlesMismatch ----------
+
+    @Test
+    fun `长文集合与清单一致时无差异,三种偏离都被判不一致`() {
+        val m = wireJson.decodeFromString(
+            ContentManifest.serializer(),
+            """{"contentVersion":"b","articles":[{"key":"a1","hash":"h1"},{"key":"a2","hash":"h2"}]}""",
+        )
+        assertNull(articlesMismatch(mapOf("a1" to "h1", "a2" to "h2"), m))
+        assertNotNull("缺一篇", articlesMismatch(mapOf("a1" to "h1"), m))
+        assertNotNull("多篇", articlesMismatch(mapOf("a1" to "h1", "a2" to "h2", "a3" to "h3"), m))
+        assertNotNull("hash 不同", articlesMismatch(mapOf("a1" to "h1", "a2" to "CHANGED"), m))
+    }
+
     private fun h(key: String, hash: String) = ContentManifest.EntryHash(key = key, hash = hash)
 }
