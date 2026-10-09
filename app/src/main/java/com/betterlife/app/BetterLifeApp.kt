@@ -27,6 +27,10 @@ import com.betterlife.app.tasks.DailyContentWorker
 import com.betterlife.app.tasks.ReminderScheduler
 import com.betterlife.app.tasks.TaskManager
 import com.betterlife.app.tasks.WeeklyReportWorker
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class BetterLifeApp : Application() {
 
@@ -42,6 +46,11 @@ class BetterLifeApp : Application() {
         WeeklyReportWorker.enqueuePeriodic(this)
         // N5：每日一条内容推送（24h 周期，锚定 08:07，默认关——开关只在 doWork 里门控）
         DailyContentWorker.enqueuePeriodic(this)
+        // 每日 tick（汇总/报喜/挽回共用载体）：任一依赖开关开着就确保 work 在——
+        // 报喜/挽回默认开，不依赖「每日提醒」开关；读设置需挂起，放 IO 协程
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            container.reminderScheduler.ensureScheduled()
+        }
     }
 }
 

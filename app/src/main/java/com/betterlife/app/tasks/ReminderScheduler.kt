@@ -22,10 +22,12 @@ import androidx.work.workDataOf
 import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.MainActivity
 import com.betterlife.app.R
+import com.betterlife.app.data.SettingsStore
 import com.betterlife.app.data.db.TaskEntity
 import com.betterlife.app.recommend.ProfileQuestions
 import com.betterlife.app.widget.WidgetUpdater
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -33,7 +35,10 @@ import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 /**
- * 每日提醒：WorkManager 周期任务（24h + flex）触发 ensureTodayTasks 并发本地通知。
+ * 每日 tick 调度：一个 WorkManager work 承载三类每日通知——每日汇总（每日提醒开关）、
+ * N2b 报喜（hcPraiseEnabled）、N2c 挽回（reengageEnabled）。work 的去留由「任一开关开着」
+ * 决定（见 ensureScheduled / cancel），发哪条由 worker 内按各自开关门控：
+ * 报喜/挽回默认开，不应随每日提醒开关一起消失。
  */
 class ReminderScheduler(private val context: Context) {
 
@@ -76,6 +81,22 @@ class ReminderScheduler(private val context: Context) {
 
     /** 按设定时间入队（已存在则更新）。首次触发时间对齐到最近的 hour:minute。 */
     fun enqueue(hour: Int, minute: Int) {
+        enqueuePeriodic(hour, minute, ExistingPeriodicWorkPolicy.UPDATE)
+    }
+
+    /**
+     * 应用启动时兜底注册：任一依赖开关（每日提醒/报喜/挽回）开着就确保 work 在
+     * （KEEP：已排队的锚点不被 App 重启重置）；全关则不管（cancel 已撤）。
+     * 触发时刻用存储的 reminderHour/reminderMinute（每日提醒从未开过时是默认 8:00）。
+     */
+    suspend fun ensureScheduled() {
+        val settings = SettingsStore(context).current()
+        if (settings.reminderEnabled || settings.hcPraiseEnabled || settings.reengageEnabled) {
+            enqueuePeriodic(settings.reminderHour, settings.reminderMinute, ExistingPeriodicWorkPolicy.KEEP)
+        }
+    }
+
+    private fun enqueuePeriodic(hour: Int, minute: Int, policy: ExistingPeriodicWorkPolicy) {
         ensureChannel(context)
         val now = LocalDateTime.now()
         var next = now.withHour(hour).withMinute(minute).withSecond(0).withNano(0)
@@ -86,11 +107,19 @@ class ReminderScheduler(private val context: Context) {
             .setInitialDelay(initialDelayMs, TimeUnit.MILLISECONDS)
             .build()
         WorkManager.getInstance(context)
-            .enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
+            .enqueueUniquePeriodicWork(WORK_NAME, policy, request)
     }
 
+    /**
+     * 关掉「每日提醒」时调用。work 是汇总/报喜/挽回的共用载体：报喜或挽回还开着就
+     * 保留 work（发不发由 worker 按各自开关门控），全关才真正撤掉。
+     */
     fun cancel() {
-        WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+        val keep = runBlocking {
+            val settings = SettingsStore(context).current()
+            settings.hcPraiseEnabled || settings.reengageEnabled
+        }
+        if (!keep) WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
     }
 
     /**
@@ -212,37 +241,45 @@ class DailyReminderWorker(
     override suspend fun doWork(): Result {
         val container = (applicationContext as BetterLifeApp).container
         val settings = container.settingsStore.current()
-        // N1：没档案也能规划（空档案走普惠推荐 + 种子池兜底），门槛改为「看过引导」——
-        // 装完从未打开过的用户不应被静默播种和提醒
-        if (settings.onboardingDone) {
-            val profile = container.profileRepository.getProfile()
-            val answered = container.settingsStore.profileQuestionsAnsweredFlow.first()
-            container.taskManager.ensureTodayTasks(ProfileQuestions.effectiveProfile(profile, answered))
-        }
-        // B1：先用 Health Connect 数据自动核销达标的每日任务，再统计未完成数发通知；
-        // 尽力而为——HC 不可用/没权限/出异常都安静跳过（按无核销处理）
-        val completed = runCatching { container.taskManager.autoCompleteByHealth() }
-            .getOrDefault(TaskManager.AutoCompleteResult.NONE)
-        // B5：新一天任务已生成 / 自动核销已落库，同步刷新桌面小部件
-        WidgetUpdater.refresh(applicationContext)
-        // N2b：核销结果交给纯函数决策——全部完成只报喜、有未完成合并进汇总、同日重发抑制
         val today = LocalDate.now().toString()
-        val decision = decideAutoNotify(
-            completions = completed.evidences,
-            undoneCount = container.taskManager.todayUndoneCount(),
-            praiseEnabled = settings.hcPraiseEnabled,
-            praiseSentToday = container.settingsStore.hcPraiseSentDate() == today,
-        )
-        when (decision) {
-            AutoNotifyType.PRAISE -> {
-                container.reminderScheduler.notifyAutoCompletePraise(completed.evidenceText)
-                container.settingsStore.setHcPraiseSentDate(today)
+        // 本 work 是汇总/报喜/挽回的共用载体，即使每日提醒关着也可能在跑（报喜/挽回还开着）。
+        // 任务流水线（播种/核销/部件刷新/汇总/报喜）只在「每日提醒」或「报喜」开着时跑——
+        // 只剩挽回开着时不必读 HC、建任务
+        if (settings.reminderEnabled || settings.hcPraiseEnabled) {
+            // N1：没档案也能规划（空档案走普惠推荐 + 种子池兜底），门槛改为「看过引导」——
+            // 装完从未打开过的用户不应被静默播种和提醒
+            if (settings.onboardingDone) {
+                val profile = container.profileRepository.getProfile()
+                val answered = container.settingsStore.profileQuestionsAnsweredFlow.first()
+                container.taskManager.ensureTodayTasks(ProfileQuestions.effectiveProfile(profile, answered))
             }
-            AutoNotifyType.SUMMARY -> notifyUndone(
-                undone = container.taskManager.todayUndoneCount(),
-                praiseText = completed.evidenceText.takeIf { completed.count > 0 },
+            // B1：先用 Health Connect 数据自动核销达标的每日任务，再统计未完成数发通知；
+            // 尽力而为——HC 不可用/没权限/出异常都安静跳过（按无核销处理）
+            val completed = runCatching { container.taskManager.autoCompleteByHealth() }
+                .getOrDefault(TaskManager.AutoCompleteResult.NONE)
+            // B5：新一天任务已生成 / 自动核销已落库，同步刷新桌面小部件
+            WidgetUpdater.refresh(applicationContext)
+            // N2b：核销结果交给纯函数决策——全部完成只报喜、有未完成合并进汇总、同日重发抑制
+            val decision = decideAutoNotify(
+                completions = completed.evidences,
+                undoneCount = container.taskManager.todayUndoneCount(),
+                praiseEnabled = settings.hcPraiseEnabled,
+                praiseSentToday = container.settingsStore.hcPraiseSentDate() == today,
             )
-            AutoNotifyType.NONE -> {}
+            when (decision) {
+                AutoNotifyType.PRAISE -> {
+                    container.reminderScheduler.notifyAutoCompletePraise(completed.evidenceText)
+                    container.settingsStore.setHcPraiseSentDate(today)
+                }
+                // 每日汇总只认「每日提醒」开关；关着时（work 为报喜/挽回而跑）不发汇总
+                AutoNotifyType.SUMMARY -> if (settings.reminderEnabled) {
+                    notifyUndone(
+                        undone = container.taskManager.todayUndoneCount(),
+                        praiseText = completed.evidenceText.takeIf { completed.count > 0 },
+                    )
+                }
+                AutoNotifyType.NONE -> {}
+            }
         }
         // N2c：3 日未打开发挽回通知（7 天频控）；用户打开 App 写 last_active_date 即自然重置
         if (decideReengageNotify(
