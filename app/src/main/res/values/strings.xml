@@ -557,6 +557,10 @@
     <string name="settings_import_confirm_text">导入会覆盖当前全部本地数据,且备份中不含 API 密钥。</string>
     <string name="action_import">导入</string>
     <string name="settings_export_ok">已导出</string>
+    <!-- 导出行副标题第二行:上次备份时间,让「多久没备份了」常显可见;导入不刷新它 -->
+    <string name="settings_backup_never">从未备份</string>
+    <string name="settings_backup_today">上次备份:今天</string>
+    <string name="settings_backup_days_ago">上次备份:%1$d 天前</string>
     <string name="settings_export_failed">导出没有成功</string>
     <string name="settings_import_ok">已导入 %1$d 条数据</string>
     <string name="settings_import_failed">导入没有成功:%1$s</string>

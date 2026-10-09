@@ -75,6 +75,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.betterlife.app.BetterLifeApp
 import com.betterlife.app.R
 import com.betterlife.app.tasks.ContentSyncWorker
 import com.betterlife.app.ui.common.MotionEntrance
@@ -83,8 +84,11 @@ import com.betterlife.app.viewmodel.SettingsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,6 +114,10 @@ fun SettingsScreen(
     }
     val context = LocalContext.current
     val resources = LocalResources.current
+
+    // 上次备份时间:导出行的副标题常显「多久没备份了」,不走 SettingsViewModel(避免为它扩 UiState)
+    val settingsStore = remember { (context.applicationContext as BetterLifeApp).container.settingsStore }
+    val lastBackupAt by settingsStore.lastBackupExportAtFlow.collectAsStateWithLifecycle(initialValue = 0L)
 
     // 导出:系统文件选择器给目标 uri,拿到后由 VM 生成 JSON 并写流;结果走 dataAction → snackbar
     val exportLauncher = rememberLauncherForActivityResult(
@@ -149,6 +157,8 @@ fun SettingsScreen(
     LaunchedEffect(state.dataAction) {
         when (val action = state.dataAction) {
             is SettingsViewModel.DataAction.Exported -> {
+                // 导出成功才刷新「上次备份时间」;导入不写(恢复别人的备份 ≠ 本机数据已备份)
+                settingsStore.setLastBackupExportAt(System.currentTimeMillis())
                 snackbar.showSnackbar(resources.getString(R.string.settings_export_ok))
                 vm.consumeDataAction()
             }
@@ -399,13 +409,28 @@ fun SettingsScreen(
             SectionTitle(stringResource(R.string.settings_section_data))
 
             // 备份导出/导入走系统文件选择器;「清空对话历史」有确认弹窗,误触可撤回决定
+            val lastBackupLabel = if (lastBackupAt <= 0L) {
+                stringResource(R.string.settings_backup_never)
+            } else {
+                val days = ChronoUnit.DAYS.between(
+                    Instant.ofEpochMilli(lastBackupAt).atZone(ZoneId.systemDefault()).toLocalDate(),
+                    LocalDate.now(),
+                )
+                if (days <= 0) stringResource(R.string.settings_backup_today)
+                else stringResource(R.string.settings_backup_days_ago, days)
+            }
             SegmentedListItem(
                 onClick = {
                     val stamp = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
                     runCatching { exportLauncher.launch("betterlife-backup-$stamp.json") }
                 },
                 shapes = ListItemDefaults.segmentedShapes(index = 0, count = 4),
-                supportingContent = { Text(stringResource(R.string.settings_export_data_sub)) },
+                supportingContent = {
+                    Column {
+                        Text(stringResource(R.string.settings_export_data_sub))
+                        Text(lastBackupLabel)
+                    }
+                },
             ) {
                 Text(stringResource(R.string.settings_export_data))
             }

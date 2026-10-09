@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -44,8 +45,8 @@ data class AppSettings(
     val seniorModeAsked: Boolean = false,
     val themeMode: String = SettingsStore.DEFAULT_THEME_MODE,
     val motionLevel: String = SettingsStore.DEFAULT_MOTION_LEVEL,
-    /** 桌面图标颜色 key（IconColor）；切换走 activity-alias，见 LauncherIconSwitcher */
-    val iconColor: String = SettingsStore.DEFAULT_ICON_COLOR,
+    /** 桌面图标变体 key（LauncherIcon）；切换走 activity-alias，见 LauncherIconSwitcher */
+    val launcherIcon: String = SettingsStore.DEFAULT_LAUNCHER_ICON,
 )
 
 /** 设置存取的窄接口：ViewModel 只依赖它，测试里可用内存 fake 替换 */
@@ -104,7 +105,8 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
         val SENIOR_MODE_ASKED = booleanPreferencesKey("senior_mode_asked")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val MOTION_LEVEL = stringPreferencesKey("motion_level")
-        val ICON_COLOR = stringPreferencesKey("icon_color")
+        // 桌面图标变体；DataStore 键保留 "icon_color"，老用户的旧 key 由 LauncherIcon.fromKey 迁移
+        val LAUNCHER_ICON = stringPreferencesKey("icon_color")
 
         // 有序历史:stringSet 不保序,用单条 string 以 \n 分隔存列表(新词在前)
         val SEARCH_HISTORY = stringPreferencesKey("search_history")
@@ -123,6 +125,9 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
 
         // 已提示过「已养成」的每周习惯条目 id,逗号分隔;无顺序要求
         val GRADUATION_PROMPTED = stringPreferencesKey("graduation_prompted")
+
+        // 最近一次备份导出成功的时间(epoch millis,0/缺失 = 从未备份);导入不改它
+        val LAST_BACKUP_EXPORT_AT = longPreferencesKey("last_backup_export_at")
 
         // 每日一问（N1 渐进式档案收集）:已答字段 / 「暂不回答」暂缓字段(逗号分隔) /
         // 当日已问日期(yyyy-MM-dd,空串 = 今天还没问) / 老用户一次性迁移标记
@@ -157,7 +162,7 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
             seniorModeAsked = p[Keys.SENIOR_MODE_ASKED] ?: false,
             themeMode = p[Keys.THEME_MODE] ?: DEFAULT_THEME_MODE,
             motionLevel = p[Keys.MOTION_LEVEL] ?: DEFAULT_MOTION_LEVEL,
-            iconColor = p[Keys.ICON_COLOR] ?: DEFAULT_ICON_COLOR,
+            launcherIcon = p[Keys.LAUNCHER_ICON] ?: DEFAULT_LAUNCHER_ICON,
         )
     }
 
@@ -331,9 +336,9 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
         context.dataStore.edit { it[Keys.MOTION_LEVEL] = levelKey }
     }
 
-    /** 桌面图标颜色 key；落盘即可，alias 启停由调用方（ViewModel）经 LauncherIconSwitcher 做 */
-    suspend fun setIconColor(colorKey: String) {
-        context.dataStore.edit { it[Keys.ICON_COLOR] = colorKey }
+    /** 桌面图标变体 key；落盘即可，alias 启停由 MainActivity 退后台时经 LauncherIconSwitcher 做 */
+    suspend fun setLauncherIcon(iconKey: String) {
+        context.dataStore.edit { it[Keys.LAUNCHER_ICON] = iconKey }
     }
 
     /** 最近搜索,新词在前。不进 AppSettings:它是条目库的局部状态,不该每次设置变化都跟着重组 */
@@ -434,6 +439,19 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
         }
     }
 
+    /**
+     * 最近一次备份导出成功的时间（epoch millis，0 = 从未备份）：设置页导出行据此
+     * 显示「上次备份：X 天前」。导入不写它——导入恢复的是别人的备份，不代表本机数据已备份。
+     * 与 searchHistory 同理不进 AppSettings —— 它是数据区的局部状态。
+     */
+    val lastBackupExportAtFlow: Flow<Long> = context.dataStore.data.map { p ->
+        p[Keys.LAST_BACKUP_EXPORT_AT] ?: 0L
+    }
+
+    suspend fun setLastBackupExportAt(millis: Long) {
+        context.dataStore.edit { it[Keys.LAST_BACKUP_EXPORT_AT] = millis }
+    }
+
     // ---------- 每日一问（N1 渐进式档案收集） ----------
     // 与 searchHistory 同理不进 AppSettings：是今日页问题卡片的局部状态。
 
@@ -532,8 +550,8 @@ class SettingsStore(private val context: Context) : ChatSettingsGateway {
         /** 默认「标准」。降级是给需要的用户的选项,不该是所有人的默认 */
         const val DEFAULT_MOTION_LEVEL = "standard"
 
-        /** 桌面图标默认蓝紫（IconColor.BLUE_PURPLE） */
-        const val DEFAULT_ICON_COLOR = "blue_purple"
+        /** 桌面图标默认酒红 × 金（LauncherIcon.WINE_GOLD） */
+        const val DEFAULT_LAUNCHER_ICON = "wine_gold"
 
         const val MAX_SEARCH_HISTORY = 10
         private const val SEARCH_HISTORY_SEPARATOR = "\n"
