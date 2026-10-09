@@ -144,6 +144,9 @@ fun LibraryScreen(
                 onSelectSort = vm::setSort,
                 onSetFilter = vm::setFilter,
                 onSelectEntry = vm::selectEntry,
+                onAddOnce = vm::addToTodo,
+                onAddDaily = vm::addDaily,
+                onAddWeekly = vm::addWeekly,
                 onOpenChat = onOpenChat,
             )
         }
@@ -156,6 +159,9 @@ fun LibraryScreen(
                 onSelectSort = vm::setSort,
                 onSetFilter = vm::setFilter,
                 onSelectEntry = vm::selectEntry,
+                onAddOnce = vm::addToTodo,
+                onAddDaily = vm::addDaily,
+                onAddWeekly = vm::addWeekly,
                 onOpenChat = onOpenChat,
             )
         }
@@ -168,6 +174,9 @@ fun LibraryScreen(
                 onSelectSort = vm::setSort,
                 onSetFilter = vm::setFilter,
                 onOpenEntry = onOpenEntry,
+                onAddOnce = vm::addToTodo,
+                onAddDaily = vm::addDaily,
+                onAddWeekly = vm::addWeekly,
             )
         }
         else -> Scaffold { padding ->
@@ -199,6 +208,9 @@ internal fun LibraryTwoPane(
     onSelectSort: (EntrySort) -> Unit,
     onSetFilter: (EntryFilter) -> Unit,
     onOpenEntry: (String) -> Unit,
+    onAddOnce: (String) -> Unit,
+    onAddDaily: (String) -> Unit,
+    onAddWeekly: (String, Int) -> Unit,
 ) {
     // 600–839 落在 medium 宽度档,默认指令只给一栏 —— 目录(搜索/章节)会被详情栏顶掉,
     // 用户就没法选章。显式用 medium 也出两栏的指令,保持「两栏都常驻」的设计。
@@ -239,6 +251,9 @@ internal fun LibraryTwoPane(
                         onSelectSort = onSelectSort,
                         onSetFilter = onSetFilter,
                         onOpenEntry = onOpenEntry,
+                        onAddOnce = onAddOnce,
+                        onAddDaily = onAddDaily,
+                        onAddWeekly = onAddWeekly,
                     )
                 }
             }
@@ -263,6 +278,9 @@ internal fun LibraryListDetail(
     onSelectSort: (EntrySort) -> Unit,
     onSetFilter: (EntryFilter) -> Unit,
     onSelectEntry: (String?) -> Unit,
+    onAddOnce: (String) -> Unit,
+    onAddDaily: (String) -> Unit,
+    onAddWeekly: (String, Int) -> Unit,
     onOpenChat: (String) -> Unit,
 ) {
     val navigator = rememberListDetailPaneScaffoldNavigator<String>()
@@ -311,6 +329,9 @@ internal fun LibraryListDetail(
                                 onSelectSort = onSelectSort,
                                 onSetFilter = onSetFilter,
                                 onOpenEntry = onSelectEntry,
+                                onAddOnce = onAddOnce,
+                                onAddDaily = onAddDaily,
+                                onAddWeekly = onAddWeekly,
                             )
                         }
                     }
@@ -366,6 +387,9 @@ internal fun LibraryThreePane(
     onSelectSort: (EntrySort) -> Unit,
     onSetFilter: (EntryFilter) -> Unit,
     onSelectEntry: (String?) -> Unit,
+    onAddOnce: (String) -> Unit,
+    onAddDaily: (String) -> Unit,
+    onAddWeekly: (String, Int) -> Unit,
     onOpenChat: (String) -> Unit,
 ) {
     val outerNavigator = rememberListDetailPaneScaffoldNavigator<Int>()
@@ -424,6 +448,9 @@ internal fun LibraryThreePane(
                                     onSelectSort = onSelectSort,
                                     onSetFilter = onSetFilter,
                                     onOpenEntry = onSelectEntry,
+                                    onAddOnce = onAddOnce,
+                                    onAddDaily = onAddDaily,
+                                    onAddWeekly = onAddWeekly,
                                 )
                             }
                         }

@@ -219,6 +219,8 @@
     <string name="library_choose_chapter">切换章节</string>
     <string name="library_chapter_overline">第 %1$d 章</string>
     <string name="library_entry_count">%1$d 条</string>
+    <!-- 章内条目行尾的快捷加计划按钮;弹窗与详情页/今日页推荐行同为 AddPlanDialog -->
+    <string name="library_add_plan_desc">加入计划</string>
     <string name="library_sort_ratio">性价比</string>
     <string name="library_sort_grade">证据等级</string>
     <string name="library_sort_order">原书顺序</string>

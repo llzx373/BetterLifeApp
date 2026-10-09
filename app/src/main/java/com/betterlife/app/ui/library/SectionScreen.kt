@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -55,6 +56,7 @@ import com.betterlife.app.data.EntryKeys
 import com.betterlife.app.data.SectionDto
 import com.betterlife.app.recommend.EntryFilter
 import com.betterlife.app.recommend.EntryStatusFilter
+import com.betterlife.app.ui.common.AddPlanDialog
 import com.betterlife.app.ui.common.AssetImageBanner
 import com.betterlife.app.ui.common.DisputeBadge
 import com.betterlife.app.ui.common.DoneBadge
@@ -108,6 +110,9 @@ fun SectionScreen(
             onSelectSort = vm::setSort,
             onSetFilter = vm::setFilter,
             onOpenEntry = onOpenEntry,
+            onAddOnce = vm::addToTodo,
+            onAddDaily = vm::addDaily,
+            onAddWeekly = vm::addWeekly,
             modifier = Modifier.padding(padding),
         )
     }
@@ -121,8 +126,13 @@ internal fun SectionListContent(
     onSelectSort: (EntrySort) -> Unit,
     onSetFilter: (EntryFilter) -> Unit,
     onOpenEntry: (String) -> Unit,
+    onAddOnce: (String) -> Unit,
+    onAddDaily: (String) -> Unit,
+    onAddWeekly: (String, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // 条目行「+」的加计划弹窗:非 null 时弹 AddPlanDialog(与详情页/今日页推荐行同一套)
+    var addPlanTarget by remember { mutableStateOf<String?>(null) }
     Column(modifier = modifier.fillMaxSize()) {
         // 配图加载放在页面级作用域:LazyColumn item 是子组合,状态更新时被销毁会连带取消解码
         val bannerPaths = listOfNotNull(section?.key?.let { sectionImagePath(it) })
@@ -171,6 +181,7 @@ internal fun SectionListContent(
                     isDone = entry.id in state.doneIds,
                     isPlanned = entry.id in state.plannedIds,
                     onClick = { onOpenEntry(entry.id) },
+                    onAddPlan = { addPlanTarget = entry.id },
                     // 排序切换时列表项 cross-fade + 位移,而不是硬跳(§6.2)
                     modifier = Modifier.animateItem(),
                 )
@@ -178,6 +189,24 @@ internal fun SectionListContent(
         }
         SortRow(selected = state.sort, onSelect = onSelectSort)
         FilterRow(filter = state.filter, onSetFilter = onSetFilter)
+    }
+
+    addPlanTarget?.let { entryId ->
+        AddPlanDialog(
+            onAddOnce = {
+                addPlanTarget = null
+                onAddOnce(entryId)
+            },
+            onAddDaily = {
+                addPlanTarget = null
+                onAddDaily(entryId)
+            },
+            onAddWeekly = { times ->
+                addPlanTarget = null
+                onAddWeekly(entryId, times)
+            },
+            onDismiss = { addPlanTarget = null },
+        )
     }
 }
 
@@ -365,6 +394,7 @@ private fun EntryRow(
     isDone: Boolean,
     isPlanned: Boolean,
     onClick: () -> Unit,
+    onAddPlan: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     SafeListItem(
@@ -377,6 +407,20 @@ private fun EntryRow(
                 if (entry.todo) TodoBadge()
                 if (isDone) DoneBadge()
                 if (isPlanned) PlannedBadge()
+            }
+        },
+        // 「浏览 → 加入计划」一步到位:已加入计划的置灰,与今日页推荐行的 + 同款
+        trailingContent = {
+            IconButton(onClick = onAddPlan, enabled = !isPlanned) {
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = stringResource(R.string.library_add_plan_desc),
+                    tint = if (isPlanned) {
+                        MaterialTheme.colorScheme.outlineVariant
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
             }
         },
         modifier = modifier.clickable(onClick = onClick),
