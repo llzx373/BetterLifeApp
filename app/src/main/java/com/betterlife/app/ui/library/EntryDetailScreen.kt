@@ -58,6 +58,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -80,6 +81,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -128,6 +130,13 @@ fun EntryDetailScreen(
     onExplain: (String) -> Unit,
     vm: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
 ) {
+    // 顶栏放条目标题:此前直接显示 entryId(一串哈希),对人是乱码;
+    // 与正文共用同一个缓存数据源,读到之前留空(Hero 区已有大标题兜底)
+    val context = LocalContext.current
+    val repo = (context.applicationContext as BetterLifeApp).container.entryRepository
+    val entryTitle by produceState<String?>(null, entryId) {
+        value = withContext(Dispatchers.IO) { repo.entriesData().byId[entryId]?.title }
+    }
     EntryDetailContent(
         entryId = entryId,
         onExplain = onExplain,
@@ -136,7 +145,9 @@ fun EntryDetailScreen(
         modifier = Modifier.predictiveBackTransition(onBack),
         topBar = {
             TopAppBar(
-                title = { Text(entryId) },
+                title = {
+                    Text(entryTitle.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
@@ -182,6 +193,8 @@ fun EntryDetailContent(
     val addedDailyMessage = stringResource(R.string.detail_added_daily)
     val addedWeeklyMessage = stringResource(R.string.detail_added_weekly)
     val copiedMessage = stringResource(R.string.detail_copied)
+    val dismissedMessage = stringResource(R.string.today_dismissed)
+    val undoLabel = stringResource(R.string.action_undo)
     var editingNote by rememberSaveable { mutableStateOf(false) }
     // 「加入待办」先问加入哪种计划(一次性/每日/每周)
     var showAddPlanDialog by rememberSaveable { mutableStateOf(false) }
@@ -373,14 +386,18 @@ fun EntryDetailContent(
                             }
                         },
                     )
-                    // 「不再推荐」写 DISMISSED,推荐引擎会排除它;屏蔽后页面没有留着的意义,交给调用方收尾
-                    // (整屏:返回上一页;三栏:清掉右栏选中)
+                    // 「不再推荐」写 DISMISSED,推荐引擎会排除它;先给撤销窗口(Snackbar 停留期间页面
+                    // 不退出),不撤销才交给调用方收尾(整屏:返回上一页;三栏:清掉右栏选中)
                     ToolbarAction(
                         icon = Icons.Filled.NotInterested,
                         labelRes = R.string.detail_dismiss,
                         onClick = {
                             vm.dismissEntry(e.id)
-                            onDismissed()
+                            scope.launch {
+                                val result = snackbar.showSnackbar(dismissedMessage, actionLabel = undoLabel)
+                                if (result == SnackbarResult.ActionPerformed) vm.restoreEntry(e.id)
+                                else onDismissed()
+                            }
                         },
                     )
                     ToolbarAction(
