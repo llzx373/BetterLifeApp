@@ -111,6 +111,9 @@ fun LibraryListDetailExpanded() {
             onSelectSort = {},
             onSetFilter = {},
             onSelectEntry = {},
+            onAddOnce = {},
+            onAddDaily = {},
+            onAddWeekly = { _, _ -> },
             onOpenChat = {},
         )
     }
@@ -135,6 +138,9 @@ fun LibraryThreePaneExpanded() {
             onSelectSort = {},
             onSetFilter = {},
             onSelectEntry = {},
+            onAddOnce = {},
+            onAddDaily = {},
+            onAddWeekly = { _, _ -> },
             onOpenChat = {},
         )
     }
@@ -159,6 +165,9 @@ fun LibraryTwoPaneExpanded() {
             onSelectSort = {},
             onSetFilter = {},
             onOpenEntry = {},
+            onAddOnce = {},
+            onAddDaily = {},
+            onAddWeekly = { _, _ -> },
         )
     }
 }
