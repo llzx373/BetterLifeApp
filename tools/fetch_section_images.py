@@ -4,10 +4,11 @@
 图片来源全部是 Unsplash 免费图(非 Unsplash+),Unsplash License 允许商用与再分发,
 不强制署名;署名信息仍写入 assets/images/credits.json,在「关于」页可展示。
 
-工作原理:unsplash.com/s/photos 搜索页与 napi 接口都需要登录/鉴权,但
-/photos/<短ID>/download 端点是公开的,302 到 images.unsplash.com 的 CDN URL;
-把 CDN URL 的参数换成 w=1600&q=72&fm=webp 即得压缩后的 WebP。
-(download 端点同时会向作者记一次下载量,符合 Unsplash 的使用约定。)
+工作原理(2026-10 起):unsplash.com 全站挂上 Anubis 反爬且 /photos/<短ID>/download
+端点要求登录,原来的「download 302 到 CDN」拿法已失效。现在用
+tools/anubis_unsplash.py(自动解 Anubis PoW):`search` 列候选、`resolve` 从照片页
+og:image 解析出 CDN base 与作者(并标出 Unsplash+ 付费图),拿到 base 后直连
+images.unsplash.com(无反爬)加参数 ?w=1600&q=72&fm=webp 即得压缩 WebP。
 
 映射表 SELECTIONS 是人工挑选的结果:列 = 章节 key、Unsplash 短 ID、主题备注、图片主题关键词。
 换图 = 改短 ID 重跑;加条目级配图 = 另建 images/entries/{entryKey}.webp 同理。

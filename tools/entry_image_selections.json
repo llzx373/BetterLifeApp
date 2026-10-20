@@ -5,9 +5,9 @@
   "note": "决定是否继续时 · 前方公路"
  },
  {
-  "key": "03c61fd8c273",
+  "key": "88aafdd3b855",
   "photoId": "PiEBY75vv5Q",
-  "note": "酒驾不碰方向盘 · 夜间警灯"
+  "note": "喝了酒不碰方向盘、不借车 · 夜间警灯"
  },
  {
   "key": "719f9b7fc8a8",
@@ -375,9 +375,9 @@
   "note": "火灾时贴地爬 · 建筑大火"
  },
  {
-  "key": "95eb456c7501",
+  "key": "57fbf3c1c877",
   "photoId": "i1iqQRLULlg",
-  "note": "有高血压就按医嘱吃药 · 血压计"
+  "note": "定期查血脂、高血压高血脂规律吃药 · 血压计"
  },
  {
   "key": "9768b5c66c38",
@@ -595,9 +595,9 @@
   "note": "开工前写下退出条件 · 停车标志"
  },
  {
-  "key": "dc88a850ad47",
+  "key": "23073f0e2fbc",
   "photoId": "oZKmP9VdvB0",
-  "note": "认真刷牙 · 牙刷牙膏"
+  "note": "刷牙清牙缝、缺牙看牙医 · 牙刷牙膏"
  },
  {
   "key": "dcbef6a2d394",
@@ -743,5 +743,100 @@
   "key": "f44293498869",
   "photoId": "fmB7IdFjhTM",
   "note": "正畸找有资质医生 · 戴隐形牙套"
+ },
+ {
+  "key": "0f807c3cb86c",
+  "photoId": "ZSo4axN3ZXI",
+  "note": "心慌心跳乱去做心电图,房颤评估抗凝 · 心电监护波形"
+ },
+ {
+  "key": "0277cf137a8c",
+  "photoId": "0jE8ynV4mis",
+  "note": "成年人查一次丙肝抗体 · 采血管架"
+ },
+ {
+  "key": "11fbc505439b",
+  "photoId": "JaLQF7bxVPc",
+  "note": "下化粪池窨井前先通风,有人倒下别跟着下 · 工人修窨井盖"
+ },
+ {
+  "key": "62bfc2e3d96d",
+  "photoId": "cSLiNu1xLvU",
+  "note": "45岁以上高危人群做胃镜筛查 · 内镜手柄与监视器"
+ },
+ {
+  "key": "0fca936a3b09",
+  "photoId": "JEsd-eg9yDU",
+  "note": "泡发木耳当顿吃完,湿米粉当天吃 · 木上木耳"
+ },
+ {
+  "key": "665af171a6a2",
+  "photoId": "8wWvAarL_Vw",
+  "note": "打鼾憋气查睡眠呼吸暂停,戴呼吸机 · 呼吸机与面罩"
+ },
+ {
+  "key": "b9137b9f740e",
+  "photoId": "tgUdTefRlSw",
+  "note": "买新车当场验车,收好发票三包凭证 · 车前持钥匙"
+ },
+ {
+  "key": "66f36533600d",
+  "photoId": "bEGTsOCnHro",
+  "note": "买二手车先查出险维修记录 · 技师检查发动机舱"
+ },
+ {
+  "key": "6dad702f2693",
+  "photoId": "Pz7lM8JRdbY",
+  "note": "跟团游被带进购物店,30天内可退货 · 导游旗与旅行团"
+ },
+ {
+  "key": "b227d85cb3fb",
+  "photoId": "c6TKtsi8C1k",
+  "note": "恒牙撞掉泡牛奶里马上看牙 · 牛奶瓶与牛奶杯"
+ },
+ {
+  "key": "c4aa21bb4416",
+  "photoId": "VoI2jd75M6Q",
+  "note": "买期房只把钱打进预售资金监管账户 · 在建楼与塔吊"
+ },
+ {
+  "key": "de2cbd789768",
+  "photoId": "GJao3ZTX9gU",
+  "note": "认购定金贷款批不下来要退钱 · 签署文件"
+ },
+ {
+  "key": "809b8cca9b67",
+  "photoId": "9lB0cUTt9IQ",
+  "note": "新房面积误差、楼书广告承诺拍照留证 · 住宅户型图"
+ },
+ {
+  "key": "a50e4bd6d2d0",
+  "photoId": "RVk8EwpRwNs",
+  "note": "浮动利率房贷高了找银行协商降 · 房模型钥匙计算器"
+ },
+ {
+  "key": "25e99b793f5f",
+  "photoId": "bqUZEAeWuok",
+  "note": "收房当场验房,问题写进交房记录 · 门前手持钥匙"
+ },
+ {
+  "key": "57775702c7e6",
+  "photoId": "kn5PFW6kH_M",
+  "note": "喝了酒别泡温泉蒸桑拿 · 温泉池中背影"
+ },
+ {
+  "key": "7dbef272f111",
+  "photoId": "KVOF71DE7ZI",
+  "note": "滑雪滑单轮滑骑山地车戴头盔 · 滑雪头盔护目镜"
+ },
+ {
+  "key": "7283736009cb",
+  "photoId": "bM-aV4Jt5qM",
+  "note": "买祛斑美白霜先核对国妆特字编号 · 面霜罐"
+ },
+ {
+  "key": "5e305f87f722",
+  "photoId": "VehdYPKnX8Y",
+  "note": "遛狗算进走路量、别为长寿专门养狗 · 牵绳遛狗"
  }
 ]

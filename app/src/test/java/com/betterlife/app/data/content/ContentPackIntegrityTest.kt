@@ -79,9 +79,11 @@ class ContentPackIntegrityTest {
     fun `已知条目的 id→key 锁定——防 assets 退回旧格式或管线漂移`() {
         // key 由 tools/build_content.py 从标题派生：标题不变 key 不变。
         // 这三条若变动，说明生成管线或标题被改了，用户数据迁移映射必须跟着重审。
+        // 02-12：上游 5f210ca 把标题加字（定期查血脂），key 随之变化，
+        // 已在 key_aliases.json 登记 95eb456c7501 → 57fbf3c1c877。
         val byId = loadEntries().entries.associate { it.id to it.key }
         assertEquals("47386c8e5c06", byId["01-01"])
-        assertEquals("95eb456c7501", byId["02-12"])
+        assertEquals("57fbf3c1c877", byId["02-12"])
         assertEquals("cd69bdc261d0", byId["33-01"])
     }
 

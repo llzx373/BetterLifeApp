@@ -6,7 +6,8 @@
   [{"key": "<条目 key>", "photoId": "<Unsplash 短 ID>", "note": "<条目标题 · 图内容>"}]
 哪些条目缺图:python tools/check_image_relevance.py --json 里 relevant=false 的条目。
 
-下载机制与 tools/fetch_section_images.py 相同(公开 download 端点 302 到 CDN),
+下载机制原与 tools/fetch_section_images.py 相同;2026-10 起该机制被反爬封死,
+实际下载改用 tools/anubis_unsplash.py 解析 + 直连 CDN(见 BUILD.md 配图规则)。
 署名并入 assets/images/credits.json。
 
 用法: python tools/fetch_entry_images.py [--force]   # 默认跳过已存在的文件

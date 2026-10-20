@@ -119,6 +119,13 @@ python tools/check_image_relevance.py        # 配图相关性校验:哪些条�
    `fetch_entry_images.py`;
 4. 署名统一并入 `app/src/main/assets/images/credits.json`,不要手改。
 
+> 2026-10 起 unsplash.com 全站挂上 Anubis 反爬、`/photos/<id>/download` 端点要求登录,
+> 两个 fetch 脚本的「download 302 拿 CDN 地址」机制已失效。替代路径:`tools/anubis_unsplash.py`
+> 自动解 Anubis PoW——`search "<英文关键词>"` 列候选(photoId + 描述)、`resolve <photoId>`
+> 从照片页 og:image 解析 CDN base 与作者(并标出 Unsplash+ 付费图,不要选),然后直连
+> `images.unsplash.com`(无反爬)加 `?q=72&fm=webp&w=1600&fit=max` 下载。需要代理时设
+> `UNSPLASH_PROXY` 环境变量。fetch 脚本本身暂未改写,下载环节按此手动走。
+
 key 继承稳定(见 [DESIGN.md](DESIGN.md) §3):标题增减几个字不会丢图;整体改标题导致 key 变化时,
 旧图文件成为孤儿(可顺手删掉),新 key 按上面流程补图。
 
